@@ -23,6 +23,6 @@ dist-ssr
 *.sln
 *.sw?
 
-.env
-firebase.js
-firebaseServiceAccount.json
+*.env
+*.firebase.js
+*.firebaseServiceAccount.json
