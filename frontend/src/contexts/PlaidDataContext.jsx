@@ -1,7 +1,10 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import usePlaidData from '../hooks/usePlaidData';
+import { usePlaidData } from '../hooks/usePlaidData.jsx';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../firebase';
+import { ErrorBoundary } from 'react-error-boundary';
+import { db } from '../firebase';
+import firebase from 'firebase/app';
 
 const PlaidDataContext = createContext();
 
@@ -17,10 +20,23 @@ export const PlaidDataProvider = (props) => {
 
   const plaidData = usePlaidData(user);
 
+  const saveAccessToken = async (userId, accessToken) => {
+    try {
+      await db.collection('user_tokens').doc(userId).set({
+        tokens: firebase.firestore.FieldValue.arrayUnion(accessToken)
+      }, { merge: true });
+      console.log('Access token saved successfully');
+    } catch (error) {
+      console.error('Error saving access token:', error);
+    }
+  };
+
   return (
-    <PlaidDataContext.Provider value={plaidData}>
-      {props.children}
-    </PlaidDataContext.Provider>
+    <ErrorBoundary>
+      <PlaidDataContext.Provider value={plaidData}>
+        {props.children}
+      </PlaidDataContext.Provider>
+    </ErrorBoundary>
   );
 };
 
