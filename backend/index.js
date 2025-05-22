@@ -71,6 +71,7 @@ app.post('/api/exchange_public_token', async (req, res) => {
     const response = await plaidClient.itemPublicTokenExchange({ public_token });
     const access_token = response.data.access_token;
     // In production, store access_token securely and associate with the user
+    console.log('Access Token:', access_token);
     res.json({ access_token });
   } catch (error) {
     console.error('Error exchanging public token:', error);
@@ -133,15 +134,47 @@ app.post('/api/transactions', async (req, res) => {
 app.post('/api/save_access_token', async (req, res) => {
   const { user_id, access_token } = req.body;
   if (!user_id || !access_token) {
+    console.error('Missing user_id or access_token');
     return res.status(400).json({ error: 'user_id and access_token are required' });
   }
+  // Additional logging for debugging
+  console.log('Received request to save access token:', { user_id, access_token });
+
   try {
-    await db.collection('user_tokens').doc(user_id).set({
-      tokens: admin.firestore.FieldValue.arrayUnion(access_token)
-    }, { merge: true });
+    const userDocRef = db.collection('user_tokens').doc(user_id);
+    const doc = await userDocRef.get();
+    console.log('Document exists:', doc.exists);
+
+    let tokens = [];
+    if (doc.exists && doc.data().tokens) {
+      tokens = doc.data().tokens;
+      console.log('Existing tokens:', tokens);
+    }
+
+    // Avoid duplicates
+    if (!tokens.includes(access_token)) {
+      tokens.push(access_token);
+      console.log('Added new access token:', access_token);
+    } else {
+      console.log('Access token already exists, not adding:', access_token);
+    }
+
+    const tokenPattern = /^access-(sandbox|development|production)-[a-z0-9-]+$/;
+    if (!tokenPattern.test(access_token)) {
+      console.error('Invalid access token format:', access_token);
+      return res.status(400).json({ error: 'Invalid access token format' });
+    }
+
+    if (!doc.exists) {
+      await userDocRef.set({ tokens: [] }); // Initialize with an empty tokens array
+      console.log('Initialized new user document with empty tokens array');
+    }
+
+    await userDocRef.set({ tokens }, { merge: true });
+    console.log('Successfully saved access tokens:', tokens);
     res.json({ success: true });
   } catch (error) {
-    console.error('Error saving access token:', error);
+    console.error('Error saving access token:', error.message);
     res.status(500).json({ error: 'Unable to save access token' });
   }
 });
@@ -153,7 +186,11 @@ app.get('/api/access_tokens', async (req, res) => {
   }
   try {
     const doc = await db.collection('user_tokens').doc(user_id).get();
-    const tokens = doc.exists ? doc.data().tokens || [] : [];
+    if (!doc.exists) {
+      return res.status(404).json({ error: 'No tokens found for this user' });
+    }
+    const tokens = doc.data().tokens || [];
+    console.log('Retrieved tokens:', tokens);
     res.json({ tokens });
   } catch (error) {
     console.error('Error fetching access tokens:', error);
