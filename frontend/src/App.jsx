@@ -430,6 +430,13 @@ function HoldingsPage() {
     if (!userId) { setHoldings([]); return; }
     setLoadingHoldings(true); setErrorHoldings(null);
     try {
+      console.log('Fetching tokens for user_id:', userId);
+      const doc = await dbClient.collection('user_tokens').doc(userId).get();
+      console.log('Firestore document:', doc);
+      if (!doc.exists) {
+        console.error('No document found for user_id:', userId);
+        return res.status(404).json({ error: 'No tokens found for this user' });
+      }
       const tokensRes = await fetch(`http://localhost:5001/api/access_tokens?user_id=${userId}`);
       if(!tokensRes.ok) throw new Error(`Failed to fetch access tokens: HTTP ${tokensRes.status}`);
       const tokenData = await tokensRes.json(); 
@@ -562,4 +569,3 @@ function ProtectedRoutes() {
     </MainLayout>
   );
 }
->>>>>>> REPLACE

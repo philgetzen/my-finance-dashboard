@@ -1,13 +1,31 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useContext } from 'react';
+import { UserContext } from '../contexts/UserContext.jsx';
 
 const usePlaidData = (user) => {
+  const { userId } = useContext(UserContext);
   const [accounts, setAccounts] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [plaidData, setPlaidData] = useState(null);
+
+  const fetchAccessTokens = async (userId) => {
+    try {
+      const response = await fetch(`http://localhost:5001/api/access_tokens?user_id=${userId}`);
+      if (!response.ok) {
+        throw new Error(`Error fetching access tokens: ${response.statusText}`);
+      }
+      const data = await response.json();
+      console.log('Fetched access tokens:', data);
+      return data;
+    } catch (error) {
+      console.error('Error in fetchAccessTokens:', error);
+      throw error; // Rethrow to handle it in the component
+    }
+  };
 
   const fetchData = useCallback(async () => {
-    if (!user) {
+    if (!userId) {
       setAccounts([]);
       setTransactions([]);
       return;
@@ -17,11 +35,7 @@ const usePlaidData = (user) => {
     setError(null);
 
     try {
-      const accessTokenResponse = await fetch(`http://localhost:5001/api/access_tokens?user_id=${user.uid}`);
-      if (!accessTokenResponse.ok) {
-        throw new Error('Failed to fetch access tokens');
-      }
-      const accessTokens = await accessTokenResponse.json();
+      const accessTokens = await fetchAccessTokens(userId);
 
       if (accessTokens && accessTokens.length > 0) {
         const accountPromises = accessTokens.map(token =>
@@ -64,19 +78,30 @@ const usePlaidData = (user) => {
         setTransactions([]);
       }
     } catch (err) {
+      console.error("Error fetching access tokens:", err);
       setError(err.message);
       setAccounts([]);
       setTransactions([]);
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [userId]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    const getAccessTokens = async () => {
+      try {
+        const tokens = await fetchAccessTokens(userId);
+        setPlaidData(tokens);
+      } catch (error) {
+        console.error('Failed to fetch access tokens:', error);
+        // Display error to the user if necessary
+      }
+    };
 
-  return { accounts, transactions, loading, error, refetchData: fetchData, user };
+    getAccessTokens();
+  }, [userId]);
+
+  return { accounts, transactions, loading, error, refetchData: fetchData, plaidData };
 };
 
 export default usePlaidData;
