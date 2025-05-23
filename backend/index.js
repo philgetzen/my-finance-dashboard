@@ -6,6 +6,23 @@ const { Configuration, PlaidApi, PlaidEnvironments } = require('plaid');
 const admin = require('firebase-admin');
 const serviceAccount = require('./firebaseServiceAccount.json');
 
+// ...existing imports and setup...
+
+app.get('/api/access_tokens', async (req, res) => {
+  const userId = req.query.user_id;
+  if (!userId) return res.status(400).json({ error: 'user_id is required' });
+
+  try {
+    const userTokensDoc = await db.collection('user_tokens').doc(userId).get();
+    if (!userTokensDoc.exists) return res.json([]);
+    const tokens = userTokensDoc.data().tokens || [];
+    res.json(tokens);
+  } catch (error) {
+    console.error('Error fetching access tokens:', error);
+    res.status(500).json({ error: 'Unable to fetch access tokens' });
+  }
+});
+
 dotenv.config();
 
 console.log('Loaded ENV:', {
