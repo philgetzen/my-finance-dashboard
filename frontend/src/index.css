@@ -39,13 +39,44 @@ a:hover {
 
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
+  padding: 0;
   min-width: 320px;
   min-height: 100vh;
+  width: 100%;
   background: linear-gradient(135deg, var(--color-bg) 0%, var(--color-surface-alt) 100%);
   color: var(--color-text);
   font-family: 'SF Pro', 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+}
+
+/* Prevent flash of unstyled content */
+html, body {
+  overflow-x: hidden;
+}
+
+/* Loading skeleton styles */
+.skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: loading 1.5s infinite;
+}
+
+.dark .skeleton {
+  background: linear-gradient(90deg, #374151 25%, #4b5563 50%, #374151 75%);
+  background-size: 200% 100%;
+}
+
+@keyframes loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 h1, h2, h3, h4, h5, h6 {

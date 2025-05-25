@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { usePlaidData } from '../hooks/usePlaidData.jsx';
+import usePlaidData from '../hooks/usePlaidData.jsx';
 import { onAuthStateChanged } from 'firebase/auth';
 import { db, auth } from '../firebase';
 import { doc, setDoc, arrayUnion } from 'firebase/firestore';
@@ -7,12 +7,16 @@ import { ErrorBoundary } from 'react-error-boundary';
 
 const PlaidDataContext = createContext();
 
-export const PlaidDataProvider = (props) => {
+export const PlaidDataProvider = ({ children }) => {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
+      try {
+        setUser(currentUser);
+      } catch (error) {
+        console.error('Error in authentication state change:', error);
+      }
     });
     return () => unsubscribe();
   }, []);
@@ -34,9 +38,9 @@ export const PlaidDataProvider = (props) => {
   };
 
   return (
-    <ErrorBoundary>
-      <PlaidDataContext.Provider value={plaidData}>
-        {props.children}
+    <ErrorBoundary fallback={<div className="p-4 text-red-600">Something went wrong with the app. Please refresh the page.</div>}>
+      <PlaidDataContext.Provider value={{ ...plaidData, user, saveAccessToken }}>
+        {children}
       </PlaidDataContext.Provider>
     </ErrorBoundary>
   );
