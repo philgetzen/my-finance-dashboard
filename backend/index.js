@@ -6,23 +6,6 @@ const { Configuration, PlaidApi, PlaidEnvironments } = require('plaid');
 const admin = require('firebase-admin');
 const serviceAccount = require('./firebaseServiceAccount.json');
 
-// ...existing imports and setup...
-
-app.get('/api/access_tokens', async (req, res) => {
-  const userId = req.query.user_id;
-  if (!userId) return res.status(400).json({ error: 'user_id is required' });
-
-  try {
-    const userTokensDoc = await db.collection('user_tokens').doc(userId).get();
-    if (!userTokensDoc.exists) return res.json([]);
-    const tokens = userTokensDoc.data().tokens || [];
-    res.json(tokens);
-  } catch (error) {
-    console.error('Error fetching access tokens:', error);
-    res.status(500).json({ error: 'Unable to fetch access tokens' });
-  }
-});
-
 dotenv.config();
 
 console.log('Loaded ENV:', {
@@ -204,7 +187,7 @@ app.get('/api/access_tokens', async (req, res) => {
   try {
     const doc = await db.collection('user_tokens').doc(user_id).get();
     if (!doc.exists) {
-      return res.status(404).json({ error: 'No tokens found for this user' });
+      return res.json({ tokens: [] });
     }
     const tokens = doc.data().tokens || [];
     console.log('Retrieved tokens:', tokens);
@@ -212,6 +195,77 @@ app.get('/api/access_tokens', async (req, res) => {
   } catch (error) {
     console.error('Error fetching access tokens:', error);
     res.status(500).json({ error: 'Unable to fetch access tokens' });
+  }
+});
+
+app.post('/api/holdings', async (req, res) => {
+  const { access_token } = req.body;
+  if (!access_token) {
+    return res.status(400).json({ error: 'access_token is required' });
+  }
+  try {
+    const response = await plaidClient.investmentsHoldingsGet({ access_token });
+    res.json(response.data);
+  } catch (error) {
+    console.error('Error fetching holdings:', error);
+    res.status(500).json({ error: 'Unable to fetch holdings' });
+  }
+});
+
+app.post('/api/remove_plaid_account', async (req, res) => {
+  const { user_id, account_id } = req.body;
+  if (!user_id || !account_id) {
+    return res.status(400).json({ error: 'user_id and account_id are required' });
+  }
+  
+  try {
+    // Get user's access tokens
+    const userDocRef = db.collection('user_tokens').doc(user_id);
+    const doc = await userDocRef.get();
+    
+    if (!doc.exists || !doc.data().tokens) {
+      return res.status(404).json({ error: 'No tokens found for user' });
+    }
+    
+    const tokens = doc.data().tokens;
+    let removedToken = null;
+    
+    // Find which access token corresponds to this account
+    for (const token of tokens) {
+      try {
+        const accountsResponse = await plaidClient.accountsGet({ access_token: token });
+        const accounts = accountsResponse.data.accounts;
+        
+        if (accounts.some(account => account.account_id === account_id)) {
+          // Found the token for this account, remove it from Plaid and our database
+          try {
+            // Remove item from Plaid (optional - invalidates the access token)
+            await plaidClient.itemRemove({ access_token: token });
+          } catch (plaidError) {
+            console.warn('Failed to remove item from Plaid, continuing anyway:', plaidError.message);
+          }
+          
+          // Remove token from our database
+          const updatedTokens = tokens.filter(t => t !== token);
+          await userDocRef.set({ tokens: updatedTokens }, { merge: true });
+          removedToken = token;
+          break;
+        }
+      } catch (accountError) {
+        console.warn('Error checking accounts for token:', accountError.message);
+        continue;
+      }
+    }
+    
+    if (removedToken) {
+      console.log('Successfully removed Plaid account:', account_id);
+      res.json({ success: true, message: 'Account disconnected successfully' });
+    } else {
+      res.status(404).json({ error: 'Account not found' });
+    }
+  } catch (error) {
+    console.error('Error removing Plaid account:', error);
+    res.status(500).json({ error: 'Unable to remove account' });
   }
 });
 
