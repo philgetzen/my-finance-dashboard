@@ -1,14 +1,24 @@
-import * as ynab from 'ynab';
-
 class YNABService {
   constructor() {
     this.client = null;
     this.accessToken = null;
+    this.ynabAPI = null;
   }
 
-  init(accessToken) {
-    this.accessToken = accessToken;
-    this.client = new ynab.API(accessToken);
+  async init(accessToken) {
+    try {
+      if (!this.ynabAPI) {
+        // Dynamic import to avoid build issues
+        const ynabModule = await import('ynab');
+        this.ynabAPI = ynabModule.API || ynabModule.default?.API || ynabModule;
+      }
+      
+      this.accessToken = accessToken;
+      this.client = new this.ynabAPI(accessToken);
+    } catch (error) {
+      console.error('Error initializing YNAB API:', error);
+      throw new Error('Failed to initialize YNAB API');
+    }
   }
 
   isInitialized() {
