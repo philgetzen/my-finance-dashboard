@@ -15,7 +15,20 @@ console.log('Loaded ENV:', {
 });
 
 const app = express();
-app.use(cors());
+
+// Configure CORS to allow your Netlify domain
+app.use(cors({
+  origin: [
+    'http://localhost:3000',
+    'http://localhost:5173', // Vite dev server
+    'https://serene-kelpie-1319e6.netlify.app', // Your Netlify domain
+    'https://my-finance-dashboard.onrender.com' // Your backend domain
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 app.use(express.json());
 
 const PLAID_CLIENT_ID = process.env.PLAID_CLIENT_ID;
@@ -31,7 +44,7 @@ const configuration = new Configuration({
     },
   },
 });
-// const plaidClient = new PlaidApi(configuration);
+const plaidClient = new PlaidApi(configuration);
 
 admin.initializeApp({
   // credential: admin.credential.cert(serviceAccount)
