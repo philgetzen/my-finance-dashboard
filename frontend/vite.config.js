@@ -6,33 +6,19 @@ export default defineConfig({
   plugins: [react()],
   define: {
     global: 'globalThis',
-    'process.env': '{}',
-  },
-  resolve: {
-    alias: {
-      // Add any necessary aliases here if needed
-    },
   },
   build: {
-    rollupOptions: {
-      external: [],
-      output: {
-        globals: {}
-      }
-    },
     target: 'esnext',
     minify: 'esbuild'
   },
   optimizeDeps: {
     include: [
-      'ynab',
       'firebase/app', 
       'firebase/auth', 
       'firebase/firestore',
       'react',
       'react-dom'
-    ],
-    exclude: []
+    ]
   },
   server: {
     fs: {

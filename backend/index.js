@@ -2,16 +2,16 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
-const { Configuration, PlaidApi, PlaidEnvironments } = require('plaid');
 const admin = require('firebase-admin');
 const serviceAccount = require('./firebaseServiceAccount.json');
+const axios = require('axios');
 
 dotenv.config();
 
 console.log('Loaded ENV:', {
-  PLAID_CLIENT_ID: process.env.PLAID_CLIENT_ID,
-  PLAID_SECRET: process.env.PLAID_SECRET ? '***' : undefined,
-  PLAID_ENV: process.env.PLAID_ENV,
+  YNAB_CLIENT_ID: process.env.YNAB_CLIENT_ID,
+  YNAB_CLIENT_SECRET: process.env.YNAB_CLIENT_SECRET ? '***' : undefined,
+  YNAB_REDIRECT_URI: process.env.YNAB_REDIRECT_URI,
 });
 
 const app = express();
@@ -31,255 +31,299 @@ app.use(cors({
 
 app.use(express.json());
 
-const PLAID_CLIENT_ID = process.env.PLAID_CLIENT_ID;
-const PLAID_SECRET = process.env.PLAID_SECRET;
-const PLAID_ENV = process.env.PLAID_ENV || 'sandbox';
-
-const configuration = new Configuration({
-  basePath: PlaidEnvironments[PLAID_ENV],
-  baseOptions: {
-    headers: {
-      'PLAID-CLIENT-ID': PLAID_CLIENT_ID,
-      'PLAID-SECRET': PLAID_SECRET,
-    },
-  },
-});
-const plaidClient = new PlaidApi(configuration);
+const YNAB_CLIENT_ID = process.env.YNAB_CLIENT_ID;
+const YNAB_CLIENT_SECRET = process.env.YNAB_CLIENT_SECRET;
+const YNAB_REDIRECT_URI = process.env.YNAB_REDIRECT_URI || 'http://localhost:5173/auth/ynab/callback';
+const YNAB_API_BASE_URL = 'https://api.ynab.com/v1';
 
 admin.initializeApp({
-  // credential: admin.credential.cert(serviceAccount)
-  credential: admin.credential.applicationDefault(),
+  credential: admin.credential.cert(serviceAccount)
+  // credential: admin.credential.applicationDefault(),
 });
 const db = admin.firestore();
 
 app.get('/', (req, res) => {
-  res.send('Plaid backend is running!');
+  res.send('YNAB backend is running!');
 });
 
-app.post('/api/create_link_token', async (req, res) => {
-  console.log('Received request to /api/create_link_token');
+// YNAB OAuth endpoints
+app.get('/api/ynab/auth', (req, res) => {
+  const authUrl = `https://app.ynab.com/oauth/authorize?client_id=${YNAB_CLIENT_ID}&redirect_uri=${encodeURIComponent(YNAB_REDIRECT_URI)}&response_type=code`;
+  res.json({ authUrl });
+});
+
+app.post('/api/ynab/token', async (req, res) => {
+  const { code } = req.body;
+  if (!code) {
+    return res.status(400).json({ error: 'Authorization code is required' });
+  }
+  
   try {
-    const response = await plaidClient.linkTokenCreate({
-      user: {
-        client_user_id: 'unique-user-id', // Replace with real user id in production
-      },
-      client_name: 'My Finance Dashboard',
-      products: ['transactions'],
-      country_codes: ['US'],
-      language: 'en',
-      redirect_uri: undefined, // Set if using OAuth
+    const response = await axios.post('https://app.ynab.com/oauth/token', {
+      client_id: YNAB_CLIENT_ID,
+      client_secret: YNAB_CLIENT_SECRET,
+      redirect_uri: YNAB_REDIRECT_URI,
+      grant_type: 'authorization_code',
+      code
     });
-    res.json({ link_token: response.data.link_token });
+    
+    const { access_token, refresh_token } = response.data;
+    res.json({ access_token, refresh_token });
   } catch (error) {
-    console.error('Error creating link token:', error);
-    res.status(500).json({ error: 'Unable to create link token' });
+    console.error('Error exchanging YNAB code:', error.response?.data || error.message);
+    res.status(500).json({ error: 'Unable to exchange authorization code' });
   }
 });
 
-app.post('/api/exchange_public_token', async (req, res) => {
-  const { public_token } = req.body;
-  if (!public_token) {
-    return res.status(400).json({ error: 'public_token is required' });
+// YNAB API proxy endpoints
+app.get('/api/ynab/budgets', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Authorization header required' });
   }
+  
   try {
-    const response = await plaidClient.itemPublicTokenExchange({ public_token });
-    const access_token = response.data.access_token;
-    // In production, store access_token securely and associate with the user
-    console.log('Access Token:', access_token);
-    res.json({ access_token });
-  } catch (error) {
-    console.error('Error exchanging public token:', error);
-    res.status(500).json({ error: 'Unable to exchange public token' });
-  }
-});
-
-app.post('/api/accounts', async (req, res) => {
-  const { access_token } = req.body;
-  if (!access_token) {
-    return res.status(400).json({ error: 'access_token is required' });
-  }
-  try {
-    const response = await plaidClient.accountsGet({ access_token });
+    const response = await axios.get(`${YNAB_API_BASE_URL}/budgets`, {
+      headers: {
+        'Authorization': authHeader,
+        'Accept': 'application/json'
+      }
+    });
     res.json(response.data);
   } catch (error) {
-    console.error('Error fetching accounts:', error);
-    res.status(500).json({ error: 'Unable to fetch accounts' });
+    console.error('Error fetching budgets:', error.response?.data || error.message);
+    res.status(error.response?.status || 500).json({ error: 'Unable to fetch budgets' });
   }
 });
 
-async function fetchTransactionsWithRetry(access_token, retries = 5, delay = 2000) {
-  for (let i = 0; i < retries; i++) {
-    const res = await fetch('http://localhost:5001/api/transactions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ access_token }),
+app.get('/api/ynab/budgets/:budgetId/accounts', async (req, res) => {
+  const { budgetId } = req.params;
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    return res.status(401).json({ error: 'Authorization header required' });
+  }
+  
+  try {
+    const response = await axios.get(`${YNAB_API_BASE_URL}/budgets/${budgetId}/accounts`, {
+      headers: {
+        'Authorization': authHeader,
+        'Accept': 'application/json'
+      }
     });
-    const data = await res.json();
-    if (!data.error || data.error.error_code !== 'PRODUCT_NOT_READY') {
-      return data;
+    res.json(response.data);
+  } catch (error) {
+    console.error('Error fetching accounts:', error.response?.data || error.message);
+    res.status(error.response?.status || 500).json({ error: 'Unable to fetch accounts' });
+  }
+});
+
+app.get('/api/ynab/budgets/:budgetId/transactions', async (req, res) => {
+  const { budgetId } = req.params;
+  const { since_date } = req.query;
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    return res.status(401).json({ error: 'Authorization header required' });
+  }
+  
+  try {
+    let url = `${YNAB_API_BASE_URL}/budgets/${budgetId}/transactions`;
+    if (since_date) {
+      url += `?since_date=${since_date}`;
     }
-    await new Promise(resolve => setTimeout(resolve, delay));
-  }
-  throw new Error('Transactions not ready after several attempts.');
-}
-
-app.post('/api/transactions', async (req, res) => {
-  const { access_token, start_date, end_date } = req.body;
-  if (!access_token) {
-    return res.status(400).json({ error: 'access_token is required' });
-  }
-  // Default to last 30 days if dates not provided
-  const end = end_date || new Date().toISOString().slice(0, 10);
-  const start = start_date || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-  try {
-    const response = await plaidClient.transactionsGet({
-      access_token,
-      start_date: start,
-      end_date: end,
-      options: { count: 100, offset: 0 },
+    
+    const response = await axios.get(url, {
+      headers: {
+        'Authorization': authHeader,
+        'Accept': 'application/json'
+      }
     });
     res.json(response.data);
   } catch (error) {
-    console.error('Error fetching transactions:', error);
-    res.status(500).json({ error: 'Unable to fetch transactions' });
+    console.error('Error fetching transactions:', error.response?.data || error.message);
+    res.status(error.response?.status || 500).json({ error: 'Unable to fetch transactions' });
   }
 });
 
-app.post('/api/save_access_token', async (req, res) => {
-  const { user_id, access_token } = req.body;
+app.get('/api/ynab/budgets/:budgetId/categories', async (req, res) => {
+  const { budgetId } = req.params;
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    return res.status(401).json({ error: 'Authorization header required' });
+  }
+  
+  try {
+    const response = await axios.get(`${YNAB_API_BASE_URL}/budgets/${budgetId}/categories`, {
+      headers: {
+        'Authorization': authHeader,
+        'Accept': 'application/json'
+      }
+    });
+    res.json(response.data);
+  } catch (error) {
+    console.error('Error fetching categories:', error.response?.data || error.message);
+    res.status(error.response?.status || 500).json({ error: 'Unable to fetch categories' });
+  }
+});
+
+app.get('/api/ynab/budgets/:budgetId/months', async (req, res) => {
+  const { budgetId } = req.params;
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    return res.status(401).json({ error: 'Authorization header required' });
+  }
+  
+  try {
+    const response = await axios.get(`${YNAB_API_BASE_URL}/budgets/${budgetId}/months`, {
+      headers: {
+        'Authorization': authHeader,
+        'Accept': 'application/json'
+      }
+    });
+    res.json(response.data);
+  } catch (error) {
+    console.error('Error fetching months:', error.response?.data || error.message);
+    res.status(error.response?.status || 500).json({ error: 'Unable to fetch months' });
+  }
+});
+
+// Save YNAB tokens to Firestore
+app.post('/api/ynab/save_token', async (req, res) => {
+  const { user_id, access_token, refresh_token } = req.body;
   if (!user_id || !access_token) {
-    console.error('Missing user_id or access_token');
     return res.status(400).json({ error: 'user_id and access_token are required' });
   }
-  // Additional logging for debugging
-  console.log('Received request to save access token:', { user_id, access_token });
-
+  
   try {
-    const userDocRef = db.collection('user_tokens').doc(user_id);
-    const doc = await userDocRef.get();
-    console.log('Document exists:', doc.exists);
-
-    let tokens = [];
-    if (doc.exists && doc.data().tokens) {
-      tokens = doc.data().tokens;
-      console.log('Existing tokens:', tokens);
-    }
-
-    // Avoid duplicates
-    if (!tokens.includes(access_token)) {
-      tokens.push(access_token);
-      console.log('Added new access token:', access_token);
-    } else {
-      console.log('Access token already exists, not adding:', access_token);
-    }
-
-    const tokenPattern = /^access-(sandbox|development|production)-[a-z0-9-]+$/;
-    if (!tokenPattern.test(access_token)) {
-      console.error('Invalid access token format:', access_token);
-      return res.status(400).json({ error: 'Invalid access token format' });
-    }
-
-    if (!doc.exists) {
-      await userDocRef.set({ tokens: [] }); // Initialize with an empty tokens array
-      console.log('Initialized new user document with empty tokens array');
-    }
-
-    await userDocRef.set({ tokens }, { merge: true });
-    console.log('Successfully saved access tokens:', tokens);
+    const userDocRef = db.collection('ynab_tokens').doc(user_id);
+    await userDocRef.set({
+      access_token,
+      refresh_token,
+      updated_at: new Date().toISOString()
+    }, { merge: true });
+    
+    console.log('Successfully saved YNAB tokens for user:', user_id);
     res.json({ success: true });
   } catch (error) {
-    console.error('Error saving access token:', error.message);
-    res.status(500).json({ error: 'Unable to save access token' });
+    console.error('Error saving YNAB token:', error.message);
+    res.status(500).json({ error: 'Unable to save YNAB token' });
   }
 });
 
-app.get('/api/access_tokens', async (req, res) => {
+// Get YNAB token from Firestore
+app.get('/api/ynab/token', async (req, res) => {
   const { user_id } = req.query;
   if (!user_id) {
     return res.status(400).json({ error: 'user_id is required' });
   }
+  
   try {
-    const doc = await db.collection('user_tokens').doc(user_id).get();
+    const doc = await db.collection('ynab_tokens').doc(user_id).get();
     if (!doc.exists) {
-      return res.json({ tokens: [] });
+      return res.json({ access_token: null, refresh_token: null });
     }
-    const tokens = doc.data().tokens || [];
-    console.log('Retrieved tokens:', tokens);
-    res.json({ tokens });
+    
+    const { access_token, refresh_token } = doc.data();
+    res.json({ access_token, refresh_token });
   } catch (error) {
-    console.error('Error fetching access tokens:', error);
-    res.status(500).json({ error: 'Unable to fetch access tokens' });
+    console.error('Error fetching YNAB token:', error);
+    res.status(500).json({ error: 'Unable to fetch YNAB token' });
   }
 });
 
-app.post('/api/holdings', async (req, res) => {
-  const { access_token } = req.body;
-  if (!access_token) {
-    return res.status(400).json({ error: 'access_token is required' });
-  }
-  try {
-    const response = await plaidClient.investmentsHoldingsGet({ access_token });
-    res.json(response.data);
-  } catch (error) {
-    console.error('Error fetching holdings:', error);
-    res.status(500).json({ error: 'Unable to fetch holdings' });
-  }
-});
-
-app.post('/api/remove_plaid_account', async (req, res) => {
-  const { user_id, account_id } = req.body;
-  if (!user_id || !account_id) {
-    return res.status(400).json({ error: 'user_id and account_id are required' });
+// Remove YNAB connection
+app.delete('/api/ynab/disconnect', async (req, res) => {
+  const { user_id } = req.body;
+  if (!user_id) {
+    return res.status(400).json({ error: 'user_id is required' });
   }
   
   try {
-    // Get user's access tokens
-    const userDocRef = db.collection('user_tokens').doc(user_id);
-    const doc = await userDocRef.get();
-    
-    if (!doc.exists || !doc.data().tokens) {
-      return res.status(404).json({ error: 'No tokens found for user' });
-    }
-    
-    const tokens = doc.data().tokens;
-    let removedToken = null;
-    
-    // Find which access token corresponds to this account
-    for (const token of tokens) {
-      try {
-        const accountsResponse = await plaidClient.accountsGet({ access_token: token });
-        const accounts = accountsResponse.data.accounts;
-        
-        if (accounts.some(account => account.account_id === account_id)) {
-          // Found the token for this account, remove it from Plaid and our database
-          try {
-            // Remove item from Plaid (optional - invalidates the access token)
-            await plaidClient.itemRemove({ access_token: token });
-          } catch (plaidError) {
-            console.warn('Failed to remove item from Plaid, continuing anyway:', plaidError.message);
-          }
-          
-          // Remove token from our database
-          const updatedTokens = tokens.filter(t => t !== token);
-          await userDocRef.set({ tokens: updatedTokens }, { merge: true });
-          removedToken = token;
-          break;
-        }
-      } catch (accountError) {
-        console.warn('Error checking accounts for token:', accountError.message);
-        continue;
-      }
-    }
-    
-    if (removedToken) {
-      console.log('Successfully removed Plaid account:', account_id);
-      res.json({ success: true, message: 'Account disconnected successfully' });
-    } else {
-      res.status(404).json({ error: 'Account not found' });
-    }
+    await db.collection('ynab_tokens').doc(user_id).delete();
+    console.log('Successfully disconnected YNAB for user:', user_id);
+    res.json({ success: true, message: 'YNAB disconnected successfully' });
   } catch (error) {
-    console.error('Error removing Plaid account:', error);
-    res.status(500).json({ error: 'Unable to remove account' });
+    console.error('Error disconnecting YNAB:', error);
+    res.status(500).json({ error: 'Unable to disconnect YNAB' });
+  }
+});
+
+// Get manual accounts from Firestore
+app.get('/api/manual_accounts', async (req, res) => {
+  const { user_id } = req.query;
+  if (!user_id) {
+    return res.status(400).json({ error: 'user_id is required' });
+  }
+  
+  try {
+    const snapshot = await db.collection('manual_accounts')
+      .where('userId', '==', user_id)
+      .get();
+    
+    const accounts = [];
+    snapshot.forEach(doc => {
+      accounts.push({ id: doc.id, ...doc.data() });
+    });
+    
+    res.json({ accounts });
+  } catch (error) {
+    console.error('Error fetching manual accounts:', error);
+    res.status(500).json({ error: 'Unable to fetch manual accounts' });
+  }
+});
+
+// Create manual account
+app.post('/api/manual_accounts', async (req, res) => {
+  const { user_id, account } = req.body;
+  if (!user_id || !account) {
+    return res.status(400).json({ error: 'user_id and account data are required' });
+  }
+  
+  try {
+    const docRef = await db.collection('manual_accounts').add({
+      ...account,
+      userId: user_id,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    });
+    
+    res.json({ id: docRef.id, ...account });
+  } catch (error) {
+    console.error('Error creating manual account:', error);
+    res.status(500).json({ error: 'Unable to create manual account' });
+  }
+});
+
+// Update manual account
+app.put('/api/manual_accounts/:accountId', async (req, res) => {
+  const { accountId } = req.params;
+  const { account } = req.body;
+  if (!account) {
+    return res.status(400).json({ error: 'account data is required' });
+  }
+  
+  try {
+    await db.collection('manual_accounts').doc(accountId).update({
+      ...account,
+      updatedAt: new Date().toISOString()
+    });
+    
+    res.json({ id: accountId, ...account });
+  } catch (error) {
+    console.error('Error updating manual account:', error);
+    res.status(500).json({ error: 'Unable to update manual account' });
+  }
+});
+
+// Delete manual account
+app.delete('/api/manual_accounts/:accountId', async (req, res) => {
+  const { accountId } = req.params;
+  
+  try {
+    await db.collection('manual_accounts').doc(accountId).delete();
+    res.json({ success: true, message: 'Account deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting manual account:', error);
+    res.status(500).json({ error: 'Unable to delete manual account' });
   }
 });
 

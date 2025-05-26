@@ -2,7 +2,7 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import { auth } from '../../firebase';
-import { usePrivacy } from '../../contexts/PrivacyContext';
+import { usePrivacy } from '../../contexts/YNABDataContext';
 import Button from '../ui/Button';
 import {
   HomeIcon,
@@ -28,7 +28,7 @@ const navItems = [
 
 export default function Sidebar({ darkMode, setDarkMode }) {
   const location = useLocation();
-  const { privacyMode, setPrivacyMode } = usePrivacy();
+  const { isPrivacyMode, togglePrivacyMode } = usePrivacy();
 
   const handleLogout = async () => {
     try {
@@ -92,16 +92,16 @@ export default function Sidebar({ darkMode, setDarkMode }) {
           </Button>
           
           <Button
-            onClick={() => setPrivacyMode(!privacyMode)}
+            onClick={togglePrivacyMode}
             variant="outline"
             className="w-full flex items-center gap-2"
           >
-            {privacyMode ? (
+            {isPrivacyMode ? (
               <EyeIcon className="h-4 w-4" />
             ) : (
               <EyeSlashIcon className="h-4 w-4" />
             )}
-            <span className="truncate">{privacyMode ? 'Show Numbers' : 'Privacy Mode'}</span>
+            <span className="truncate">{isPrivacyMode ? 'Show Numbers' : 'Privacy Mode'}</span>
           </Button>
           
           <Button

@@ -2,10 +2,11 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { PlaidDataProvider, usePlaid } from './contexts/PlaidDataContext.jsx';
+import { YNABDataProvider, PrivacyProvider, useYNAB } from './contexts/YNABDataContext.jsx';
 import { queryClient } from './lib/queryClient';
 import Layout from './components/layout/Layout';
 import LoginCard from './components/auth/LoginCard';
+import YNABCallback from './components/auth/YNABCallback';
 import Dashboard from './components/pages/Dashboard';
 import Accounts from './components/pages/Accounts';
 import BalanceSheet from './components/pages/BalanceSheet';
@@ -18,14 +19,17 @@ import './App.css';
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <PlaidDataProvider>
-        <Router>
-          <Routes>
-            <Route path="/login" element={<LoginWrapper />} />
-            <Route path="/*" element={<ProtectedRoutes />} />
-          </Routes>
-        </Router>
-      </PlaidDataProvider>
+      <PrivacyProvider>
+        <YNABDataProvider>
+          <Router>
+            <Routes>
+              <Route path="/login" element={<LoginWrapper />} />
+              <Route path="/auth/ynab/callback" element={<YNABCallback />} />
+              <Route path="/*" element={<ProtectedRoutes />} />
+            </Routes>
+          </Router>
+        </YNABDataProvider>
+      </PrivacyProvider>
       <ReactQueryDevtools initialIsOpen={false} />
     </QueryClientProvider>
   );
@@ -33,7 +37,7 @@ export default function App() {
 
 // Login wrapper component
 function LoginWrapper() {
-  const { user, loading } = usePlaid();
+  const { user, loading } = useYNAB();
 
   if (loading) {
     return (
@@ -52,7 +56,7 @@ function LoginWrapper() {
 
 // Protected routes wrapper
 function ProtectedRoutes() {
-  const { user, loading } = usePlaid();
+  const { user, loading } = useYNAB();
 
   if (loading) {
     return (

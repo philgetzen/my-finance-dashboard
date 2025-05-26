@@ -1,8 +1,5 @@
 import React, { useState } from 'react';
-import { usePlaid } from '../../contexts/PlaidDataContext';
-import { usePrivacy } from '../../contexts/PrivacyContext';
-import { useCombinedFinanceData } from '../../hooks/useCombinedFinanceData';
-import { useDeleteManualAccount } from '../../hooks/useFinanceData';
+import { useYNAB, usePrivacy } from '../../contexts/YNABDataContext';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
 import ManualAccountModal from '../ui/ManualAccountModal';
@@ -21,19 +18,18 @@ import {
 } from '@heroicons/react/24/outline';
 
 export default function Accounts() {
-  const { user } = usePlaid();
   const { 
-    manualAccounts, 
-    ynabAccounts, 
-    accounts: allAccounts,
-    isLoading, 
-    isError, 
+    user,
+    accounts: ynabAccounts,
+    manualAccounts,
+    isLoading,
     error,
-    ynabConnected,
+    deleteManualAccount,
+    ynabToken,
     refetch
-  } = useCombinedFinanceData(user?.uid);
+  } = useYNAB();
+  const { isPrivacyMode } = usePrivacy();
   
-  const deleteManualAccount = useDeleteManualAccount();
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingAccount, setEditingAccount] = useState(null);
@@ -42,9 +38,10 @@ export default function Accounts() {
   const [filterType, setFilterType] = useState('all');
   const [sortBy, setSortBy] = useState('institution');
   const [searchTerm, setSearchTerm] = useState('');
-
-  // Use global privacy context
-  const { privacyMode } = usePrivacy();
+  
+  const ynabConnected = !!ynabToken;
+  const allAccounts = [...(ynabAccounts || []), ...(manualAccounts || [])];
+  const isError = !!error;
 
 
   const handleEditAccount = (account) => {
@@ -56,11 +53,10 @@ export default function Accounts() {
   const handleDeleteAccount = async (accountId) => {
     if (deleteConfirm === accountId) {
       try {
-        await deleteManualAccount.mutateAsync({ accountId, userId: user.uid });
+        await deleteManualAccount(accountId);
         setDeleteConfirm(null);
       } catch (error) {
         console.error('Failed to delete account:', error);
-        // Error is handled by the mutation
       }
     } else {
       setDeleteConfirm(accountId);
@@ -376,7 +372,7 @@ export default function Accounts() {
                     
                     <div className="flex items-center gap-3">
                       <div className="text-right mr-3">
-                        <p className={`font-semibold text-gray-900 dark:text-white ${privacyMode ? 'filter blur' : ''}`}>
+                        <p className={`font-semibold text-gray-900 dark:text-white ${isPrivacyMode ? 'filter blur' : ''}`}>
                           {formatCurrency(account.balance)}
                         </p>
                         <p className="text-xs text-gray-500 dark:text-gray-500">Read-only</p>
@@ -458,7 +454,7 @@ export default function Accounts() {
                       
                       <div className="flex items-center gap-3">
                         <div className="text-right mr-3">
-                          <p className={`font-semibold text-gray-900 dark:text-white ${privacyMode ? 'filter blur' : ''}`}>
+                          <p className={`font-semibold text-gray-900 dark:text-white ${isPrivacyMode ? 'filter blur' : ''}`}>
                             {formatCurrency(account.balance)}
                           </p>
                         </div>
@@ -552,7 +548,7 @@ export default function Accounts() {
                     
                     <div className="flex items-center gap-3">
                       <div className="text-right mr-3">
-                        <p className={`font-semibold ${account.balance > 0 ? 'text-green-600 dark:text-green-400' : account.balance < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'} ${privacyMode ? 'filter blur' : ''}`}>
+                        <p className={`font-semibold ${account.balance > 0 ? 'text-green-600 dark:text-green-400' : account.balance < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'} ${isPrivacyMode ? 'filter blur' : ''}`}>
                           ${(account.balance || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </p>
                         <p className="text-xs text-gray-500 dark:text-gray-500">Read-only</p>

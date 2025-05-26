@@ -1,224 +1,157 @@
 import React, { useState } from 'react';
+import { useYNAB } from '../../contexts/YNABDataContext';
 import Card from './Card';
 import Button from './Button';
-import { useInitializeYNAB, useYNABBudgets } from '../../hooks/useYNABData';
 import {
-  ExclamationTriangleIcon,
   CheckCircleIcon,
   LinkIcon,
-  InformationCircleIcon,
+  ExclamationCircleIcon,
 } from '@heroicons/react/24/outline';
 
 export default function YNABConnectionCard({ onConnect, isConnected, compact = false }) {
-  const [accessToken, setAccessToken] = useState('');
-  const [showTokenInput, setShowTokenInput] = useState(false);
-  const [error, setError] = useState('');
+  const [isConnecting, setIsConnecting] = useState(false);
+  const { disconnectYNAB } = useYNAB();
   
-  const initializeYNAB = useInitializeYNAB();
-  const { data: budgets, isLoading: budgetsLoading, error: budgetsError } = useYNABBudgets(isConnected);
-
   const handleConnect = async () => {
-    if (!accessToken.trim()) {
-      setError('Please enter your YNAB Personal Access Token');
-      return;
-    }
-
-    setError('');
     try {
-      await initializeYNAB.mutateAsync(accessToken);
-      onConnect?.(accessToken);
-      setShowTokenInput(false);
-      setAccessToken('');
-    } catch (err) {
-      console.error('Error connecting to YNAB:', err);
-      setError('Failed to connect to YNAB. Please check your access token and try again.');
+      setIsConnecting(true);
+      
+      // Fetch auth URL from backend
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/ynab/auth`);
+      const { authUrl } = await response.json();
+      
+      // Open YNAB OAuth in new window
+      const authWindow = window.open(authUrl, 'ynab-auth', 'width=500,height=600');
+      
+      // Listen for OAuth callback
+      const handleMessage = async (event) => {
+        if (event.origin !== window.location.origin) return;
+        
+        if (event.data.type === 'ynab-auth-success') {
+          const { code } = event.data;
+          
+          // Exchange code for tokens
+          const tokenResponse = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/ynab/token`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code })
+          });
+          
+          if (tokenResponse.ok) {
+            const { access_token, refresh_token } = await tokenResponse.json();
+            await onConnect(access_token, refresh_token);
+          }
+          
+          window.removeEventListener('message', handleMessage);
+          setIsConnecting(false);
+        }
+      };
+      
+      window.addEventListener('message', handleMessage);
+      
+      // Clean up if window is closed
+      const checkClosed = setInterval(() => {
+        if (authWindow.closed) {
+          clearInterval(checkClosed);
+          window.removeEventListener('message', handleMessage);
+          setIsConnecting(false);
+        }
+      }, 1000);
+      
+    } catch (error) {
+      console.error('Error connecting to YNAB:', error);
+      setIsConnecting(false);
     }
   };
 
-  const handleDisconnect = () => {
-    setAccessToken('');
-    setShowTokenInput(false);
-    setError('');
-    onConnect?.(null);
+  const handleDisconnect = async () => {
+    try {
+      await disconnectYNAB();
+    } catch (error) {
+      console.error('Error disconnecting YNAB:', error);
+    }
   };
 
-  if (isConnected) {
-    if (compact) {
+  if (compact) {
+    if (isConnected) {
       return (
         <Button
-          variant="outline"
           onClick={handleDisconnect}
-          className="text-red-600 border-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"
+          variant="outline"
+          className="flex items-center gap-2"
         >
-          <CheckCircleIcon className="h-4 w-4" />
-          Disconnect YNAB
+          <CheckCircleIcon className="h-4 w-4 text-green-600" />
+          YNAB Connected
         </Button>
       );
     }
     
     return (
-      <Card>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center">
-            <CheckCircleIcon className="h-8 w-8 text-green-500 mr-3" />
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                YNAB Connected
-              </h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                {budgetsLoading ? 'Loading budgets...' : 
-                 budgetsError ? 'Error loading budgets' :
-                 `${budgets?.length || 0} budget(s) available`}
-              </p>
-            </div>
-          </div>
-          <Button
-            variant="outline"
-            onClick={handleDisconnect}
-            className="text-red-600 border-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-          >
-            Disconnect
-          </Button>
-        </div>
-        
-        {budgetsError && (
-          <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-            <div className="flex items-center">
-              <ExclamationTriangleIcon className="h-5 w-5 text-red-500 mr-2" />
-              <p className="text-sm text-red-700 dark:text-red-400">
-                Error loading YNAB data: {budgetsError.message}
-              </p>
-            </div>
-          </div>
-        )}
-      </Card>
-    );
-  }
-
-  if (compact && !showTokenInput) {
-    return (
       <Button
-        onClick={() => setShowTokenInput(true)}
+        onClick={handleConnect}
+        disabled={isConnecting}
+        variant="outline"
         className="flex items-center gap-2"
       >
         <LinkIcon className="h-4 w-4" />
-        Connect YNAB
+        {isConnecting ? 'Connecting...' : 'Connect YNAB'}
       </Button>
-    );
-  }
-  
-  if (compact && showTokenInput) {
-    return (
-      <div className="flex items-center gap-2">
-        <input
-          type="text"
-          value={accessToken}
-          onChange={(e) => setAccessToken(e.target.value)}
-          placeholder="YNAB Access Token"
-          className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm flex-1 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-        />
-        <Button
-          onClick={handleConnect}
-          disabled={!accessToken.trim() || initializeYNAB.isPending}
-          className="text-sm px-3 py-2"
-        >
-          {initializeYNAB.isPending ? 'Connecting...' : 'Connect'}
-        </Button>
-        <Button
-          variant="outline"
-          onClick={() => setShowTokenInput(false)}
-          className="text-sm px-3 py-2"
-        >
-          Cancel
-        </Button>
-      </div>
     );
   }
 
   return (
     <Card>
       <div className="text-center">
-        <LinkIcon className="mx-auto h-12 w-12 text-blue-500 mb-4" />
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-          Connect Your YNAB Account
-        </h3>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-          Import your budgets, accounts, and transactions from You Need A Budget (YNAB)
-        </p>
-
-        {!showTokenInput ? (
-          <div className="space-y-4">
-            <Button onClick={() => setShowTokenInput(true)} className="w-full">
-              Connect YNAB
+        {isConnected ? (
+          <>
+            <CheckCircleIcon className="mx-auto h-12 w-12 text-green-500 mb-4" />
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+              YNAB Connected
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Your YNAB budget is connected and syncing.
+            </p>
+            <Button
+              onClick={handleDisconnect}
+              variant="outline"
+              className="text-red-600 border-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+            >
+              Disconnect YNAB
+            </Button>
+          </>
+        ) : (
+          <>
+            <LinkIcon className="mx-auto h-12 w-12 text-blue-500 mb-4" />
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+              Connect Your YNAB Budget
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Connect your YNAB account to sync your budget, accounts, and transactions.
+            </p>
+            
+            <Button
+              onClick={handleConnect}
+              disabled={isConnecting}
+              className="w-full sm:w-auto"
+            >
+              <LinkIcon className="h-4 w-4 mr-2" />
+              {isConnecting ? 'Connecting...' : 'Connect YNAB'}
             </Button>
             
-            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+            <div className="mt-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
               <div className="flex items-start">
-                <InformationCircleIcon className="h-5 w-5 text-blue-500 mr-2 mt-0.5 flex-shrink-0" />
+                <ExclamationCircleIcon className="h-5 w-5 text-blue-500 mr-2 mt-0.5 flex-shrink-0" />
                 <div className="text-left">
                   <p className="text-sm text-blue-700 dark:text-blue-400 font-medium mb-1">
-                    You'll need a YNAB Personal Access Token
+                    Secure Connection
                   </p>
                   <p className="text-xs text-blue-600 dark:text-blue-300">
-                    Get yours from: YNAB → Account Settings → Developer Settings → Personal Access Tokens
+                    Your YNAB credentials are never stored. We use OAuth to securely connect to your budget.
                   </p>
                 </div>
               </div>
             </div>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="ynab-token" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 text-left">
-                YNAB Personal Access Token
-              </label>
-              <input
-                id="ynab-token"
-                type="password"
-                value={accessToken}
-                onChange={(e) => setAccessToken(e.target.value)}
-                placeholder="Enter your YNAB Personal Access Token"
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-              />
-            </div>
-
-            {error && (
-              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
-                <div className="flex items-center">
-                  <ExclamationTriangleIcon className="h-5 w-5 text-red-500 mr-2" />
-                  <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
-                </div>
-              </div>
-            )}
-
-            <div className="flex space-x-3">
-              <Button
-                onClick={handleConnect}
-                disabled={initializeYNAB.isPending}
-                className="flex-1"
-              >
-                {initializeYNAB.isPending ? 'Connecting...' : 'Connect'}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setShowTokenInput(false);
-                  setAccessToken('');
-                  setError('');
-                }}
-                className="flex-1"
-              >
-                Cancel
-              </Button>
-            </div>
-
-            <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3">
-              <p className="text-xs text-gray-600 dark:text-gray-400 text-left">
-                <strong>Note:</strong> Your access token is stored locally and only used to connect to YNAB's API. 
-                We never store or transmit your token to our servers.
-              </p>
-            </div>
-          </div>
+          </>
         )}
       </div>
     </Card>

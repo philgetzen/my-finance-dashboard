@@ -1,9 +1,6 @@
 import React, { useState } from 'react';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, BarChart, Bar } from 'recharts';
-import { usePlaid } from '../../contexts/PlaidDataContext';
-import { usePrivacy } from '../../contexts/PrivacyContext';
-import { useAddManualAccount } from '../../hooks/useFinanceData';
-import { useCombinedFinanceData } from '../../hooks/useCombinedFinanceData';
+import { useYNAB, usePrivacy } from '../../contexts/YNABDataContext';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
 import ManualAccountModal from '../ui/ManualAccountModal';
@@ -26,21 +23,25 @@ import {
 const COLORS = ['#3B82F6', '#8B5CF6', '#EF4444', '#10B981', '#F59E0B', '#06B6D4'];
 
 export default function Dashboard() {
-  const { user } = usePlaid();
-  const { privacyMode } = usePrivacy();
   const { 
-    accounts: allAccounts, 
-    transactions: allTransactions, 
+    user,
+    accounts: ynabAccounts,
+    transactions: ynabTransactions,
     manualAccounts,
-    ynabConnected,
-    isLoading, 
+    ynabToken,
+    isLoading,
     error,
-    updateYNABToken,
-    refreshData
-  } = useCombinedFinanceData(user?.uid);
-  const addManualAccount = useAddManualAccount();
+    saveYNABToken,
+    disconnectYNAB,
+    refetch
+  } = useYNAB();
+  const { isPrivacyMode } = usePrivacy();
   
   const [showManualModal, setShowManualModal] = useState(false);
+  
+  // Combine YNAB accounts and manual accounts
+  const allAccounts = [...(ynabAccounts || []), ...(manualAccounts || [])];
+  const allTransactions = ynabTransactions || [];
 
   // Helper functions for account processing
   const normalizeAccountType = (type) => {
@@ -68,8 +69,9 @@ export default function Dashboard() {
     return `${(amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
-  const handleYNABConnect = (accessToken) => {
-    updateYNABToken(accessToken);
+  const handleYNABConnect = async (accessToken, refreshToken) => {
+    await saveYNABToken(accessToken, refreshToken);
+    refetch();
   };
 
   // allAccounts now includes YNAB accounts from useFinancialData
@@ -209,7 +211,7 @@ export default function Dashboard() {
             <>
               <Button
                 variant="outline"
-                onClick={refreshData}
+                onClick={refetch}
                 className="flex items-center gap-2"
               >
                 <ArrowPathIcon className="h-4 w-4" />
@@ -224,7 +226,7 @@ export default function Dashboard() {
               </Button>
               <YNABConnectionCard 
                 onConnect={handleYNABConnect} 
-                isConnected={ynabConnected} 
+                isConnected={!!ynabToken} 
                 compact={true}
               />
             </>
@@ -250,7 +252,7 @@ export default function Dashboard() {
             </div>
             <div className="ml-4">
               <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Net Worth</p>
-              <p className={`text-xl sm:text-2xl font-bold ${netWorth > 0 ? 'text-green-600 dark:text-green-400' : netWorth < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'} ${privacyMode ? 'filter blur' : ''}`}>
+              <p className={`text-xl sm:text-2xl font-bold ${netWorth > 0 ? 'text-green-600 dark:text-green-400' : netWorth < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'} ${isPrivacyMode ? 'filter blur' : ''}`}>
                 ${netWorth.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
             </div>
@@ -266,7 +268,7 @@ export default function Dashboard() {
             </div>
             <div className="ml-4">
               <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Total Assets</p>
-              <p className={`text-xl sm:text-2xl font-bold ${totalAssets > 0 ? 'text-green-600 dark:text-green-400' : totalAssets < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'} ${privacyMode ? 'filter blur' : ''}`}>
+              <p className={`text-xl sm:text-2xl font-bold ${totalAssets > 0 ? 'text-green-600 dark:text-green-400' : totalAssets < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'} ${isPrivacyMode ? 'filter blur' : ''}`}>
                 ${totalAssets.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
             </div>
@@ -282,7 +284,7 @@ export default function Dashboard() {
             </div>
             <div className="ml-4">
               <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Total Liabilities</p>
-              <p className={`text-xl sm:text-2xl font-bold ${totalLiabilities > 0 ? 'text-red-600 dark:text-red-400' : totalLiabilities < 0 ? 'text-green-600 dark:text-green-400' : 'text-gray-900 dark:text-white'} ${privacyMode ? 'filter blur' : ''}`}>
+              <p className={`text-xl sm:text-2xl font-bold ${totalLiabilities > 0 ? 'text-red-600 dark:text-red-400' : totalLiabilities < 0 ? 'text-green-600 dark:text-green-400' : 'text-gray-900 dark:text-white'} ${isPrivacyMode ? 'filter blur' : ''}`}>
                 ${totalLiabilities.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
             </div>
@@ -322,7 +324,7 @@ export default function Dashboard() {
                   </Pie>
                   <Tooltip 
                     formatter={(value, name) => {
-                      if (privacyMode) {
+                      if (isPrivacyMode) {
                         return ['***', name]; // Hide values in privacy mode
                       }
                       return [`${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, name];
@@ -366,7 +368,7 @@ export default function Dashboard() {
                   />
                   <span className="text-sm sm:text-base font-medium text-gray-900 dark:text-white">{item.name}</span>
                 </div>
-                <span className={`text-sm sm:text-base font-semibold ${item.value > 0 ? 'text-green-600 dark:text-green-400' : item.value < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'} ${privacyMode ? 'filter blur' : ''}`}>
+                <span className={`text-sm sm:text-base font-semibold ${item.value > 0 ? 'text-green-600 dark:text-green-400' : item.value < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'} ${isPrivacyMode ? 'filter blur' : ''}`}>
                   ${item.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
@@ -412,7 +414,7 @@ export default function Dashboard() {
                     fontSize: '12px'
                   }}
                   formatter={(value, name) => {
-                    if (privacyMode) {
+                    if (isPrivacyMode) {
                       return ['***', name]; // Hide values in privacy mode
                     }
                     return [`${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, name];
@@ -475,7 +477,7 @@ export default function Dashboard() {
                     fontSize: '12px'
                   }}
                   formatter={(value, name) => {
-                    if (privacyMode) {
+                    if (isPrivacyMode) {
                       return ['***', name]; // Hide values in privacy mode
                     }
                     return [`${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, name];
@@ -557,7 +559,7 @@ export default function Dashboard() {
                       )}
                     </div>
                   </td>
-                  <td className={`px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm font-medium text-right ${(txn.amount || 0) > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'} ${privacyMode ? 'filter blur' : ''}`}>
+                  <td className={`px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm font-medium text-right ${(txn.amount || 0) > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'} ${isPrivacyMode ? 'filter blur' : ''}`}>
                     ${(txn.amount || 0) < 0 ? '-' : ''}${Math.abs(txn.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
                   <td className="px-3 sm:px-6 py-4 text-xs sm:text-sm text-gray-500 dark:text-gray-400">

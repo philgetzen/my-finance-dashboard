@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ynabService } from '../lib/ynabApi';
 import { queryKeys } from '../lib/queryClient';
+import { useEffect } from 'react';
 
 // YNAB Query Keys
 export const ynabQueryKeys = {
@@ -14,13 +15,12 @@ export const ynabQueryKeys = {
 };
 
 // Initialize YNAB Service
-export const useInitializeYNAB = () => {
-  return useMutation({
-    mutationFn: (accessToken) => {
+export const useInitializeYNAB = (accessToken) => {
+  useEffect(() => {
+    if (accessToken) {
       ynabService.init(accessToken);
-      return Promise.resolve(true);
-    },
-  });
+    }
+  }, [accessToken]);
 };
 
 // Get YNAB Budgets
@@ -85,7 +85,10 @@ export const useYNABSummary = (budgetId = 'last-used', enabled = false) => {
 };
 
 // Combined hook for all YNAB data
-export const useYNABData = (budgetId = 'last-used', enabled = false) => {
+export const useYNABData = (budgetId = 'last-used', enabled = false, accessToken = null) => {
+  // Initialize YNAB service when access token is provided
+  useInitializeYNAB(accessToken);
+  
   const budgets = useYNABBudgets(enabled);
   const accounts = useYNABAccounts(budgetId, enabled);
   const transactions = useYNABTransactions(budgetId, enabled);
