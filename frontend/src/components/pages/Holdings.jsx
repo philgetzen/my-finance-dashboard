@@ -19,6 +19,32 @@ export default function Holdings() {
   const { user } = usePlaid();
   const { accounts, holdings, isLoading, isError, error } = useCombinedFinanceData(user?.uid);
 
+  // Helper functions for account processing
+  const normalizeAccountType = (type) => {
+    if (!type) return 'other';
+    const lowerType = type.toLowerCase();
+    if (lowerType === 'otherasset') return 'investment';
+    if (lowerType === 'creditcard') return 'credit';
+    return lowerType;
+  };
+
+  const getDisplayAccountType = (type) => {
+    const normalizedType = normalizeAccountType(type);
+    switch (normalizedType) {
+      case 'investment': return 'Investment';
+      case 'credit': return 'Credit Card';
+      case 'checking': return 'Checking';
+      case 'savings': return 'Savings';
+      case 'loan': return 'Loan';
+      case 'mortgage': return 'Mortgage';
+      default: return type ? type.charAt(0).toUpperCase() + type.slice(1) : 'Other';
+    }
+  };
+
+  const formatCurrency = (amount) => {
+    return `${(amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
+
   const allAccountsForNaming = accounts || [];
   const accountIdToName = Object.fromEntries(allAccountsForNaming.map(acc => [acc.account_id || acc.id, acc.name]));
 
@@ -57,8 +83,8 @@ export default function Holdings() {
       <div className="flex items-center gap-3">
         <TrophyIcon className="h-8 w-8 text-yellow-600 dark:text-yellow-400" />
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Holdings</h1>
-          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1">Detailed view of your investment holdings</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white text-left">Holdings</h1>
+          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1 text-left">Detailed view of your investment holdings</p>
         </div>
       </div>
 

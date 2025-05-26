@@ -2,23 +2,24 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import { auth } from '../../firebase';
+import { usePrivacy } from '../../contexts/PrivacyContext';
 import Button from '../ui/Button';
 import {
   HomeIcon,
   CreditCardIcon,
   ListBulletIcon,
-  ChartPieIcon,
   BanknotesIcon,
   TrophyIcon,
   Cog6ToothIcon,
   ArrowRightStartOnRectangleIcon,
   SunIcon,
-  MoonIcon
+  MoonIcon,
+  EyeSlashIcon,
+  EyeIcon
 } from '@heroicons/react/24/outline';
 
 const navItems = [
   { name: 'Dashboard', path: '/', icon: HomeIcon },
-  { name: 'Snapshot', path: '/snapshot', icon: ChartPieIcon },
   { name: 'Accounts', path: '/accounts', icon: CreditCardIcon },
   { name: 'Balance Sheet', path: '/balance-sheet', icon: ListBulletIcon },
   { name: 'Investments', path: '/investment-allocation', icon: BanknotesIcon },
@@ -27,6 +28,7 @@ const navItems = [
 
 export default function Sidebar({ darkMode, setDarkMode }) {
   const location = useLocation();
+  const { privacyMode, setPrivacyMode } = usePrivacy();
 
   const handleLogout = async () => {
     try {
@@ -87,6 +89,19 @@ export default function Sidebar({ darkMode, setDarkMode }) {
               <MoonIcon className="h-4 w-4" />
             )}
             <span className="truncate">{darkMode ? 'Light Mode' : 'Dark Mode'}</span>
+          </Button>
+          
+          <Button
+            onClick={() => setPrivacyMode(!privacyMode)}
+            variant="outline"
+            className="w-full flex items-center gap-2"
+          >
+            {privacyMode ? (
+              <EyeIcon className="h-4 w-4" />
+            ) : (
+              <EyeSlashIcon className="h-4 w-4" />
+            )}
+            <span className="truncate">{privacyMode ? 'Show Numbers' : 'Privacy Mode'}</span>
           </Button>
           
           <Button

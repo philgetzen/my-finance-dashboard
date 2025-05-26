@@ -50,8 +50,8 @@ export default function InvestmentAllocation() {
       <div className="flex items-center gap-3">
         <ChartBarIcon className="h-8 w-8 text-purple-600 dark:text-purple-400" />
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Investment Allocation</h1>
-          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1">Track your investment portfolio distribution</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white text-left">Investment Allocation</h1>
+          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1 text-left">Track your investment portfolio distribution</p>
           {isError && error && (
             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 p-3 sm:p-4 rounded-lg text-sm sm:text-base mt-4">
               Error: {error?.message || 'Failed to load data'}

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, BarChart, Bar } from 'recharts';
 import { usePlaid } from '../../contexts/PlaidDataContext';
+import { usePrivacy } from '../../contexts/PrivacyContext';
 import { useAddManualAccount } from '../../hooks/useFinanceData';
 import { useCombinedFinanceData } from '../../hooks/useCombinedFinanceData';
 import Card from '../ui/Card';
@@ -16,12 +17,17 @@ import {
   PlusIcon,
   HomeIcon,
   ArrowPathIcon,
+  ArrowTrendingUpIcon,
+  ArrowTrendingDownIcon,
+  ScaleIcon,
+  ChartPieIcon,
 } from '@heroicons/react/24/outline';
 
 const COLORS = ['#3B82F6', '#8B5CF6', '#EF4444', '#10B981', '#F59E0B', '#06B6D4'];
 
 export default function Dashboard() {
   const { user } = usePlaid();
+  const { privacyMode } = usePrivacy();
   const { 
     accounts: allAccounts, 
     transactions: allTransactions, 
@@ -35,6 +41,32 @@ export default function Dashboard() {
   const addManualAccount = useAddManualAccount();
   
   const [showManualModal, setShowManualModal] = useState(false);
+
+  // Helper functions for account processing
+  const normalizeAccountType = (type) => {
+    if (!type) return 'other';
+    const lowerType = type.toLowerCase();
+    if (lowerType === 'otherasset') return 'investment';
+    if (lowerType === 'creditcard') return 'credit';
+    return lowerType;
+  };
+
+  const getDisplayAccountType = (type) => {
+    const normalizedType = normalizeAccountType(type);
+    switch (normalizedType) {
+      case 'investment': return 'Investment';
+      case 'credit': return 'Credit Card';
+      case 'checking': return 'Checking';
+      case 'savings': return 'Savings';
+      case 'loan': return 'Loan';
+      case 'mortgage': return 'Mortgage';
+      default: return type ? type.charAt(0).toUpperCase() + type.slice(1) : 'Other';
+    }
+  };
+
+  const formatCurrency = (amount) => {
+    return `${(amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
 
   const handleYNABConnect = (accessToken) => {
     updateYNABToken(accessToken);
@@ -76,14 +108,14 @@ export default function Dashboard() {
   }, 0);
 
   const allocation = Object.values(allAccounts.reduce((acc, account) => {
-    const type = account.type || 'other';
+    const type = getDisplayAccountType(account.type);
     const balance = typeof account.balances?.current === 'number' ? account.balances.current : (typeof account.balance === 'number' ? account.balance : 0);
-    acc[type] = acc[type] || { name: type.charAt(0).toUpperCase() + type.slice(1), value: 0 };
+    acc[type] = acc[type] || { name: type, value: 0 };
     acc[type].value += Math.abs(balance);
     return acc;
   }, {})).filter(item => item.value > 0);
 
-  // Process cashflow data
+  // Process cashflow data for line chart
   const processCashflowData = () => {
     if (!allTransactions.length) return [];
     
@@ -120,7 +152,41 @@ export default function Dashboard() {
     }));
   };
 
+  // Process income vs expenses data for bar chart (from Snapshot)
+  const processIncomeExpensesData = () => {
+    if (!allTransactions.length) return [];
+    
+    const last6Months = {};
+    const today = new Date();
+    
+    // Initialize last 6 months
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      const key = date.toISOString().slice(0, 7); // YYYY-MM format
+      const monthName = date.toLocaleDateString('en-US', { month: 'short' });
+      last6Months[key] = { month: monthName, income: 0, expenses: 0 };
+    }
+    
+    // Process transactions
+    allTransactions.forEach(transaction => {
+      const transactionDate = new Date(transaction.date);
+      const monthKey = transactionDate.toISOString().slice(0, 7);
+      
+      if (last6Months[monthKey]) {
+        const amount = Math.abs(transaction.amount);
+        if (transaction.amount > 0) {
+          last6Months[monthKey].income += amount;
+        } else {
+          last6Months[monthKey].expenses += amount;
+        }
+      }
+    });
+    
+    return Object.values(last6Months);
+  };
+
   const cashflowData = processCashflowData();
+  const incomeExpensesData = processIncomeExpensesData();
 
   if (isLoading) {
     return <DashboardSkeleton />;
@@ -134,8 +200,8 @@ export default function Dashboard() {
         <div className="flex items-center gap-3">
           <HomeIcon className="h-8 w-8 text-blue-600 dark:text-blue-400" />
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
-            <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1">Track your financial health at a glance</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white text-left">Dashboard</h1>
+            <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1 text-left">Track your financial health at a glance</p>
           </div>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
@@ -179,13 +245,13 @@ export default function Dashboard() {
           <div className="flex items-center">
             <div className="flex-shrink-0">
               <div className="w-10 h-10 bg-green-100 dark:bg-green-900/20 rounded-lg flex items-center justify-center">
-                <ChartBarIcon className="h-6 w-6 text-green-600 dark:text-green-400" />
+                    <ScaleIcon className="h-6 w-6 text-blue-600 dark:text-blue-400" />
               </div>
             </div>
             <div className="ml-4">
               <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Net Worth</p>
-              <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
-                ${netWorth.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+              <p className={`text-xl sm:text-2xl font-bold ${netWorth > 0 ? 'text-green-600 dark:text-green-400' : netWorth < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'} ${privacyMode ? 'filter blur' : ''}`}>
+                ${netWorth.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
             </div>
           </div>
@@ -195,13 +261,13 @@ export default function Dashboard() {
           <div className="flex items-center">
             <div className="flex-shrink-0">
               <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center">
-                <BanknotesIcon className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                <ArrowTrendingUpIcon className="h-6 w-6 text-blue-600 dark:text-blue-400" />
               </div>
             </div>
             <div className="ml-4">
               <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Total Assets</p>
-              <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
-                ${totalAssets.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+              <p className={`text-xl sm:text-2xl font-bold ${totalAssets > 0 ? 'text-green-600 dark:text-green-400' : totalAssets < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'} ${privacyMode ? 'filter blur' : ''}`}>
+                ${totalAssets.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
             </div>
           </div>
@@ -211,13 +277,13 @@ export default function Dashboard() {
           <div className="flex items-center">
             <div className="flex-shrink-0">
               <div className="w-10 h-10 bg-red-100 dark:bg-red-900/20 rounded-lg flex items-center justify-center">
-                <CreditCardIcon className="h-6 w-6 text-red-600 dark:text-red-400" />
+                    <ArrowTrendingDownIcon className="h-6 w-6 text-red-600 dark:text-red-400" />
               </div>
             </div>
             <div className="ml-4">
               <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Total Liabilities</p>
-              <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
-                ${totalLiabilities.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+              <p className={`text-xl sm:text-2xl font-bold ${totalLiabilities > 0 ? 'text-red-600 dark:text-red-400' : totalLiabilities < 0 ? 'text-green-600 dark:text-green-400' : 'text-gray-900 dark:text-white'} ${privacyMode ? 'filter blur' : ''}`}>
+                ${totalLiabilities.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
             </div>
           </div>
@@ -228,8 +294,11 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
         <Card>
           <div className="mb-6">
-            <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">Asset Allocation</h3>
-            <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Breakdown by account type</p>
+            <div className="flex items-center justify-center">
+              <ChartPieIcon className="h-6 w-6 text-blue-600 dark:text-blue-400 mr-2 justify-center" />
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white text-center">Asset Allocation</h3>
+            </div>
+            <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">Breakdown by account type</p>
           </div>
           {allocation.length > 0 ? (
             <div className="h-80 sm:h-96 lg:h-[400px] min-h-[320px]">
@@ -252,7 +321,12 @@ export default function Dashboard() {
                     ))}
                   </Pie>
                   <Tooltip 
-                    formatter={(value, name, props) => [`$${value.toLocaleString()}`, props.payload.name]}
+                    formatter={(value, name) => {
+                      if (privacyMode) {
+                        return ['***', name]; // Hide values in privacy mode
+                      }
+                      return [`${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, name];
+                    }}
                     contentStyle={{
                       backgroundColor: 'rgba(255, 255, 255, 0.95)',
                       border: '1px solid #e5e7eb',
@@ -275,75 +349,177 @@ export default function Dashboard() {
           )}
         </Card>
 
+        {/* Account Summary - from Snapshot */}
         <Card>
           <div className="mb-6">
-            <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">Cash Flow</h3>
-            <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Income vs expenses over time</p>
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">Account Summary</h3>
+            <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">Quick overview of all accounts</p>
           </div>
-          {cashflowData.length > 0 ? (
-            <div className="h-64 sm:h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={cashflowData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                  <XAxis 
-                    dataKey="month" 
-                    className="text-xs fill-gray-600 dark:fill-gray-400"
-                    tick={{ fontSize: 12 }}
+          
+          <div className="space-y-3 sm:space-y-4">
+            {allocation.map((item, index) => (
+              <div key={item.name} className="flex items-center justify-between p-2 sm:p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <div className="flex items-center">
+                  <div
+                    className="w-4 h-4 rounded-full mr-3"
+                    style={{ backgroundColor: COLORS[index % COLORS.length] }}
                   />
-                  <YAxis 
-                    className="text-xs fill-gray-600 dark:fill-gray-400"
-                    tick={{ fontSize: 12 }}
-                    tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
-                  />
-                  <Tooltip 
-                    contentStyle={{
-                      backgroundColor: 'var(--tooltip-bg)',
-                      border: '1px solid var(--tooltip-border)',
-                      borderRadius: '6px',
-                      fontSize: '12px'
-                    }}
-                    formatter={(value, name) => [`$${value.toLocaleString()}`, name]}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="income" 
-                    stroke="#10B981" 
-                    strokeWidth={2} 
-                    name="Income"
-                    dot={{ fill: '#10B981', strokeWidth: 2, r: 4 }}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="expenses" 
-                    stroke="#EF4444" 
-                    strokeWidth={2} 
-                    name="Expenses"
-                    dot={{ fill: '#EF4444', strokeWidth: 2, r: 4 }}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="net" 
-                    stroke="#3B82F6" 
-                    strokeWidth={2} 
-                    name="Net"
-                    dot={{ fill: '#3B82F6', strokeWidth: 2, r: 4 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <div className="h-64 sm:h-80 flex items-center justify-center text-gray-500 dark:text-gray-400 text-sm sm:text-base">
-              No transaction data available for cashflow analysis
-            </div>
-          )}
+                  <span className="text-sm sm:text-base font-medium text-gray-900 dark:text-white">{item.name}</span>
+                </div>
+                <span className={`text-sm sm:text-base font-semibold ${item.value > 0 ? 'text-green-600 dark:text-green-400' : item.value < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'} ${privacyMode ? 'filter blur' : ''}`}>
+                  ${item.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+            ))}
+            
+            {allocation.length === 0 && (
+              <div className="text-center py-6 sm:py-8 text-gray-500 dark:text-gray-400">
+                <ChartPieIcon className="mx-auto h-8 sm:h-12 w-8 sm:w-12 mb-4" />
+                <p className="text-sm sm:text-base">No accounts connected</p>
+                <p className="text-xs sm:text-sm">Connect your accounts to see your financial snapshot</p>
+              </div>
+            )}
+          </div>
         </Card>
       </div>
+
+      {/* Income vs Expenses Chart - from Snapshot */}
+      <Card>
+        <div className="mb-6">
+          <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">Income vs Expenses</h3>
+          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">Monthly cash flow analysis</p>
+        </div>
+        {incomeExpensesData.length > 0 ? (
+          <div className="h-48 sm:h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={incomeExpensesData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                <XAxis 
+                  dataKey="month" 
+                  className="text-xs fill-gray-600 dark:fill-gray-400"
+                  tick={{ fontSize: 12 }}
+                />
+                <YAxis 
+                  className="text-xs fill-gray-600 dark:fill-gray-400"
+                  tick={{ fontSize: 12 }}
+                  tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
+                />
+                <Tooltip 
+                  contentStyle={{
+                    backgroundColor: 'var(--tooltip-bg)',
+                    border: '1px solid var(--tooltip-border)',
+                    borderRadius: '6px',
+                    fontSize: '12px'
+                  }}
+                  formatter={(value, name) => {
+                    if (privacyMode) {
+                      return ['***', name]; // Hide values in privacy mode
+                    }
+                    return [`${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, name];
+                  }}
+                />
+                <Bar 
+                  dataKey="income" 
+                  fill="#10B981" 
+                  name="Income"
+                  radius={[2, 2, 0, 0]}
+                />
+                <Bar 
+                  dataKey="expenses" 
+                  fill="#EF4444" 
+                  name="Expenses"
+                  radius={[2, 2, 0, 0]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        ) : (
+          <div className="h-48 sm:h-64 flex items-center justify-center bg-gray-50 dark:bg-gray-700 rounded-lg">
+            <div className="text-center">
+              <ChartBarIcon className="mx-auto h-8 sm:h-12 w-8 sm:w-12 text-gray-400 mb-4" />
+              <p className="text-sm sm:text-base text-gray-500 dark:text-gray-400">No transaction data available</p>
+              <p className="text-xs sm:text-sm text-gray-400 dark:text-gray-500 mt-1">
+                Connect accounts to see income and expenses
+              </p>
+            </div>
+          </div>
+        )}
+      </Card>
+
+      {/* Cash Flow Trends */}
+      <Card>
+        <div className="mb-6">
+          <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">Cash Flow Trends</h3>
+          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Income vs expenses trend over time</p>
+        </div>
+        {cashflowData.length > 0 ? (
+          <div className="h-64 sm:h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={cashflowData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                <XAxis 
+                  dataKey="month" 
+                  className="text-xs fill-gray-600 dark:fill-gray-400"
+                  tick={{ fontSize: 12 }}
+                />
+                <YAxis 
+                  className="text-xs fill-gray-600 dark:fill-gray-400"
+                  tick={{ fontSize: 12 }}
+                  tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
+                />
+                <Tooltip 
+                  contentStyle={{
+                    backgroundColor: 'var(--tooltip-bg)',
+                    border: '1px solid var(--tooltip-border)',
+                    borderRadius: '6px',
+                    fontSize: '12px'
+                  }}
+                  formatter={(value, name) => {
+                    if (privacyMode) {
+                      return ['***', name]; // Hide values in privacy mode
+                    }
+                    return [`${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, name];
+                  }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="income" 
+                  stroke="#10B981" 
+                  strokeWidth={2} 
+                  name="Income"
+                  dot={{ fill: '#10B981', strokeWidth: 2, r: 4 }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="expenses" 
+                  stroke="#EF4444" 
+                  strokeWidth={2} 
+                  name="Expenses"
+                  dot={{ fill: '#EF4444', strokeWidth: 2, r: 4 }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="net" 
+                  stroke="#3B82F6" 
+                  strokeWidth={2} 
+                  name="Net"
+                  dot={{ fill: '#3B82F6', strokeWidth: 2, r: 4 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        ) : (
+          <div className="h-64 sm:h-80 flex items-center justify-center text-gray-500 dark:text-gray-400 text-sm sm:text-base">
+            No transaction data available for cashflow analysis
+          </div>
+        )}
+      </Card>
 
       {/* Recent Transactions */}
       <Card>
         <div className="mb-6">
-          <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">Recent Transactions</h3>
-          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Your latest financial activity</p>
+          <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white text-left">Recent Transactions</h3>
+          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 text-left">Your latest financial activity</p>
         </div>
         <div className="overflow-x-auto -mx-4 sm:mx-0">
           <div className="min-w-full">
@@ -356,11 +532,11 @@ export default function Dashboard() {
                 <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Description
                 </th>
-                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Amount
+                <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                Amount
                 </th>
                 <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Account
+                Account
                 </th>
               </tr>
             </thead>
@@ -373,7 +549,7 @@ export default function Dashboard() {
                   <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white">
                     {txn.date}
                   </td>
-                  <td className="px-3 sm:px-6 py-4 text-xs sm:text-sm text-gray-900 dark:text-white">
+                  <td className="px-3 sm:px-6 py-4 text-xs sm:text-sm text-gray-900 dark:text-white text-left">
                     <div className="truncate max-w-32 sm:max-w-none">
                       {txn.name || txn.payee_name || 'Unknown Transaction'}
                       {txn.source === 'ynab' && (
@@ -381,11 +557,11 @@ export default function Dashboard() {
                       )}
                     </div>
                   </td>
-                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm font-medium text-gray-900 dark:text-white">
-                    ${Math.abs(txn.amount || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                  <td className={`px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm font-medium text-right ${(txn.amount || 0) > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'} ${privacyMode ? 'filter blur' : ''}`}>
+                    ${(txn.amount || 0) < 0 ? '-' : ''}${Math.abs(txn.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
                   <td className="px-3 sm:px-6 py-4 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-                    <div className="truncate max-w-24 sm:max-w-none">
+                    <div className="truncate max-w-24 sm:max-w-none text-left">
                       {allAccounts.find(acc => (acc.account_id || acc.id) === txn.account_id)?.name || txn.account_id}
                     </div>
                   </td>

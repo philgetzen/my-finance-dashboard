@@ -9,7 +9,6 @@ import LoginCard from './components/auth/LoginCard';
 import Dashboard from './components/pages/Dashboard';
 import Accounts from './components/pages/Accounts';
 import BalanceSheet from './components/pages/BalanceSheet';
-import Snapshot from './components/pages/Snapshot';
 import InvestmentAllocation from './components/pages/InvestmentAllocation';
 import Holdings from './components/pages/Holdings';
 import LoadingSpinner from './components/ui/LoadingSpinner';
@@ -71,7 +70,6 @@ function ProtectedRoutes() {
     <Layout>
       <Routes>
         <Route path="/" element={<Dashboard />} />
-        <Route path="/snapshot" element={<Snapshot />} />
         <Route path="/accounts" element={<Accounts />} />
         <Route path="/balance-sheet" element={<BalanceSheet />} />
         <Route path="/investment-allocation" element={<InvestmentAllocation />} />

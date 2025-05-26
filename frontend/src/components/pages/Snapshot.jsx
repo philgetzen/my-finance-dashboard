@@ -94,8 +94,8 @@ export default function Snapshot() {
       <div className="flex items-center gap-3">
         <EyeIcon className="h-8 w-8 text-blue-600 dark:text-blue-400" />
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Financial Snapshot</h1>
-          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1">Your financial overview at a glance</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white text-left">Financial Snapshot</h1>
+          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1 text-left">Your financial overview at a glance</p>
         </div>
       </div>
 
