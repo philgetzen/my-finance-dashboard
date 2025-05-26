@@ -16,6 +16,7 @@
     "firebase": "^11.8.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "react-error-boundary": "^4.0.13",
     "react-plaid-link": "^4.0.1",
     "react-router-dom": "^7.6.0",
     "recharts": "^2.15.3",
