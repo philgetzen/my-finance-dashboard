@@ -6,22 +6,18 @@ export default defineConfig({
   plugins: [react()],
   define: {
     global: 'globalThis',
-    'process.env': {},
+    'process.env': '{}',
   },
   resolve: {
     alias: {
-      // Polyfill Node.js modules for browser
-      util: 'util',
+      // Add any necessary aliases here if needed
     },
   },
   build: {
     rollupOptions: {
       external: [],
       output: {
-        globals: {
-          'process': 'process',
-          'global': 'globalThis'
-        }
+        globals: {}
       }
     },
     target: 'esnext',
@@ -29,7 +25,7 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: [
-      'ynab', 
+      'ynab',
       'firebase/app', 
       'firebase/auth', 
       'firebase/firestore',

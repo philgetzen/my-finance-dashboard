@@ -16,9 +16,9 @@ export const ynabQueryKeys = {
 // Initialize YNAB Service
 export const useInitializeYNAB = () => {
   return useMutation({
-    mutationFn: async (accessToken) => {
-      await ynabService.init(accessToken);
-      return true;
+    mutationFn: (accessToken) => {
+      ynabService.init(accessToken);
+      return Promise.resolve(true);
     },
   });
 };
