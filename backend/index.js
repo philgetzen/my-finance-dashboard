@@ -31,10 +31,11 @@ const configuration = new Configuration({
     },
   },
 });
-const plaidClient = new PlaidApi(configuration);
+// const plaidClient = new PlaidApi(configuration);
 
 admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
+  // credential: admin.credential.cert(serviceAccount)
+  credential: admin.credential.applicationDefault(),
 });
 const db = admin.firestore();
 
