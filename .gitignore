@@ -27,3 +27,4 @@ dist-ssr
 *.firebase.js
 *.firebaseServiceAccount.json
 /Users/philgetzen/development/my-finance-dashboard/backend/firebaseServiceAccount.jsonbackend/firebaseServiceAccount.json
+backend/firebaseServiceAccount.json
