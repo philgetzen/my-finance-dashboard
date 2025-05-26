@@ -7,17 +7,48 @@ class YNABService {
 
   async init(accessToken) {
     try {
+      console.log('Initializing YNAB service with token:', accessToken ? 'Token provided' : 'No token');
+      
+      if (!accessToken) {
+        throw new Error('Access token is required');
+      }
+      
       if (!this.ynabAPI) {
+        console.log('Loading YNAB module...');
         // Dynamic import to avoid build issues
         const ynabModule = await import('ynab');
-        this.ynabAPI = ynabModule.API || ynabModule.default?.API || ynabModule;
+        console.log('YNAB module loaded:', ynabModule);
+        
+        // Try different ways to access the API class
+        this.ynabAPI = ynabModule.API || ynabModule.default?.API || ynabModule.default;
+        
+        if (!this.ynabAPI) {
+          console.error('Could not find YNAB API class in module:', ynabModule);
+          throw new Error('Could not load YNAB API class');
+        }
+        
+        console.log('YNAB API class found:', this.ynabAPI);
       }
       
       this.accessToken = accessToken;
       this.client = new this.ynabAPI(accessToken);
+      
+      console.log('YNAB client initialized successfully');
+      
+      // Test the connection by trying to get budgets
+      try {
+        const response = await this.client.budgets.getBudgets();
+        console.log('YNAB connection test successful:', response.data.budgets.length, 'budgets found');
+      } catch (testError) {
+        console.error('YNAB connection test failed:', testError);
+        throw new Error(`YNAB connection failed: ${testError.message}`);
+      }
+      
     } catch (error) {
       console.error('Error initializing YNAB API:', error);
-      throw new Error('Failed to initialize YNAB API');
+      this.client = null;
+      this.accessToken = null;
+      throw new Error(`Failed to initialize YNAB API: ${error.message}`);
     }
   }
 
