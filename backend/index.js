@@ -3,10 +3,41 @@ const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const admin = require('firebase-admin');
-const serviceAccount = require('./firebaseServiceAccount.json');
 const axios = require('axios');
+const fs = require('fs');
 
 dotenv.config();
+
+// Add startup logging
+console.log('🚀 Starting backend server...');
+console.log('Environment:', process.env.NODE_ENV || 'development');
+console.log('Port:', process.env.PORT || 5001);
+
+// Check if Firebase service account file exists
+let serviceAccount;
+try {
+  if (fs.existsSync('./firebaseServiceAccount.json')) {
+    serviceAccount = require('./firebaseServiceAccount.json');
+    console.log('✅ Firebase service account loaded successfully');
+  } else {
+    console.log('⚠️ Firebase service account file not found, using environment variables');
+    serviceAccount = {
+      type: "service_account",
+      project_id: process.env.FIREBASE_PROJECT_ID,
+      private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
+      private_key: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+      client_email: process.env.FIREBASE_CLIENT_EMAIL,
+      client_id: process.env.FIREBASE_CLIENT_ID,
+      auth_uri: "https://accounts.google.com/o/oauth2/auth",
+      token_uri: "https://oauth2.googleapis.com/token",
+      auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
+      client_x509_cert_url: process.env.FIREBASE_CLIENT_CERT_URL
+    };
+  }
+} catch (error) {
+  console.error('❌ Error loading Firebase service account:', error.message);
+  process.exit(1);
+}
 
 console.log('Loaded ENV:', {
   YNAB_CLIENT_ID: process.env.YNAB_CLIENT_ID,
@@ -18,33 +49,115 @@ const app = express();
 
 // Configure CORS to allow your Netlify domain
 app.use(cors({
-  origin: [
-    'http://localhost:3000',
-    'http://localhost:5173', // Vite dev server
-    'https://serene-kelpie-1319e6.netlify.app', // Your Netlify domain
-    'https://my-finance-dashboard.onrender.com' // Your backend domain
-  ],
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl)
+    if (!origin) return callback(null, true);
+    
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'http://localhost:5173', // Vite dev server
+      'https://serene-kelpie-1319e6.netlify.app', // Old Netlify domain
+      'https://ynabwealthdashboard.netlify.app', // New Netlify domain
+      'https://my-finance-dashboard.onrender.com' // Your backend domain
+    ];
+    
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    
+    console.log('CORS blocked origin:', origin);
+    return callback(new Error('Not allowed by CORS'), false);
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  optionsSuccessStatus: 200 // Some legacy browsers choke on 204
 }));
+
+// Handle preflight requests explicitly
+app.options('*', (req, res) => {
+  const origin = req.headers.origin;
+  const allowedOrigins = [
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'https://serene-kelpie-1319e6.netlify.app',
+    'https://ynabwealthdashboard.netlify.app',
+    'https://my-finance-dashboard.onrender.com'
+  ];
+  
+  if (!origin || allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin || '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.status(200).end();
+  } else {
+    console.log('Preflight request blocked for origin:', origin);
+    res.status(403).end();
+  }
+});
 
 app.use(express.json());
 
+// Add request logging for debugging
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.path} - Origin: ${req.headers.origin || 'none'}`);
+  next();
+});
+
+// Basic routes - these should come early
 const YNAB_CLIENT_ID = process.env.YNAB_CLIENT_ID;
 const YNAB_CLIENT_SECRET = process.env.YNAB_CLIENT_SECRET;
-const YNAB_REDIRECT_URI = process.env.YNAB_REDIRECT_URI || 'http://localhost:5173/auth/ynab/callback';
+// Set redirect URI based on environment
+const YNAB_REDIRECT_URI = process.env.YNAB_REDIRECT_URI || 
+  (process.env.NODE_ENV === 'production' 
+    ? 'https://ynabwealthdashboard.netlify.app/auth/ynab/callback'
+    : 'http://localhost:5173/auth/ynab/callback');
 const YNAB_API_BASE_URL = 'https://api.ynab.com/v1';
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
-  // credential: admin.credential.applicationDefault(),
-});
+// Initialize Firebase Admin
+try {
+  if (!admin.apps.length) {
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount)
+    });
+    console.log('✅ Firebase Admin initialized successfully');
+  }
+} catch (error) {
+  console.error('❌ Error initializing Firebase:', error.message);
+  process.exit(1);
+}
+
 const db = admin.firestore();
+console.log('✅ Firestore initialized');
+
+// Test database connection
+try {
+  db.settings({ ignoreUndefinedProperties: true });
+  console.log('✅ Firestore settings configured');
+} catch (error) {
+  console.error('⚠️ Firestore settings warning:', error.message);
+}
 
 app.get('/', (req, res) => {
-  res.send('YNAB backend is running!');
+  res.json({ 
+    status: 'YNAB backend is running!',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+    port: process.env.PORT || 5001
+  });
 });
+console.log('✅ Registered route: GET /');
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
+});
+console.log('✅ Registered route: GET /health');
 
 // Debug endpoint to check environment variables
 app.get('/api/debug/env', (req, res) => {
@@ -69,6 +182,19 @@ app.get('/api/debug/auth-url', (req, res) => {
 
 // YNAB OAuth endpoints
 app.get('/api/ynab/auth', (req, res) => {
+  // Set CORS headers explicitly for this endpoint
+  const origin = req.headers.origin;
+  if (origin && [
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'https://serene-kelpie-1319e6.netlify.app',
+    'https://ynabwealthdashboard.netlify.app',
+    'https://my-finance-dashboard.onrender.com'
+  ].includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Credentials', 'true');
+  }
+  
   console.log('Generating YNAB auth URL with:', {
     client_id: YNAB_CLIENT_ID,
     redirect_uri: YNAB_REDIRECT_URI
@@ -318,6 +444,19 @@ app.post('/api/ynab/save_token', async (req, res) => {
 
 // Get YNAB token from Firestore
 app.get('/api/ynab/token', async (req, res) => {
+  // Set CORS headers explicitly for this endpoint
+  const origin = req.headers.origin;
+  if (origin && [
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'https://serene-kelpie-1319e6.netlify.app',
+    'https://ynabwealthdashboard.netlify.app',
+    'https://my-finance-dashboard.onrender.com'
+  ].includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Credentials', 'true');
+  }
+  
   const { user_id } = req.query;
   if (!user_id) {
     return res.status(400).json({ error: 'user_id is required' });
@@ -434,7 +573,58 @@ app.delete('/api/manual_accounts/:accountId', async (req, res) => {
   }
 });
 
+// Global error handlers
+process.on('uncaughtException', (error) => {
+  console.error('❌ Uncaught Exception:', error);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+  process.exit(1);
+});
+
+// Catch-all route for debugging - should be last
+app.use('*', (req, res) => {
+  console.log(`❓ Unhandled route: ${req.method} ${req.path}`);
+  console.log('Available routes: /, /health, /api/debug/env, /api/debug/auth-url, /api/ynab/*, /api/manual_accounts');
+  res.status(404).json({ 
+    error: 'Route not found',
+    path: req.path,
+    method: req.method,
+    availableRoutes: ['/', '/health', '/api/debug/env', '/api/debug/auth-url', '/api/ynab/*', '/api/manual_accounts']
+  });
+});
+
 const PORT = process.env.PORT || 5001;
-app.listen(PORT, () => {
-  console.log(`Backend server running on port ${PORT}`);
+
+// Add error handling for the server
+const server = app.listen(PORT, '0.0.0.0', () => {
+  console.log(`✅ Backend server running on port ${PORT}`);
+  console.log(`🌐 Server URL: http://0.0.0.0:${PORT}`);
+  console.log('📡 Server is ready to accept connections');
+});
+
+// Handle server errors
+server.on('error', (error) => {
+  console.error('❌ Server error:', error);
+  if (error.code === 'EADDRINUSE') {
+    console.error(`❌ Port ${PORT} is already in use`);
+  }
+  process.exit(1);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('🚦 SIGTERM received, shutting down gracefully');
+  server.close(() => {
+    console.log('Process terminated');
+  });
+});
+
+process.on('SIGINT', () => {
+  console.log('🚦 SIGINT received, shutting down gracefully');
+  server.close(() => {
+    console.log('Process terminated');
+  });
 });
