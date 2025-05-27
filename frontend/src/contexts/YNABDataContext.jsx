@@ -96,6 +96,11 @@ export const YNABDataProvider = ({ children }) => {
       if (response.ok) {
         setYnabToken(accessToken);
         console.log('YNAB token saved successfully');
+        
+        // Force a small delay to ensure the token state is updated
+        setTimeout(() => {
+          console.log('Triggering data refresh after token save');
+        }, 100);
       }
     } catch (error) {
       console.error('Error saving YNAB token:', error);

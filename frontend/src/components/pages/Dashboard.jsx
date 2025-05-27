@@ -69,7 +69,12 @@ export default function Dashboard() {
 
   const handleYNABConnect = async (accessToken, refreshToken) => {
     await saveYNABToken(accessToken, refreshToken);
-    refetch();
+    console.log('Token saved, waiting a moment before refetch...');
+    // Give time for the state to update, then refetch
+    setTimeout(() => {
+      console.log('Triggering refetch after YNAB connection');
+      refetch();
+    }, 200);
   };
 
   // allAccounts now includes YNAB accounts from useFinancialData

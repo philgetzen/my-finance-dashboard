@@ -18,7 +18,11 @@ export const ynabQueryKeys = {
 export const useInitializeYNAB = (accessToken) => {
   useEffect(() => {
     if (accessToken) {
+      console.log('Initializing YNAB service with token:', accessToken.substring(0, 10) + '...');
       ynabService.init(accessToken);
+      console.log('YNAB service initialized:', ynabService.isInitialized());
+    } else {
+      console.log('No access token provided to initialize YNAB service');
     }
   }, [accessToken]);
 };
@@ -28,7 +32,7 @@ export const useYNABBudgets = (enabled = false) => {
   return useQuery({
     queryKey: ynabQueryKeys.budgets(),
     queryFn: () => ynabService.getBudgets(),
-    enabled: enabled && ynabService.isInitialized(),
+    enabled: enabled,
     staleTime: 10 * 60 * 1000, // 10 minutes
     retry: 2,
   });
@@ -39,7 +43,7 @@ export const useYNABAccounts = (budgetId = 'last-used', enabled = false) => {
   return useQuery({
     queryKey: ynabQueryKeys.accounts(budgetId),
     queryFn: () => ynabService.getAccounts(budgetId),
-    enabled: enabled && ynabService.isInitialized(),
+    enabled: enabled,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 };
@@ -49,7 +53,7 @@ export const useYNABTransactions = (budgetId = 'last-used', enabled = false) => 
   return useQuery({
     queryKey: ynabQueryKeys.transactions(budgetId),
     queryFn: () => ynabService.getTransactions(budgetId),
-    enabled: enabled && ynabService.isInitialized(),
+    enabled: enabled,
     staleTime: 2 * 60 * 1000, // 2 minutes
   });
 };
@@ -59,7 +63,7 @@ export const useYNABCategories = (budgetId = 'last-used', enabled = false) => {
   return useQuery({
     queryKey: ynabQueryKeys.categories(budgetId),
     queryFn: () => ynabService.getCategories(budgetId),
-    enabled: enabled && ynabService.isInitialized(),
+    enabled: enabled,
     staleTime: 10 * 60 * 1000, // 10 minutes
   });
 };
@@ -69,7 +73,7 @@ export const useYNABMonths = (budgetId = 'last-used', enabled = false) => {
   return useQuery({
     queryKey: ynabQueryKeys.months(budgetId),
     queryFn: () => ynabService.getMonths(budgetId),
-    enabled: enabled && ynabService.isInitialized(),
+    enabled: enabled,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 };
@@ -79,7 +83,7 @@ export const useYNABSummary = (budgetId = 'last-used', enabled = false) => {
   return useQuery({
     queryKey: ynabQueryKeys.summary(budgetId),
     queryFn: () => ynabService.getBudgetSummary(budgetId),
-    enabled: enabled && ynabService.isInitialized(),
+    enabled: enabled,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 };
@@ -89,12 +93,15 @@ export const useYNABData = (budgetId = 'last-used', enabled = false, accessToken
   // Initialize YNAB service when access token is provided
   useInitializeYNAB(accessToken);
   
-  const budgets = useYNABBudgets(enabled);
-  const accounts = useYNABAccounts(budgetId, enabled);
-  const transactions = useYNABTransactions(budgetId, enabled);
-  const categories = useYNABCategories(budgetId, enabled);
-  const months = useYNABMonths(budgetId, enabled);
-  const summary = useYNABSummary(budgetId, enabled);
+  // Use accessToken presence instead of ynabService.isInitialized() for enabling queries
+  const shouldEnable = enabled && !!accessToken;
+  
+  const budgets = useYNABBudgets(shouldEnable);
+  const accounts = useYNABAccounts(budgetId, shouldEnable);
+  const transactions = useYNABTransactions(budgetId, shouldEnable);
+  const categories = useYNABCategories(budgetId, shouldEnable);
+  const months = useYNABMonths(budgetId, shouldEnable);
+  const summary = useYNABSummary(budgetId, shouldEnable);
 
   const isLoading = budgets.isLoading || accounts.isLoading || transactions.isLoading || 
                     categories.isLoading || months.isLoading || summary.isLoading;
