@@ -19,6 +19,10 @@ services:
         value: "100937902305400015223"
       - key: FIREBASE_CLIENT_CERT_URL
         value: https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40healthy-wealth-9d3c3.iam.gserviceaccount.com
+      - key: YNAB_CLIENT_ID
+        sync: false
+      - key: YNAB_CLIENT_SECRET
+        sync: false
       - key: YNAB_REDIRECT_URI
         value: https://ynabwealthdashboard.netlify.app/auth/ynab/callback
     healthCheckPath: /health

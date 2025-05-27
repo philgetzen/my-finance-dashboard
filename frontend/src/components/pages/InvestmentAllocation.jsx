@@ -14,10 +14,47 @@ import {
 
 const COLORS = ['#3B82F6', '#8B5CF6', '#EF4444', '#10B981', '#F59E0B', '#06B6D4'];
 
+// Mobile-friendly Investment Account Card
+const InvestmentAccountCard = ({ account, balance, percentage, isPrivacyMode }) => {
+  return (
+    <div className="bg-purple-50 dark:bg-purple-900/10 rounded-lg p-4 hover:bg-purple-100 dark:hover:bg-purple-900/20 transition-colors">
+      <div className="flex items-start justify-between">
+        <div className="flex items-start gap-3 flex-1">
+          <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/20 rounded-lg flex items-center justify-center flex-shrink-0">
+            <ChartBarIcon className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-medium text-gray-900 dark:text-white text-sm truncate">{account.name}</p>
+            <p className="text-xs text-gray-600 dark:text-gray-400 capitalize mt-1">
+              {account.subtype || 'Investment Account'}
+            </p>
+          </div>
+        </div>
+        <div className="text-right ml-3">
+          <p className={`font-semibold text-purple-600 dark:text-purple-400 text-sm ${isPrivacyMode ? 'filter blur' : ''}`}>
+            ${balance.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+          </p>
+          <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+            {percentage.toFixed(1)}%
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default function InvestmentAllocation() {
   const { user, accounts, manualAccounts, isLoading, error } = useYNAB();
   const { isPrivacyMode } = usePrivacy();
   const [tab, setTab] = useState('summary');
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  // Detect mobile screen
+  React.useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const isError = !!error;
   const allAccounts = [...(accounts || []), ...(manualAccounts || [])];
@@ -55,79 +92,82 @@ export default function InvestmentAllocation() {
 
   return (
     <PageTransition>
-      <div className="w-full max-w-none space-y-4 sm:space-y-6 lg:space-y-8">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <ChartBarIcon className="h-8 w-8 text-purple-600 dark:text-purple-400" />
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white text-left">Investment Allocation</h1>
-          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1 text-left">Track your investment portfolio distribution</p>
+      <div className="w-full max-w-none space-y-4 pb-4">
+        {/* Header - Mobile Optimized */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <ChartBarIcon className="h-6 w-6 sm:h-8 sm:w-8 text-purple-600 dark:text-purple-400 flex-shrink-0" />
+            <div>
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white">Investment Allocation</h1>
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Track your portfolio distribution</p>
+            </div>
+          </div>
+          
           {isError && error && (
-            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 p-3 sm:p-4 rounded-lg text-sm sm:text-base mt-4">
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 p-3 rounded-lg text-sm">
               Error: {error?.message || 'Failed to load data'}
             </div>
           )}
         </div>
-      </div>
 
-      {/* Tabs */}
-      <div className="border-b border-gray-200 dark:border-gray-700 pb-4">
-        <div className="flex flex-col sm:flex-row gap-2">
-          {[
-            { id: 'summary', name: 'Summary' },
-            { id: 'detail', name: 'Detail (Coming Soon)' }
-          ].map((tabItem) => (
-            <Button
-              key={tabItem.id}
-              onClick={() => setTab(tabItem.id)}
-              variant={tab === tabItem.id ? 'primary' : 'outline'}
-              size="sm"
-            >
-              {tabItem.name}
-            </Button>
-          ))}
+        {/* Tabs - Mobile Optimized */}
+        <div className="border-b border-gray-200 dark:border-gray-700 -mx-4 px-4 sm:mx-0 sm:px-0">
+          <div className="flex gap-4 overflow-x-auto pb-4">
+            {[
+              { id: 'summary', name: 'Summary' },
+              { id: 'detail', name: 'Detail (Coming Soon)' }
+            ].map((tabItem) => (
+              <button
+                key={tabItem.id}
+                onClick={() => setTab(tabItem.id)}
+                className={`whitespace-nowrap pb-2 px-1 text-sm font-medium transition-colors ${
+                  tab === tabItem.id
+                    ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                }`}
+              >
+                {tabItem.name}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
 
-      {tab === 'summary' && (
-        <div className="space-y-4 sm:space-y-6 lg:space-y-8">
-          {/* Total Investment Value */}
-          <Card className="text-center">
-            <div className="flex items-center justify-center mb-4">
-              <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-r from-purple-500 to-pink-600 rounded-full flex items-center justify-center">
-                <ArrowTrendingUpIcon className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
+        {tab === 'summary' && (
+          <div className="space-y-4">
+            {/* Total Investment Value - Mobile Optimized */}
+            <Card className="p-6">
+              <div className="text-center">
+                <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-purple-500 to-pink-600 rounded-full mb-4">
+                  <ArrowTrendingUpIcon className="h-8 w-8 text-white" />
+                </div>
+                <h2 className="text-sm text-gray-600 dark:text-gray-400 mb-2">Total Investment Value</h2>
+                <p className={`text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white mb-3 ${isPrivacyMode ? 'filter blur' : ''}`}>
+                  ${totalInvestmentValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {investmentAccounts.length} investment {investmentAccounts.length === 1 ? 'account' : 'accounts'}
+                </p>
               </div>
-            </div>
-            <h2 className="text-base sm:text-lg font-medium text-gray-600 dark:text-gray-400 mb-2">Total Investment Value</h2>
-            <p className={`text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-4 ${isPrivacyMode ? 'filter blur' : ''}`}>
-              ${totalInvestmentValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-            </p>
-            <div className="flex items-center justify-center text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-              <span className="mr-2">{investmentAccounts.length}</span>
-              <span>investment {investmentAccounts.length === 1 ? 'account' : 'accounts'}</span>
-            </div>
-          </Card>
+            </Card>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
-            {/* Investment Allocation Chart */}
-            <Card>
-              <div className="mb-6">
-                <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">Allocation Breakdown</h3>
-                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">By account type</p>
+            {/* Investment Allocation Chart - Mobile Optimized */}
+            <Card className="p-4">
+              <div className="mb-4">
+                <h3 className="text-base font-semibold text-gray-900 dark:text-white">Allocation Breakdown</h3>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">By account type</p>
               </div>
               
               {investmentAllocation.length > 0 ? (
-                <div className="h-80 sm:h-96 lg:h-[400px] min-h-[320px]">
+                <div className="h-64 sm:h-80">
                   <ResponsiveContainer width="100%" height="100%">
-                    <PieChart margin={{ top: 20, right: 30, bottom: 60, left: 30 }}>
+                    <PieChart margin={{ top: 0, right: 0, bottom: 40, left: 0 }}>
                       <Pie
                         data={investmentAllocation}
                         dataKey="value"
                         nameKey="name"
                         cx="50%"
-                        cy="40%"
-                        outerRadius="60%"
-                        innerRadius="0%"
+                        cy="45%"
+                        outerRadius={isMobile ? "70%" : "60%"}
                         label={false}
                         stroke="#ffffff"
                         strokeWidth={2}
@@ -138,45 +178,43 @@ export default function InvestmentAllocation() {
                       </Pie>
                       <Tooltip
                         formatter={(value) => {
-                          if (isPrivacyMode) {
-                            return ['***', 'Value'];
-                          }
-                          return [`${value.toLocaleString()}`, 'Value'];
+                          if (isPrivacyMode) return ['***', 'Value'];
+                          return [`$${value.toLocaleString()}`, 'Value'];
                         }}
                         contentStyle={{
                           backgroundColor: 'rgba(255, 255, 255, 0.95)',
                           border: '1px solid #e5e7eb',
                           borderRadius: '8px',
-                          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                          fontSize: '12px'
                         }}
                       />
                       <Legend 
                         verticalAlign="bottom" 
                         height={36}
-                        wrapperStyle={{ paddingTop: '20px' }}
+                        wrapperStyle={{ paddingTop: '10px', fontSize: '12px' }}
                       />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
               ) : (
-                <div className="h-64 sm:h-80 flex items-center justify-center text-gray-500 dark:text-gray-400">
+                <div className="h-48 flex items-center justify-center text-gray-500 dark:text-gray-400">
                   <div className="text-center">
-                    <BanknotesIcon className="mx-auto h-8 sm:h-12 w-8 sm:w-12 mb-4" />
-                    <p className="text-sm sm:text-base">No investment accounts found</p>
-                    <p className="text-xs sm:text-sm mt-1">Connect your investment accounts to see allocation</p>
+                    <BanknotesIcon className="mx-auto h-10 w-10 mb-3" />
+                    <p className="text-sm">No investment accounts found</p>
+                    <p className="text-xs mt-1">Connect your investment accounts</p>
                   </div>
                 </div>
               )}
             </Card>
 
-            {/* Investment Accounts List */}
-            <Card>
-              <div className="mb-6">
-                <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">Investment Accounts</h3>
-                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">All connected investment accounts</p>
+            {/* Investment Accounts List - Mobile Optimized */}
+            <Card className="p-4">
+              <div className="mb-4">
+                <h3 className="text-base font-semibold text-gray-900 dark:text-white">Investment Accounts</h3>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">All connected investment accounts</p>
               </div>
               
-              <div className="space-y-2 sm:space-y-3">
+              <div className="space-y-3">
                 {investmentAccounts.map((account, index) => {
                   // Use same balance calculation as allocation
                   const balance = account.balance !== undefined ? 
@@ -185,57 +223,39 @@ export default function InvestmentAllocation() {
                   const percentage = totalInvestmentValue > 0 ? (balance / totalInvestmentValue) * 100 : 0;
                   
                   return (
-                    <div
+                    <InvestmentAccountCard
                       key={account.account_id || account.id}
-                      className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 bg-purple-50 dark:bg-purple-900/10 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/20 transition-colors gap-2 sm:gap-0"
-                    >
-                      <div className="flex items-center">
-                        <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/20 rounded-lg flex items-center justify-center mr-3">
-                          <ChartBarIcon className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                        </div>
-                        <div>
-                          <p className="text-sm sm:text-base font-medium text-gray-900 dark:text-white">{account.name}</p>
-                          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 capitalize">
-                            {account.subtype || 'Investment Account'}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-left sm:text-right">
-                        <p className={`text-sm sm:text-base font-semibold text-purple-600 dark:text-purple-400 ${isPrivacyMode ? 'filter blur' : ''}`}>
-                          ${balance.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                        </p>
-                        <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                          {percentage.toFixed(1)}%
-                        </p>
-                      </div>
-                    </div>
+                      account={account}
+                      balance={balance}
+                      percentage={percentage}
+                      isPrivacyMode={isPrivacyMode}
+                    />
                   );
                 })}
                 
                 {investmentAccounts.length === 0 && (
-                  <div className="text-center py-6 sm:py-8 text-gray-500 dark:text-gray-400">
-                    <ChartBarIcon className="mx-auto h-8 sm:h-12 w-8 sm:w-12 mb-4" />
-                    <p className="text-sm sm:text-base">No investment accounts connected</p>
-                    <p className="text-xs sm:text-sm">Connect your brokerage accounts to track investments</p>
+                  <div className="text-center py-6 text-gray-500 dark:text-gray-400">
+                    <ChartBarIcon className="mx-auto h-10 w-10 mb-3" />
+                    <p className="text-sm">No investment accounts connected</p>
+                    <p className="text-xs mt-1">Connect your brokerage accounts</p>
                   </div>
                 )}
               </div>
             </Card>
           </div>
-        </div>
-      )}
+        )}
 
-      {tab === 'detail' && (
-        <Card>
-          <div className="text-center py-8 sm:py-12">
-            <ChartBarIcon className="mx-auto h-8 sm:h-12 w-8 sm:w-12 text-gray-400 mb-4" />
-            <h3 className="text-base sm:text-lg font-medium text-gray-900 dark:text-white">Detailed Asset Allocation</h3>
-            <p className="mt-2 text-sm sm:text-base text-gray-600 dark:text-gray-400">
-              Advanced allocation analysis and rebalancing tools coming soon
-            </p>
-          </div>
-        </Card>
-      )}
+        {tab === 'detail' && (
+          <Card className="p-6">
+            <div className="text-center">
+              <ChartBarIcon className="mx-auto h-10 w-10 text-gray-400 mb-3" />
+              <h3 className="text-base font-medium text-gray-900 dark:text-white">Detailed Asset Allocation</h3>
+              <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                Advanced allocation analysis coming soon
+              </p>
+            </div>
+          </Card>
+        )}
       </div>
     </PageTransition>
   );

@@ -16,7 +16,131 @@ import {
   PencilIcon,
   TrashIcon,
   ExclamationTriangleIcon,
+  MagnifyingGlassIcon,
+  FunnelIcon,
 } from '@heroicons/react/24/outline';
+
+// Mobile-friendly account card component
+const AccountCard = ({ account, isManual, isClosed, onEdit, onDelete, deleteConfirm, isPrivacyMode }) => {
+  const getAccountTypeIcon = (type) => {
+    const normalizedType = normalizeYNABAccountType(type);
+    switch (normalizedType) {
+      case 'credit':
+      case 'creditCard':
+        return <CreditCardIcon className="h-5 w-5" />;
+      case 'loan':
+      case 'mortgage':
+        return <BuildingLibraryIcon className="h-5 w-5" />;
+      case 'investment':
+      case 'otherAsset':
+        return <ChartBarIcon className="h-5 w-5" />;
+      default:
+        return <BanknotesIcon className="h-5 w-5" />;
+    }
+  };
+
+  const getAccountTypeColor = (type) => {
+    const normalizedType = normalizeYNABAccountType(type);
+    switch (normalizedType) {
+      case 'credit':
+      case 'creditCard':
+        return 'text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/20';
+      case 'loan':
+      case 'mortgage':
+        return 'text-orange-600 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/20';
+      case 'investment':
+      case 'otherAsset':
+        return 'text-purple-600 dark:text-purple-400 bg-purple-100 dark:bg-purple-900/20';
+      default:
+        return 'text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/20';
+    }
+  };
+
+  const getDisplayAccountType = (type) => {
+    const normalizedType = normalizeYNABAccountType(type);
+    switch (normalizedType) {
+      case 'investment': return 'Investment';
+      case 'credit': return 'Credit Card';
+      case 'checking': return 'Checking';
+      case 'savings': return 'Savings';
+      case 'loan': return 'Loan';
+      case 'mortgage': return 'Mortgage';
+      default: return type ? type.charAt(0).toUpperCase() + type.slice(1) : 'Other';
+    }
+  };
+
+  const extractInstitution = (accountName) => {
+    if (!accountName) return 'Unknown';
+    const patterns = [
+      /^(\w+)\s+/,
+      /^(.+?)\s+(Checking|Savings|Credit|Card|Account)/i,
+    ];
+    
+    for (const pattern of patterns) {
+      const match = accountName.match(pattern);
+      if (match) {
+        return match[1].trim();
+      }
+    }
+    
+    const firstWord = accountName.split(' ')[0];
+    return firstWord.length > 2 ? firstWord : accountName;
+  };
+
+  const formatCurrency = (amount) => {
+    return `${(amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
+
+  return (
+    <div className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md transition-shadow ${isClosed ? 'opacity-60' : ''}`}>
+      <div className="flex items-start justify-between">
+        <div className="flex items-start gap-3 flex-1">
+          <div className={`p-2 rounded-lg ${getAccountTypeColor(account.type)} ${isClosed ? 'opacity-50' : ''} flex-shrink-0`}>
+            {getAccountTypeIcon(account.type)}
+          </div>
+          <div className="flex-1 min-w-0">
+            <h4 className="font-medium text-gray-900 dark:text-white truncate">{account.name}</h4>
+            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+              {extractInstitution(account.name)} • {getDisplayAccountType(account.type)}
+            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+              {account.account_id ? 'YNAB' : 'Manual'} {isClosed && '• Closed'}
+            </p>
+          </div>
+        </div>
+        
+        <div className="text-right ml-3">
+          <p className={`font-semibold text-gray-900 dark:text-white ${isPrivacyMode ? 'filter blur' : ''}`}>
+            ${formatCurrency(getAccountBalance(account))}
+          </p>
+          {isManual && !isClosed && (
+            <div className="flex gap-1 mt-2 justify-end">
+              <button
+                onClick={() => onEdit(account)}
+                className="p-1.5 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                title="Edit account"
+              >
+                <PencilIcon className="h-4 w-4" />
+              </button>
+              
+              <button
+                onClick={() => onDelete(account.id)}
+                className={`p-1.5 rounded-lg transition-colors ${
+                  deleteConfirm === account.id
+                    ? 'text-white bg-red-600 hover:bg-red-700'
+                    : 'text-red-600 hover:bg-red-100 dark:hover:bg-red-900/20'
+                }`}
+                title={deleteConfirm === account.id ? 'Tap again to confirm' : 'Delete account'}
+              >
+                <TrashIcon className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export default function Accounts() {
   const { 
@@ -39,17 +163,24 @@ export default function Accounts() {
   const [filterType, setFilterType] = useState('all');
   const [sortBy, setSortBy] = useState('institution');
   const [searchTerm, setSearchTerm] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  
+  // Detect mobile screen
+  React.useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   
   const ynabConnected = !!ynabToken;
   const allAccounts = [...(ynabAccounts || []), ...(manualAccounts || [])];
   const isError = !!error;
 
-
   const handleEditAccount = (account) => {
     setEditingAccount(account);
     setShowEditModal(true);
   };
-
 
   const handleDeleteAccount = async (accountId) => {
     if (deleteConfirm === accountId) {
@@ -65,41 +196,6 @@ export default function Accounts() {
     }
   };
 
-  const getAccountTypeIcon = (type) => {
-    const normalizedType = normalizeAccountType(type);
-    switch (normalizedType) {
-      case 'credit':
-      case 'creditCard':
-        return <CreditCardIcon className="h-5 w-5" />;
-      case 'loan':
-      case 'mortgage':
-        return <BuildingLibraryIcon className="h-5 w-5" />;
-      case 'investment':
-      case 'otherAsset':
-        return <ChartBarIcon className="h-5 w-5" />;
-      default:
-        return <BanknotesIcon className="h-5 w-5" />;
-    }
-  };
-
-  const getAccountTypeColor = (type) => {
-    const normalizedType = normalizeAccountType(type);
-    switch (normalizedType) {
-      case 'credit':
-      case 'creditCard':
-        return 'text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/20';
-      case 'loan':
-      case 'mortgage':
-        return 'text-orange-600 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/20';
-      case 'investment':
-      case 'otherAsset':
-        return 'text-purple-600 dark:text-purple-400 bg-purple-100 dark:bg-purple-900/20';
-      default:
-        return 'text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/20';
-    }
-  };
-
-  // Helper functions for account processing
   const normalizeAccountType = (type) => {
     return normalizeYNABAccountType(type);
   };
@@ -119,10 +215,9 @@ export default function Accounts() {
 
   const extractInstitution = (accountName) => {
     if (!accountName) return 'Unknown';
-    // Common patterns for institution extraction
     const patterns = [
-      /^(\w+)\s+/,  // First word
-      /^(.+?)\s+(Checking|Savings|Credit|Card|Account)/i,  // Before account type
+      /^(\w+)\s+/,
+      /^(.+?)\s+(Checking|Savings|Credit|Card|Account)/i,
     ];
     
     for (const pattern of patterns) {
@@ -132,7 +227,6 @@ export default function Accounts() {
       }
     }
     
-    // Fallback: use first word or full name if short
     const firstWord = accountName.split(' ')[0];
     return firstWord.length > 2 ? firstWord : accountName;
   };
@@ -142,23 +236,22 @@ export default function Accounts() {
     switch (normalizedType) {
       case 'checking':
       case 'savings':
-        return 1; // Cash accounts first
+        return 1;
       case 'credit':
-        return 2; // Credit cards second
+        return 2;
       case 'investment':
-        return 3; // Investments third
+        return 3;
       case 'loan':
       case 'mortgage':
-        return 4; // Loans/Mortgages last
+        return 4;
       default:
-        return 5; // Other accounts at the end
+        return 5;
     }
   };
 
   const sortAccounts = (accounts, sortBy, searchTerm = '') => {
     let filtered = accounts;
     
-    // Apply search filter
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       filtered = accounts.filter(account => 
@@ -168,7 +261,6 @@ export default function Accounts() {
       );
     }
     
-    // Apply sorting
     return filtered.sort((a, b) => {
       switch (sortBy) {
         case 'institution':
@@ -195,25 +287,12 @@ export default function Accounts() {
     });
   };
 
-  const groupAccountsByType = (accounts) => {
-    const groups = {};
-    accounts.forEach(account => {
-      const type = getDisplayAccountType(account.type);
-      if (!groups[type]) {
-        groups[type] = [];
-      }
-      groups[type].push(account);
-    });
-    return groups;
-  };
-
   const filterAccountsByType = (accounts, filterType) => {
-    if (filterType === 'all') return accounts;
-    const filtered = accounts.filter(account => {
+    if (filterType === 'all') return [...accounts];
+    return accounts.filter(account => {
       const normalizedType = normalizeAccountType(account.type);
       return normalizedType === filterType;
     });
-    return filtered;
   };
 
   const formatCurrency = (amount) => {
@@ -223,13 +302,11 @@ export default function Accounts() {
   // Calculate net worth
   const liabilityTypes = ['credit', 'loan', 'mortgage', 'credit_card', 'creditCard'];
   
-  // Helper function to check if an account is a liability
   const isLiability = (account) => {
     const type = account.type?.toLowerCase();
     const subtype = account.subtype?.toLowerCase();
     const name = account.name?.toLowerCase();
     
-    // Check for credit card indicators in various fields
     return (
       liabilityTypes.some(liability => type?.includes(liability)) ||
       liabilityTypes.some(liability => subtype?.includes(liability)) ||
@@ -255,51 +332,60 @@ export default function Accounts() {
 
   return (
     <PageTransition>
-      <div className="w-full max-w-none space-y-4 sm:space-y-6 lg:space-y-8">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="w-full max-w-none space-y-4 pb-4">
+        {/* Header - Mobile Optimized */}
+        <div className="space-y-4">
           <div className="flex items-center gap-3">
-            <CreditCardIcon className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+            <CreditCardIcon className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600 dark:text-blue-400 flex-shrink-0" />
             <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white text-left">Accounts</h1>
-            <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1 text-left">
-            Manage all your connected accounts
-            </p>
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white">Accounts</h1>
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                Manage all your connected accounts
+              </p>
             </div>
           </div>
           
-          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+          <div className="flex gap-2">
             <Button
               onClick={() => setShowAddModal(true)}
               className="flex items-center gap-2"
+              size="sm"
             >
               <PlusIcon className="h-4 w-4" />
-              Add Manual Account
+              <span className="hidden sm:inline">Add Manual Account</span>
+              <span className="sm:hidden">Add Account</span>
             </Button>
           </div>
         </div>
 
-        {/* Filters */}
-        <Card>
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row gap-4">
-              {/* Search */}
-              <div className="flex-1">
-                <input
-                  type="text"
-                  placeholder="Search accounts..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-              
-              {/* Type Filter */}
-              <div className="w-full sm:w-48">
+        {/* Mobile Search Bar */}
+        <div className="relative">
+          <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search accounts..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-10 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+          />
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`absolute right-3 top-1/2 transform -translate-y-1/2 p-1 ${showFilters ? 'text-blue-600' : 'text-gray-400'}`}
+          >
+            <FunnelIcon className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Filters - Collapsible on Mobile */}
+        {showFilters && (
+          <Card className="p-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Type</label>
                 <select
                   value={filterType}
                   onChange={(e) => setFilterType(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                 >
                   <option value="all">All Types</option>
                   <option value="checking">Checking</option>
@@ -311,22 +397,22 @@ export default function Accounts() {
                 </select>
               </div>
               
-              {/* Sort */}
-              <div className="w-full sm:w-48">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Sort By</label>
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                 >
-                  <option value="institution">By Institution</option>
-                  <option value="balance">By Balance</option>
-                  <option value="name">By Name</option>
-                  <option value="type">By Type</option>
+                  <option value="institution">Institution</option>
+                  <option value="balance">Balance</option>
+                  <option value="name">Name</option>
+                  <option value="type">Type</option>
                 </select>
               </div>
             </div>
-          </div>
-        </Card>
+          </Card>
+        )}
 
         {/* YNAB Accounts - Active */}
         {(() => {
@@ -338,55 +424,37 @@ export default function Accounts() {
           );
           
           return ynabConnected && filteredAccounts.length > 0 ? (
-            <Card>
-              <div className="mb-6">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2 text-left">
+            <Card className="p-4">
+              <div className="mb-4">
+                <h3 className="text-base font-semibold text-gray-900 dark:text-white">
                   YNAB Accounts
                 </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 text-left">
-                  {filteredAccounts.length} active {filteredAccounts.length === 1 ? 'account' : 'accounts'} from YNAB
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                  {filteredAccounts.length} active {filteredAccounts.length === 1 ? 'account' : 'accounts'}
                 </p>
               </div>
               
               <div className="space-y-3">
                 {filteredAccounts.slice(0, showAllYnab ? filteredAccounts.length : 5).map((account) => (
-                  <div
+                  <AccountCard
                     key={account.account_id}
-                    className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg transition-all duration-300 ease-in-out transform hover:scale-[1.01] animate-in fade-in-0 slide-in-from-left-4"
-                  >
-                    <div className="flex items-center">
-                      <div className={`p-2 rounded-lg mr-3 ${getAccountTypeColor(account.type)}`}>
-                        {getAccountTypeIcon(account.type)}
-                      </div>
-                      <div>
-                        <h4 className="font-medium text-gray-900 dark:text-white text-left">{account.name}</h4>
-                        <p className="text-sm text-gray-600 dark:text-gray-400 capitalize text-left">
-                          {extractInstitution(account.name)} • {getDisplayAccountType(account.type)} • YNAB • Active
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-3">
-                      <div className="text-right mr-3">
-                        <p className={`font-semibold text-gray-900 dark:text-white ${isPrivacyMode ? 'filter blur' : ''}`}>
-                          ${formatCurrency(getAccountBalance(account))}
-                        </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-500">Read-only</p>
-                      </div>
-                    </div>
-                  </div>
+                    account={account}
+                    isManual={false}
+                    isClosed={false}
+                    isPrivacyMode={isPrivacyMode}
+                  />
                 ))}
                 
                 {filteredAccounts.length > 5 && (
-                  <div className="text-center py-4">
+                  <div className="text-center pt-2">
                     <Button
                       variant="outline"
                       onClick={() => setShowAllYnab(!showAllYnab)}
-                      className="text-sm"
+                      size="sm"
                     >
                       {showAllYnab 
                         ? 'Show Less' 
-                        : `Show All ${filteredAccounts.length} YNAB Accounts (${filteredAccounts.length - 5} more)`
+                        : `Show All ${filteredAccounts.length} Accounts`
                       }
                     </Button>
                   </div>
@@ -398,16 +466,13 @@ export default function Accounts() {
 
         {/* Error Display */}
         {isError && (
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 p-4 rounded-lg">
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 p-3 rounded-lg">
             <div className="flex items-center">
-              <ExclamationTriangleIcon className="h-5 w-5 mr-2" />
-              <p>{error?.message || 'Unknown error occurred'}</p>
+              <ExclamationTriangleIcon className="h-4 w-4 mr-2 flex-shrink-0" />
+              <p className="text-sm">{error?.message || 'Unknown error occurred'}</p>
             </div>
           </div>
         )}
-
-
-
 
         {/* Manual Accounts */}
         {(() => {
@@ -418,90 +483,52 @@ export default function Accounts() {
           );
           
           return filteredAccounts.length > 0 ? (
-            <Card>
-              <div className="mb-6">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2 text-left">
+            <Card className="p-4">
+              <div className="mb-4">
+                <h3 className="text-base font-semibold text-gray-900 dark:text-white">
                   Manual Accounts
                 </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 text-left">
-                  {filteredAccounts.length} {filteredAccounts.length === 1 ? 'account' : 'accounts'} - editable and removable
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                  {filteredAccounts.length} {filteredAccounts.length === 1 ? 'account' : 'accounts'} - editable
                 </p>
               </div>
               
               <div className="space-y-3">
                 {filteredAccounts.map((account) => (
-                  <div
+                  <AccountCard
                     key={account.id}
-                    className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg transition-all duration-300 ease-in-out transform hover:scale-[1.01] animate-in fade-in-0 slide-in-from-left-4"
-                  >
-                    <div className="flex items-center">
-                      <div className={`p-2 rounded-lg mr-3 ${getAccountTypeColor(account.type)}`}>
-                        {getAccountTypeIcon(account.type)}
-                      </div>
-                      <div>
-                        <h4 className="font-medium text-gray-900 dark:text-white text-left">{account.name}</h4>
-                        <p className="text-sm text-gray-600 dark:text-gray-400 capitalize text-left">
-                          {extractInstitution(account.name)} • {getDisplayAccountType(account.type)} • Manual
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-3">
-                      <div className="text-right mr-3">
-                        <p className={`font-semibold text-gray-900 dark:text-white ${isPrivacyMode ? 'filter blur' : ''}`}>
-                          ${formatCurrency(getAccountBalance(account))}
-                        </p>
-                      </div>
-                      
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleEditAccount(account)}
-                          className="p-2 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
-                          title="Edit account"
-                        >
-                          <PencilIcon className="h-4 w-4" />
-                        </button>
-                        
-                        <button
-                          onClick={() => handleDeleteAccount(account.id)}
-                          className={`p-2 rounded-lg transition-colors ${
-                            deleteConfirm === account.id
-                              ? 'text-white bg-red-600 hover:bg-red-700'
-                              : 'text-red-600 hover:bg-red-100 dark:hover:bg-red-900/20'
-                          }`}
-                          title={deleteConfirm === account.id ? 'Click again to confirm' : 'Delete account'}
-                        >
-                          <TrashIcon className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                    account={account}
+                    isManual={true}
+                    isClosed={false}
+                    onEdit={handleEditAccount}
+                    onDelete={handleDeleteAccount}
+                    deleteConfirm={deleteConfirm}
+                    isPrivacyMode={isPrivacyMode}
+                  />
                 ))}
               </div>
             </Card>
           ) : (manualAccounts || []).length === 0 && (filterType === 'all' || !searchTerm) ? (
-            <Card>
-              <div className="mb-6">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2 text-left">Manual Accounts</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 text-left">
-                  Accounts you've added manually - editable and removable
+            <Card className="p-4">
+              <div className="mb-4">
+                <h3 className="text-base font-semibold text-gray-900 dark:text-white">Manual Accounts</h3>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                  Add accounts manually
                 </p>
               </div>
-              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                <BanknotesIcon className="mx-auto h-12 w-12 mb-4" />
-                <p>No manual accounts added yet</p>
-                <p className="text-sm mt-1">Click "Add Manual Account" to get started</p>
+              <div className="text-center py-6 text-gray-500 dark:text-gray-400">
+                <BanknotesIcon className="mx-auto h-10 w-10 mb-3" />
+                <p className="text-sm">No manual accounts added yet</p>
+                <p className="text-xs mt-1">Click "Add Account" to get started</p>
               </div>
             </Card>
           ) : null;
         })()}
 
-
-
-        {/* Closed Accounts (Combined) */}
+        {/* Closed Accounts */}
         {(() => {
           const closedYnabAccounts = ynabAccounts?.filter(acc => acc.closed) || [];
-          const closedManualAccounts = []; // Manual accounts don't have closed status currently
+          const closedManualAccounts = [];
           const allClosedAccounts = [...closedYnabAccounts, ...closedManualAccounts];
           
           const filteredAccounts = sortAccounts(
@@ -511,43 +538,25 @@ export default function Accounts() {
           );
           
           return filteredAccounts.length > 0 ? (
-            <Card>
-              <div className="mb-6">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2 text-left">
+            <Card className="p-4">
+              <div className="mb-4">
+                <h3 className="text-base font-semibold text-gray-900 dark:text-white">
                   Closed Accounts
                 </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 text-left">
-                  {filteredAccounts.length} closed {filteredAccounts.length === 1 ? 'account' : 'accounts'} from YNAB and manual entries
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                  {filteredAccounts.length} closed {filteredAccounts.length === 1 ? 'account' : 'accounts'}
                 </p>
               </div>
               
               <div className="space-y-3">
                 {filteredAccounts.map((account) => (
-                  <div
+                  <AccountCard
                     key={account.account_id || account.id}
-                    className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg opacity-60 transition-all duration-300 ease-in-out"
-                  >
-                    <div className="flex items-center">
-                      <div className={`p-2 rounded-lg mr-3 ${getAccountTypeColor(account.type)} opacity-50`}>
-                        {getAccountTypeIcon(account.type)}
-                      </div>
-                      <div>
-                        <h4 className="font-medium text-gray-900 dark:text-white text-left">{account.name}</h4>
-                        <p className="text-sm text-gray-600 dark:text-gray-400 capitalize text-left">
-                          {extractInstitution(account.name)} • {getDisplayAccountType(account.type)} • {account.account_id ? 'YNAB' : 'Manual'} • Closed
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-3">
-                      <div className="text-right mr-3">
-                        <p className={`font-semibold text-gray-900 dark:text-white ${isPrivacyMode ? 'filter blur' : ''}`}>
-                          ${formatCurrency(getAccountBalance(account))}
-                        </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-500">Read-only</p>
-                      </div>
-                    </div>
-                  </div>
+                    account={account}
+                    isManual={!account.account_id}
+                    isClosed={true}
+                    isPrivacyMode={isPrivacyMode}
+                  />
                 ))}
               </div>
             </Card>
