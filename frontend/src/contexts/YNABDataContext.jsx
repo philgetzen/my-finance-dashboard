@@ -77,8 +77,8 @@ export const YNABDataProvider = ({ children }) => {
     return () => unsubscribe();
   }, []);
 
-  // Initialize YNAB data
-  const ynabData = useYNABData('last-used', !!ynabToken, ynabToken);
+  // Initialize YNAB data - only when we have a token
+  const ynabData = useYNABData('last-used', !!ynabToken && !loading, ynabToken);
 
   // Helper function to save YNAB token
   const saveYNABToken = async (accessToken, refreshToken) => {

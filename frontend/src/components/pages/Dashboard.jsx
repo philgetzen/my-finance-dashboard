@@ -19,6 +19,7 @@ import {
   ArrowTrendingDownIcon,
   ScaleIcon,
   ChartPieIcon,
+  LinkIcon,
 } from '@heroicons/react/24/outline';
 
 const COLORS = ['#3B82F6', '#8B5CF6', '#EF4444', '#10B981', '#F59E0B', '#06B6D4'];
@@ -241,9 +242,19 @@ export default function Dashboard() {
       </div>
 
       {/* Error Messages */}
-      {error && (
+      {error && ynabToken && (
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 p-3 sm:p-4 rounded-lg text-sm sm:text-base">
           {error.message || 'Failed to load data'}
+        </div>
+      )}
+
+      {/* YNAB Connection Status */}
+      {!ynabToken && (
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400 p-3 sm:p-4 rounded-lg text-sm sm:text-base">
+          <div className="flex items-center">
+            <LinkIcon className="h-5 w-5 mr-2" />
+            <span>Connect your YNAB account to see your financial data</span>
+          </div>
         </div>
       )}
 

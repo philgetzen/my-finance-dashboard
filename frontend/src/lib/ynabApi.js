@@ -16,7 +16,8 @@ class YNABService {
 
   async makeRequest(endpoint, options = {}) {
     if (!this.isInitialized() && !options.skipAuth) {
-      throw new Error('YNAB service not initialized');
+      console.warn('YNAB API request attempted without access token');
+      throw new Error('YNAB service not initialized - please connect your YNAB account first');
     }
 
     const headers = {
@@ -35,8 +36,14 @@ class YNABService {
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'API request failed');
+        const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+        
+        // Handle specific error cases
+        if (response.status === 401) {
+          throw new Error('YNAB authentication failed - please reconnect your account');
+        }
+        
+        throw new Error(error.error || `API request failed with status ${response.status}`);
       }
 
       return await response.json();
