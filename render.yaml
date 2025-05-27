@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: my-finance-dashboard-backend
+    env: node
+    buildCommand: cd backend && npm install
+    startCommand: cd backend && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: FIREBASE_PROJECT_ID
+        value: healthy-wealth-9d3c3
+      - key: FIREBASE_PRIVATE_KEY_ID
+        value: 0d97e66c1a194e8e70e318d55bd939e9d2f9af80
+      - key: FIREBASE_PRIVATE_KEY
+        value: "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQDZhEybKXubsSPj\nEmDGTYbcC65mQUx971/yzczTUUqXcrmNdn/Sz4ryIfJcecaIKtkrGGL1FZSvsFXe\nElLM5HwORK7uepv39//hu8N1yzu9o+7FfuIVIQ7EczhowP7D719xkJKyIEdIJ23s\nN3n1YAr8ugBWNrCpOtN6VR3+j45ke2bGURdjnhogWQ1ykfCVyvBNVCRfi6JVXfj/\nLj/XPkxdIYzEz8d2oEhpnO6Fw/IaE3YLlCG4aLT+WU9rHtoI7ophcC9vKruhUu7N\n2Sxnl61IoCUFiiEh3kQdor20nJjbRcG88wblXc+AjXA3E71ZNlv3lDiyCDYSQ/Py\n33OjOEJNAgMBAAECggEAFfri/NjrxzdWv4bnZZKG+qxpgqa9kopCYVg/hukThwtO\nSce8MfLMARzCD2s0zyS5TjwIH+j+3eQNQUQLvu2lxZFWNf4Izb1vS4G8RiZz0n2C\nzs08DlOJWPulqxw5glYpiGHKGRre6SEm3/RZLBz470Hib9PV9TvfC+EXB1a9VlTc\nQHgtJeFUA0dIqrBBaEXxIlz5pj03zAPy4uM01JFjNmR1QDcIV1d6nGMPMFfRALn4\nakDexU9kRGzFeQf4JByePg7J4HaUE68PDLYwGWKysi/KGDsB6Hr5CyYJ5GTxBlvT\nJlHBnqgKDb+sfBS9iph51jeSrLHu5gPTb2jwrshzNwKBgQDyBjDcLe/E96WjrtQT\nEf3ZpsX1IPGUHpK8C/S8PBl6y3iYq9A4XGQNVzWRZ/7pSRVwga+2spEVJ3DV9Qoc\nLpDpdmbjO5JsnJPXv4CotQg6SST3QPX2kLfH8Rb2aHyRQyTEztbPqQA8oMuwOvRJ\nJFIYesm4kDpLB+ZhM8IetiU+7wKBgQDmE9GyZ1D7eQRIqB/4g9h57U+oZ16otqOy\nWuCdsDP2AsfLqByMhHMps38YfHUjZAqFe07RanUz9RjWUiISQWS/N7qTuZQmzloh\nca7IZ+docwZZY/kmZIHUF7UK1Qg4e4xpuN11vv9mPAUoOwH0YJKHJcKjYES5WZ8F\nGfsFWAfSgwKBgHlcb13JTyUmxZGJlmClsfRVM4jS5zDOD+hp2mQVgvVXWHa+GSBZ\n+/XQmFT8oA+dDTooXdMwQZ4o8+TmBhbRpura64bglXEPJveV2M9AUAriKL4vfecQ\n9Ic3NruC84vn7mUeDwt8hFjijKEnPt36b4xE7ig1cnWzVWvCh4Hc9lpTAoGADlyw\nW12drYT5Ynu0OzQnwDyzG0UQoKF+CHUpzk4ggDveMvVUiuT9t12wElw6h7IIAhsX\naXUmyc6D9WT9IXyZiGI3MF+GQwHgmHPbQEFULa34eH4IIIBnplCwiXOQ5s23jyXu\nFRqOINigTcmZLqMUooEV7FLnF1bj2VKs28GKA3cCgYA8jEVDc7L0rkHLIBCDrjpb\nCxFnSr+zev/nsR72XNq4NzR8EmV6PSxnqlcEZPTM58p4oa+cRyHdrqiRCwQT7Y95\nDsltfTrjIxjNfmBHHgjjZpFS2S5aZjPI0ku5RPp/CFAXCmq0ny7YLHC/BI1fcYU1\nZc61jsKiMHvNDwLbFnTXQA==\n-----END PRIVATE KEY-----\n"
+      - key: FIREBASE_CLIENT_EMAIL
+        value: firebase-adminsdk-fbsvc@healthy-wealth-9d3c3.iam.gserviceaccount.com
+      - key: FIREBASE_CLIENT_ID
+        value: "100937902305400015223"
+      - key: FIREBASE_CLIENT_CERT_URL
+        value: https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40healthy-wealth-9d3c3.iam.gserviceaccount.com
+      - key: YNAB_REDIRECT_URI
+        value: https://ynabwealthdashboard.netlify.app/auth/ynab/callback
+    healthCheckPath: /health
