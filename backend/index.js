@@ -46,32 +46,139 @@ app.get('/', (req, res) => {
   res.send('YNAB backend is running!');
 });
 
+// Debug endpoint to check environment variables
+app.get('/api/debug/env', (req, res) => {
+  res.json({
+    YNAB_CLIENT_ID: YNAB_CLIENT_ID ? 'SET' : 'MISSING',
+    YNAB_CLIENT_SECRET: YNAB_CLIENT_SECRET ? 'SET' : 'MISSING',
+    YNAB_REDIRECT_URI: YNAB_REDIRECT_URI || 'MISSING',
+    NODE_ENV: process.env.NODE_ENV || 'not set'
+  });
+});
+
+// Debug endpoint to check auth URL generation
+app.get('/api/debug/auth-url', (req, res) => {
+  const authUrl = `https://app.ynab.com/oauth/authorize?client_id=${YNAB_CLIENT_ID}&redirect_uri=${encodeURIComponent(YNAB_REDIRECT_URI)}&response_type=code`;
+  res.json({
+    client_id: YNAB_CLIENT_ID,
+    redirect_uri: YNAB_REDIRECT_URI,
+    encoded_redirect_uri: encodeURIComponent(YNAB_REDIRECT_URI),
+    full_auth_url: authUrl
+  });
+});
+
 // YNAB OAuth endpoints
 app.get('/api/ynab/auth', (req, res) => {
+  console.log('Generating YNAB auth URL with:', {
+    client_id: YNAB_CLIENT_ID,
+    redirect_uri: YNAB_REDIRECT_URI
+  });
+  
+  if (!YNAB_CLIENT_ID) {
+    return res.status(500).json({ error: 'YNAB_CLIENT_ID not configured' });
+  }
+  
   const authUrl = `https://app.ynab.com/oauth/authorize?client_id=${YNAB_CLIENT_ID}&redirect_uri=${encodeURIComponent(YNAB_REDIRECT_URI)}&response_type=code`;
+  console.log('Generated auth URL:', authUrl);
   res.json({ authUrl });
 });
 
+// Track processed authorization codes to prevent duplicates
+const processedCodes = new Set();
+
 app.post('/api/ynab/token', async (req, res) => {
   const { code } = req.body;
+  console.log('=== TOKEN EXCHANGE REQUEST RECEIVED ===');
+  console.log('Request body:', req.body);
+  console.log('Authorization code received:', code ? 'YES' : 'NO');
+  
   if (!code) {
+    console.error('❌ No authorization code provided');
     return res.status(400).json({ error: 'Authorization code is required' });
   }
   
+  // Check for duplicate requests
+  if (processedCodes.has(code)) {
+    console.log('⚠️ Duplicate authorization code request detected, ignoring');
+    return res.status(409).json({ error: 'Authorization code already processed' });
+  }
+  
+  // Mark code as being processed
+  processedCodes.add(code);
+  
+  // Clean up old codes (keep last 100 to prevent memory issues)
+  if (processedCodes.size > 100) {
+    const codesArray = Array.from(processedCodes);
+    processedCodes.clear();
+    codesArray.slice(-50).forEach(c => processedCodes.add(c));
+  }
+  
+  // Debug logging
+  console.log('Token exchange attempt:', {
+    client_id: YNAB_CLIENT_ID,
+    client_secret: YNAB_CLIENT_SECRET ? 'SET' : 'MISSING',
+    redirect_uri: YNAB_REDIRECT_URI,
+    code: code ? 'PROVIDED' : 'MISSING'
+  });
+  
+  if (!YNAB_CLIENT_ID || !YNAB_CLIENT_SECRET) {
+    console.error('❌ Missing YNAB credentials:', {
+      YNAB_CLIENT_ID: !!YNAB_CLIENT_ID,
+      YNAB_CLIENT_SECRET: !!YNAB_CLIENT_SECRET
+    });
+    return res.status(500).json({ error: 'Server configuration error: Missing YNAB credentials' });
+  }
+  
   try {
-    const response = await axios.post('https://app.ynab.com/oauth/token', {
+    const tokenPayload = {
       client_id: YNAB_CLIENT_ID,
       client_secret: YNAB_CLIENT_SECRET,
       redirect_uri: YNAB_REDIRECT_URI,
       grant_type: 'authorization_code',
       code
+    };
+    
+    console.log('📤 Sending token request to YNAB with payload:', {
+      ...tokenPayload,
+      client_secret: '***',
+      code: code.substring(0, 10) + '...'
     });
+    
+    const response = await axios.post('https://app.ynab.com/oauth/token', tokenPayload, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      timeout: 10000 // 10 second timeout
+    });
+    
+    console.log('✅ YNAB token exchange successful');
+    console.log('Response status:', response.status);
     
     const { access_token, refresh_token } = response.data;
     res.json({ access_token, refresh_token });
   } catch (error) {
-    console.error('Error exchanging YNAB code:', error.response?.data || error.message);
-    res.status(500).json({ error: 'Unable to exchange authorization code' });
+    console.error('❌ Error exchanging YNAB code:');
+    console.error('Error type:', error.constructor.name);
+    console.error('Error message:', error.message);
+    
+    if (error.response) {
+      console.error('Response status:', error.response.status);
+      console.error('Response statusText:', error.response.statusText);
+      console.error('Response headers:', error.response.headers);
+      console.error('Response data:', error.response.data);
+    } else if (error.request) {
+      console.error('Request was made but no response received');
+      console.error('Request details:', error.request);
+    } else {
+      console.error('Error setting up request:', error.message);
+    }
+    
+    res.status(500).json({ 
+      error: 'Unable to exchange authorization code',
+      details: error.response?.data || error.message,
+      status: error.response?.status
+    });
   }
 });
 

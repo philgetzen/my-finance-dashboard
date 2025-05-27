@@ -1,7 +1,6 @@
 import React from 'react';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { usePlaid } from '../../contexts/PlaidDataContext';
-import { useCombinedFinanceData } from '../../hooks/useCombinedFinanceData';
+import { useYNAB, usePrivacy } from '../../contexts/YNABDataContext';
 import Card from '../ui/Card';
 import { HoldingsSkeleton } from '../ui/Skeleton';
 import PageTransition from '../ui/PageTransition';
@@ -16,8 +15,13 @@ import {
 const COLORS = ['#3B82F6', '#8B5CF6', '#EF4444', '#10B981', '#F59E0B', '#06B6D4', '#EC4899', '#6366F1'];
 
 export default function Holdings() {
-  const { user } = usePlaid();
-  const { accounts, holdings, isLoading, isError, error } = useCombinedFinanceData(user?.uid);
+  const { user, accounts, isLoading, error } = useYNAB();
+  const { isPrivacyMode } = usePrivacy();
+  
+  // For now, Holdings will show a placeholder since YNAB doesn't provide investment holdings
+  // This would typically come from Plaid investment accounts
+  const holdings = [];
+  const isError = !!error;
 
   // Helper functions for account processing
   const normalizeAccountType = (type) => {

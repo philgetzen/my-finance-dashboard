@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useYNAB, usePrivacy } from '../../contexts/YNABDataContext';
+import { getAccountBalance, normalizeYNABAccountType } from '../../utils/ynabHelpers';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
 import ManualAccountModal from '../ui/ManualAccountModal';
@@ -100,12 +101,7 @@ export default function Accounts() {
 
   // Helper functions for account processing
   const normalizeAccountType = (type) => {
-    if (!type) return 'other';
-    const lowerType = type.toLowerCase();
-    if (lowerType === 'otherasset') return 'investment';
-    if (lowerType === 'creditcard') return 'credit';
-    if (lowerType === 'otherliability') return 'loan';
-    return lowerType;
+    return normalizeYNABAccountType(type);
   };
 
   const getDisplayAccountType = (type) => {
@@ -183,7 +179,7 @@ export default function Accounts() {
           }
           return a.name.localeCompare(b.name);
         case 'balance':
-          return (b.balance || 0) - (a.balance || 0);
+          return getAccountBalance(b) - getAccountBalance(a);
         case 'name':
           return a.name.localeCompare(b.name);
         case 'type':
@@ -245,7 +241,7 @@ export default function Accounts() {
   };
   
   const netWorth = allAccounts.reduce((sum, acc) => {
-    const bal = acc.balances?.current ?? acc.balance ?? 0;
+    const bal = getAccountBalance(acc);
     return isLiability(acc) ? sum - Math.abs(bal) : sum + bal;
   }, 0);
 
@@ -334,7 +330,7 @@ export default function Accounts() {
 
         {/* YNAB Accounts - Active */}
         {(() => {
-          const activeAccounts = ynabAccounts.filter(acc => !acc.closed);
+          const activeAccounts = ynabAccounts?.filter(acc => !acc.closed) || [];
           const filteredAccounts = sortAccounts(
             filterAccountsByType(activeAccounts, filterType),
             sortBy,
@@ -373,7 +369,7 @@ export default function Accounts() {
                     <div className="flex items-center gap-3">
                       <div className="text-right mr-3">
                         <p className={`font-semibold text-gray-900 dark:text-white ${isPrivacyMode ? 'filter blur' : ''}`}>
-                          {formatCurrency(account.balance)}
+                          ${formatCurrency(getAccountBalance(account))}
                         </p>
                         <p className="text-xs text-gray-500 dark:text-gray-500">Read-only</p>
                       </div>
@@ -416,77 +412,74 @@ export default function Accounts() {
         {/* Manual Accounts */}
         {(() => {
           const filteredAccounts = sortAccounts(
-            filterAccountsByType(manualAccounts, filterType),
+            filterAccountsByType(manualAccounts || [], filterType),
             sortBy,
             searchTerm
           );
-          const groupedAccounts = groupAccountsByType(filteredAccounts);
           
-          return Object.keys(groupedAccounts).length > 0 ? (
-            Object.entries(groupedAccounts).map(([type, accounts]) => (
-              <Card key={`manual-${type}`}>
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2 text-left">
-                    {type} Accounts (Manual)
-                  </h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 text-left">
-                    {accounts.length} {type.toLowerCase()} {accounts.length === 1 ? 'account' : 'accounts'} - editable and removable
-                  </p>
-                </div>
-                
-                <div className="space-y-3">
-                  {accounts.map((account) => (
-                    <div
-                      key={account.id}
-                      className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg transition-all duration-300 ease-in-out transform hover:scale-[1.01] animate-in fade-in-0 slide-in-from-left-4"
-                    >
-                      <div className="flex items-center">
-                        <div className={`p-2 rounded-lg mr-3 ${getAccountTypeColor(account.type)}`}>
-                          {getAccountTypeIcon(account.type)}
-                        </div>
-                        <div>
-                          <h4 className="font-medium text-gray-900 dark:text-white">{account.name}</h4>
-                          <p className="text-sm text-gray-600 dark:text-gray-400 capitalize">
-                            {extractInstitution(account.name)} • {getDisplayAccountType(account.type)} • Manual
-                          </p>
-                        </div>
+          return filteredAccounts.length > 0 ? (
+            <Card>
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2 text-left">
+                  Manual Accounts
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400 text-left">
+                  {filteredAccounts.length} {filteredAccounts.length === 1 ? 'account' : 'accounts'} - editable and removable
+                </p>
+              </div>
+              
+              <div className="space-y-3">
+                {filteredAccounts.map((account) => (
+                  <div
+                    key={account.id}
+                    className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg transition-all duration-300 ease-in-out transform hover:scale-[1.01] animate-in fade-in-0 slide-in-from-left-4"
+                  >
+                    <div className="flex items-center">
+                      <div className={`p-2 rounded-lg mr-3 ${getAccountTypeColor(account.type)}`}>
+                        {getAccountTypeIcon(account.type)}
                       </div>
-                      
-                      <div className="flex items-center gap-3">
-                        <div className="text-right mr-3">
-                          <p className={`font-semibold text-gray-900 dark:text-white ${isPrivacyMode ? 'filter blur' : ''}`}>
-                            {formatCurrency(account.balance)}
-                          </p>
-                        </div>
-                        
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleEditAccount(account)}
-                            className="p-2 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
-                            title="Edit account"
-                          >
-                            <PencilIcon className="h-4 w-4" />
-                          </button>
-                          
-                          <button
-                            onClick={() => handleDeleteAccount(account.id)}
-                            className={`p-2 rounded-lg transition-colors ${
-                              deleteConfirm === account.id
-                                ? 'text-white bg-red-600 hover:bg-red-700'
-                                : 'text-red-600 hover:bg-red-100 dark:hover:bg-red-900/20'
-                            }`}
-                            title={deleteConfirm === account.id ? 'Click again to confirm' : 'Delete account'}
-                          >
-                            <TrashIcon className="h-4 w-4" />
-                          </button>
-                        </div>
+                      <div>
+                        <h4 className="font-medium text-gray-900 dark:text-white text-left">{account.name}</h4>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 capitalize text-left">
+                          {extractInstitution(account.name)} • {getDisplayAccountType(account.type)} • Manual
+                        </p>
                       </div>
                     </div>
-                  ))}
-                </div>
-              </Card>
-            ))
-          ) : manualAccounts.length === 0 && (filterType === 'all' || !searchTerm) ? (
+                    
+                    <div className="flex items-center gap-3">
+                      <div className="text-right mr-3">
+                        <p className={`font-semibold text-gray-900 dark:text-white ${isPrivacyMode ? 'filter blur' : ''}`}>
+                          ${formatCurrency(getAccountBalance(account))}
+                        </p>
+                      </div>
+                      
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleEditAccount(account)}
+                          className="p-2 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                          title="Edit account"
+                        >
+                          <PencilIcon className="h-4 w-4" />
+                        </button>
+                        
+                        <button
+                          onClick={() => handleDeleteAccount(account.id)}
+                          className={`p-2 rounded-lg transition-colors ${
+                            deleteConfirm === account.id
+                              ? 'text-white bg-red-600 hover:bg-red-700'
+                              : 'text-red-600 hover:bg-red-100 dark:hover:bg-red-900/20'
+                          }`}
+                          title={deleteConfirm === account.id ? 'Click again to confirm' : 'Delete account'}
+                        >
+                          <TrashIcon className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          ) : (manualAccounts || []).length === 0 && (filterType === 'all' || !searchTerm) ? (
             <Card>
               <div className="mb-6">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2 text-left">Manual Accounts</h3>
@@ -507,7 +500,7 @@ export default function Accounts() {
 
         {/* Closed Accounts (Combined) */}
         {(() => {
-          const closedYnabAccounts = ynabAccounts.filter(acc => acc.closed);
+          const closedYnabAccounts = ynabAccounts?.filter(acc => acc.closed) || [];
           const closedManualAccounts = []; // Manual accounts don't have closed status currently
           const allClosedAccounts = [...closedYnabAccounts, ...closedManualAccounts];
           
@@ -541,15 +534,15 @@ export default function Accounts() {
                       <div>
                         <h4 className="font-medium text-gray-900 dark:text-white text-left">{account.name}</h4>
                         <p className="text-sm text-gray-600 dark:text-gray-400 capitalize text-left">
-                          {extractInstitution(account.name)} • {getDisplayAccountType(account.type)} • {account.source === 'ynab' ? 'YNAB' : 'Manual'} • Closed
+                          {extractInstitution(account.name)} • {getDisplayAccountType(account.type)} • {account.account_id ? 'YNAB' : 'Manual'} • Closed
                         </p>
                       </div>
                     </div>
                     
                     <div className="flex items-center gap-3">
                       <div className="text-right mr-3">
-                        <p className={`font-semibold ${account.balance > 0 ? 'text-green-600 dark:text-green-400' : account.balance < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'} ${isPrivacyMode ? 'filter blur' : ''}`}>
-                          ${(account.balance || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        <p className={`font-semibold text-gray-900 dark:text-white ${isPrivacyMode ? 'filter blur' : ''}`}>
+                          ${formatCurrency(getAccountBalance(account))}
                         </p>
                         <p className="text-xs text-gray-500 dark:text-gray-500">Read-only</p>
                       </div>

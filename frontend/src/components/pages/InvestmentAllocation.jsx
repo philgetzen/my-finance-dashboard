@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { usePlaid } from '../../contexts/PlaidDataContext';
-import { useCombinedFinanceData } from '../../hooks/useCombinedFinanceData';
+import { useYNAB, usePrivacy } from '../../contexts/YNABDataContext';
+import { normalizeYNABAccountType } from '../../utils/ynabHelpers';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
 import LoadingSpinner from '../ui/LoadingSpinner';
@@ -15,19 +15,29 @@ import {
 const COLORS = ['#3B82F6', '#8B5CF6', '#EF4444', '#10B981', '#F59E0B', '#06B6D4'];
 
 export default function InvestmentAllocation() {
-  const { user } = usePlaid();
-  const { accounts, isLoading, isError, error } = useCombinedFinanceData(user?.uid);
+  const { user, accounts, manualAccounts, isLoading, error } = useYNAB();
+  const { isPrivacyMode } = usePrivacy();
   const [tab, setTab] = useState('summary');
 
-
-  const allAccounts = accounts || [];
-  const investmentAccounts = allAccounts.filter(account => account.type === 'investment');
+  const isError = !!error;
+  const allAccounts = [...(accounts || []), ...(manualAccounts || [])];
+  
+  // Filter for investment accounts using normalized account types
+  const investmentAccounts = allAccounts.filter(account => {
+    const normalizedType = normalizeYNABAccountType(account.type);
+    return normalizedType === 'investment';
+  });
   
   const investmentAllocation = Object.values(investmentAccounts.reduce((acc, account) => {
-    const subtype = account.subtype || account.type || 'other';
-    const balance = typeof account.balances?.current === 'number' ? account.balances.current : (typeof account.balance === 'number' ? account.balance : 0);
-    acc[subtype] = acc[subtype] || { name: subtype.charAt(0).toUpperCase() + subtype.slice(1), value: 0 };
-    acc[subtype].value += balance;
+    const subtype = account.subtype || 'Investment';
+    // Use YNAB balance conversion for YNAB accounts, direct balance for manual accounts
+    const balance = account.balance !== undefined ? 
+      (typeof account.balance === 'number' ? account.balance / (account.budget_id ? 1000 : 1) : 0) :
+      (account.balances?.current || 0);
+    
+    const displayName = subtype.charAt(0).toUpperCase() + subtype.slice(1);
+    acc[subtype] = acc[subtype] || { name: displayName, value: 0 };
+    acc[subtype].value += Math.abs(balance); // Use absolute value for investments
     return acc;
   }, {})).filter(item => item.value > 0);
 
@@ -89,7 +99,7 @@ export default function InvestmentAllocation() {
               </div>
             </div>
             <h2 className="text-base sm:text-lg font-medium text-gray-600 dark:text-gray-400 mb-2">Total Investment Value</h2>
-            <p className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-4">
+            <p className={`text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-4 ${isPrivacyMode ? 'filter blur' : ''}`}>
               ${totalInvestmentValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}
             </p>
             <div className="flex items-center justify-center text-xs sm:text-sm text-gray-500 dark:text-gray-400">
@@ -127,7 +137,12 @@ export default function InvestmentAllocation() {
                         ))}
                       </Pie>
                       <Tooltip
-                        formatter={(value) => [`$${value.toLocaleString()}`, 'Value']}
+                        formatter={(value) => {
+                          if (isPrivacyMode) {
+                            return ['***', 'Value'];
+                          }
+                          return [`${value.toLocaleString()}`, 'Value'];
+                        }}
                         contentStyle={{
                           backgroundColor: 'rgba(255, 255, 255, 0.95)',
                           border: '1px solid #e5e7eb',
@@ -163,7 +178,10 @@ export default function InvestmentAllocation() {
               
               <div className="space-y-2 sm:space-y-3">
                 {investmentAccounts.map((account, index) => {
-                  const balance = account.balances?.current ?? account.balance ?? 0;
+                  // Use same balance calculation as allocation
+                  const balance = account.balance !== undefined ? 
+                    (typeof account.balance === 'number' ? Math.abs(account.balance / (account.budget_id ? 1000 : 1)) : 0) :
+                    Math.abs(account.balances?.current || 0);
                   const percentage = totalInvestmentValue > 0 ? (balance / totalInvestmentValue) * 100 : 0;
                   
                   return (
@@ -183,7 +201,7 @@ export default function InvestmentAllocation() {
                         </div>
                       </div>
                       <div className="text-left sm:text-right">
-                        <p className="text-sm sm:text-base font-semibold text-purple-600 dark:text-purple-400">
+                        <p className={`text-sm sm:text-base font-semibold text-purple-600 dark:text-purple-400 ${isPrivacyMode ? 'filter blur' : ''}`}>
                           ${balance.toLocaleString(undefined, { maximumFractionDigits: 2 })}
                         </p>
                         <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">

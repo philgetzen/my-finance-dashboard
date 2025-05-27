@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { useAddManualAccount } from '../../hooks/useFinanceData';
+import { useYNAB } from '../../contexts/YNABDataContext';
 import Card from './Card';
 import Button from './Button';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 
 export default function ManualAccountModal({ user, show, onClose, onAccountAdded }) {
+  const { createManualAccount } = useYNAB();
   const [manualForm, setManualForm] = useState({ 
     name: '', 
     type: 'checking', 
@@ -13,7 +14,6 @@ export default function ManualAccountModal({ user, show, onClose, onAccountAdded
   });
   const [manualError, setManualError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const addManualAccount = useAddManualAccount();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -33,14 +33,11 @@ export default function ManualAccountModal({ user, show, onClose, onAccountAdded
         return;
       }
 
-      await addManualAccount.mutateAsync({
-        userId: user.uid,
-        accountData: {
-          name: manualForm.name.trim(),
-          type: manualForm.type,
-          subtype: manualForm.subtype.trim(),
-          balance: parseFloat(manualForm.balance) || 0,
-        }
+      await createManualAccount({
+        name: manualForm.name.trim(),
+        type: manualForm.type,
+        subtype: manualForm.subtype.trim(),
+        balance: parseFloat(manualForm.balance) || 0,
       });
       
       // Reset form and close modal
@@ -148,10 +145,10 @@ export default function ManualAccountModal({ user, show, onClose, onAccountAdded
             <div className="flex space-x-3 pt-4">
               <Button
                 type="submit"
-                disabled={isSubmitting || addManualAccount.isPending}
+                disabled={isSubmitting}
                 className="flex-1"
               >
-                {isSubmitting || addManualAccount.isPending ? 'Adding...' : 'Add Account'}
+                {isSubmitting ? 'Adding...' : 'Add Account'}
               </Button>
               <Button
                 type="button"

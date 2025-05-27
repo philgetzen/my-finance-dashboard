@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { PrivacyProvider } from '../../contexts/PrivacyContext';
 import Sidebar from './Sidebar';
 
 export default function Layout({ children }) {
@@ -19,11 +18,13 @@ export default function Layout({ children }) {
       }
     } else {
       // Check system preference
-      const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const systemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
       setDarkMode(systemDark);
       if (systemDark) {
         document.documentElement.classList.add('dark');
       }
+      // Save the initial preference
+      localStorage.setItem('darkMode', JSON.stringify(systemDark));
     }
   }, []);
 
@@ -39,17 +40,15 @@ export default function Layout({ children }) {
   }, [darkMode]);
 
   return (
-    <PrivacyProvider>
-      <div className="flex min-h-screen w-full bg-gray-50 dark:bg-gray-900">
-        <Sidebar darkMode={darkMode} setDarkMode={setDarkMode} />
-        <main className="flex-1 overflow-auto">
-          <div className="w-full min-h-full p-4 sm:p-6 lg:p-8">
-            <div className="w-full max-w-none">
-              {children}
-            </div>
+    <div className="flex min-h-screen w-full bg-gray-50 dark:bg-gray-900">
+      <Sidebar darkMode={darkMode} setDarkMode={setDarkMode} />
+      <main className="flex-1 overflow-auto">
+        <div className="w-full min-h-full p-4 sm:p-6 lg:p-8">
+          <div className="w-full max-w-none">
+            {children}
           </div>
-        </main>
-      </div>
-    </PrivacyProvider>
+        </div>
+      </main>
+    </div>
   );
 }

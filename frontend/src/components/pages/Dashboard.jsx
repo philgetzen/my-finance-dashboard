@@ -7,6 +7,7 @@ import ManualAccountModal from '../ui/ManualAccountModal';
 import YNABConnectionCard from '../ui/YNABConnectionCard';
 import { DashboardSkeleton } from '../ui/Skeleton';
 import PageTransition from '../ui/PageTransition';
+import { getAccountBalance, getTransactionAmount, normalizeYNABAccountType } from '../../utils/ynabHelpers';
 import {
   BanknotesIcon,
   CreditCardIcon,
@@ -45,11 +46,7 @@ export default function Dashboard() {
 
   // Helper functions for account processing
   const normalizeAccountType = (type) => {
-    if (!type) return 'other';
-    const lowerType = type.toLowerCase();
-    if (lowerType === 'otherasset') return 'investment';
-    if (lowerType === 'creditcard') return 'credit';
-    return lowerType;
+    return normalizeYNABAccountType(type);
   };
 
   const getDisplayAccountType = (type) => {
@@ -95,23 +92,23 @@ export default function Dashboard() {
   };
   
   const netWorth = allAccounts.reduce((sum, acc) => {
-    const bal = acc.balances?.current ?? acc.balance ?? 0;
+    const bal = getAccountBalance(acc);
     return isLiability(acc) ? sum - Math.abs(bal) : sum + bal;
   }, 0);
 
   const totalAssets = allAccounts.reduce((sum, acc) => {
-    const bal = acc.balances?.current ?? acc.balance ?? 0;
+    const bal = getAccountBalance(acc);
     return !isLiability(acc) ? sum + bal : sum;
   }, 0);
 
   const totalLiabilities = allAccounts.reduce((sum, acc) => {
-    const bal = acc.balances?.current ?? acc.balance ?? 0;
+    const bal = getAccountBalance(acc);
     return isLiability(acc) ? sum + Math.abs(bal) : sum;
   }, 0);
 
   const allocation = Object.values(allAccounts.reduce((acc, account) => {
     const type = getDisplayAccountType(account.type);
-    const balance = typeof account.balances?.current === 'number' ? account.balances.current : (typeof account.balance === 'number' ? account.balance : 0);
+    const balance = getAccountBalance(account);
     acc[type] = acc[type] || { name: type, value: 0 };
     acc[type].value += Math.abs(balance);
     return acc;
@@ -132,17 +129,22 @@ export default function Dashboard() {
       last6Months[key] = { month: monthName, income: 0, expenses: 0, net: 0 };
     }
     
-    // Process transactions
+    // Process transactions - YNAB transactions have different structure
     allTransactions.forEach(transaction => {
       const transactionDate = new Date(transaction.date);
       const monthKey = transactionDate.toISOString().slice(0, 7);
       
       if (last6Months[monthKey]) {
-        const amount = Math.abs(transaction.amount);
-        if (transaction.amount > 0) {
-          last6Months[monthKey].income += amount;
+        // YNAB transactions: positive amounts are outflows (expenses), negative are inflows (income)
+        // Convert from milliunits if it's a YNAB transaction
+        const rawAmount = getTransactionAmount(transaction);
+        
+        if (rawAmount > 0) {
+          // Positive amount = expense (outflow)
+          last6Months[monthKey].expenses += rawAmount;
         } else {
-          last6Months[monthKey].expenses += amount;
+          // Negative amount = income (inflow)
+          last6Months[monthKey].income += Math.abs(rawAmount);
         }
       }
     });
@@ -169,17 +171,21 @@ export default function Dashboard() {
       last6Months[key] = { month: monthName, income: 0, expenses: 0 };
     }
     
-    // Process transactions
+    // Process transactions - YNAB transactions have different structure
     allTransactions.forEach(transaction => {
       const transactionDate = new Date(transaction.date);
       const monthKey = transactionDate.toISOString().slice(0, 7);
       
       if (last6Months[monthKey]) {
-        const amount = Math.abs(transaction.amount);
-        if (transaction.amount > 0) {
-          last6Months[monthKey].income += amount;
+        // YNAB transactions: positive amounts are outflows (expenses), negative are inflows (income)
+        const rawAmount = getTransactionAmount(transaction);
+        
+        if (rawAmount > 0) {
+          // Positive amount = expense (outflow)
+          last6Months[monthKey].expenses += rawAmount;
         } else {
-          last6Months[monthKey].expenses += amount;
+          // Negative amount = income (inflow)
+          last6Months[monthKey].income += Math.abs(rawAmount);
         }
       }
     });
@@ -559,8 +565,8 @@ export default function Dashboard() {
                       )}
                     </div>
                   </td>
-                  <td className={`px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm font-medium text-right ${(txn.amount || 0) > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'} ${isPrivacyMode ? 'filter blur' : ''}`}>
-                    ${(txn.amount || 0) < 0 ? '-' : ''}${Math.abs(txn.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  <td className={`px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm font-medium text-right ${getTransactionAmount(txn) > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'} ${isPrivacyMode ? 'filter blur' : ''}`}>
+                    ${getTransactionAmount(txn) < 0 ? '-' : ''}${Math.abs(getTransactionAmount(txn)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
                   <td className="px-3 sm:px-6 py-4 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
                     <div className="truncate max-w-24 sm:max-w-none text-left">

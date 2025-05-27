@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { usePlaid } from '../../contexts/PlaidDataContext';
-import { usePrivacy } from '../../contexts/PrivacyContext';
-import { useCombinedFinanceData } from '../../hooks/useCombinedFinanceData';
+import { useYNAB, usePrivacy } from '../../contexts/YNABDataContext';
+import { getTransactionAmount, milliunitsToAmount } from '../../utils/ynabHelpers';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
 import LoadingSpinner from '../ui/LoadingSpinner';
@@ -12,10 +11,18 @@ import {
 } from '@heroicons/react/24/outline';
 
 export default function BalanceSheet() {
-  const { user } = usePlaid();
-  const { privacyMode } = usePrivacy();
-  const { ynabTransactions, isLoading, isError, error } = useCombinedFinanceData(user?.uid);
+  const { user, transactions: ynabTransactions, isLoading, error } = useYNAB();
+  const { isPrivacyMode } = usePrivacy();
+  const isError = !!error;
   const [periodMonths, setPeriodMonths] = useState(12);
+
+  // Helper function for currency formatting
+  const formatCurrency = (amount) => {
+    return (amount || 0).toLocaleString('en-US', { 
+      minimumFractionDigits: 2, 
+      maximumFractionDigits: 2 
+    });
+  };
 
 
   // Process YNAB category data for month-by-month income vs expense report
@@ -70,7 +77,8 @@ export default function BalanceSheet() {
       
       const categoryName = transaction.category_name || 'Uncategorized';
       const monthKey = transactionDate.toISOString().slice(0, 7);
-      const amount = transaction.amount || 0;
+      // Use the helper function to get the properly converted amount
+      const amount = getTransactionAmount(transaction);
       
       if (!categoryMap[categoryName]) {
         categoryMap[categoryName] = {
@@ -170,8 +178,8 @@ export default function BalanceSheet() {
             </div>
             <div className="ml-4">
               <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Total ({periodMonths === 999 ? 'All time' : `${periodMonths} months`})</p>
-              <p className={`text-xl sm:text-2xl font-bold ${grandTotal >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'} ${privacyMode ? 'filter blur' : ''}`}>
-                ${grandTotal.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+              <p className={`text-xl sm:text-2xl font-bold ${grandTotal >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'} ${isPrivacyMode ? 'filter blur' : ''}`}>
+                ${formatCurrency(grandTotal)}
               </p>
             </div>
           </div>
@@ -186,8 +194,8 @@ export default function BalanceSheet() {
             </div>
             <div className="ml-4">
               <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Monthly Average</p>
-              <p className={`text-xl sm:text-2xl font-bold ${grandAverage >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'} ${privacyMode ? 'filter blur' : ''}`}>
-                ${grandAverage.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+              <p className={`text-xl sm:text-2xl font-bold ${grandAverage >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'} ${isPrivacyMode ? 'filter blur' : ''}`}>
+                ${formatCurrency(grandAverage)}
               </p>
             </div>
           </div>
@@ -254,8 +262,8 @@ export default function BalanceSheet() {
                           value >= 0 
                             ? 'text-green-600 dark:text-green-400' 
                             : 'text-red-600 dark:text-red-400'
-                        } ${privacyMode ? 'filter blur' : ''}`}>
-                          {Math.abs(value) < 0.01 ? '—' : `${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
+                        } ${isPrivacyMode ? 'filter blur' : ''}`}>
+                          {Math.abs(value) < 0.01 ? '—' : `${formatCurrency(value)}`}
                         </td>
                       );
                     })}
@@ -263,15 +271,15 @@ export default function BalanceSheet() {
                       category.average >= 0 
                         ? 'text-green-600 dark:text-green-400' 
                         : 'text-red-600 dark:text-red-400'
-                    } ${privacyMode ? 'filter blur' : ''}`}>
-                      ${category.average.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    } ${isPrivacyMode ? 'filter blur' : ''}`}>
+                      ${formatCurrency(category.average)}
                     </td>
                     <td className={`px-3 py-2 text-right text-sm font-bold bg-gray-50 dark:bg-gray-800 ${
                       category.total >= 0 
                         ? 'text-green-600 dark:text-green-400' 
                         : 'text-red-600 dark:text-red-400'
-                    } ${privacyMode ? 'filter blur' : ''}`}>
-                      ${category.total.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    } ${isPrivacyMode ? 'filter blur' : ''}`}>
+                      ${formatCurrency(category.total)}
                     </td>
                   </tr>
                 ))}
@@ -288,8 +296,8 @@ export default function BalanceSheet() {
                         value >= 0 
                           ? 'text-green-600 dark:text-green-400' 
                           : 'text-red-600 dark:text-red-400'
-                      } ${privacyMode ? 'filter blur' : ''}`}>
-                        ${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                      } ${isPrivacyMode ? 'filter blur' : ''}`}>
+                        ${formatCurrency(value)}
                       </td>
                     );
                   })}
@@ -297,15 +305,15 @@ export default function BalanceSheet() {
                     grandAverage >= 0 
                       ? 'text-green-600 dark:text-green-400' 
                       : 'text-red-600 dark:text-red-400'
-                  } ${privacyMode ? 'filter blur' : ''}`}>
-                    ${grandAverage.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                  } ${isPrivacyMode ? 'filter blur' : ''}`}>
+                    ${formatCurrency(grandAverage)}
                   </td>
                   <td className={`px-3 py-2 text-right text-sm font-bold bg-gray-200 dark:bg-gray-700 ${
                     grandTotal >= 0 
                       ? 'text-green-600 dark:text-green-400' 
                       : 'text-red-600 dark:text-red-400'
-                  } ${privacyMode ? 'filter blur' : ''}`}>
-                    ${grandTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                  } ${isPrivacyMode ? 'filter blur' : ''}`}>
+                    ${formatCurrency(grandTotal)}
                   </td>
                 </tr>
               </tbody>

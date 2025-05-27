@@ -1,15 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { collection, doc, updateDoc, deleteDoc } from 'firebase/firestore';
-import { getFirestore } from 'firebase/firestore';
+import { useYNAB } from '../../contexts/YNABDataContext';
 import Button from './Button';
 import {
   XMarkIcon,
   ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
 
-const dbClient = getFirestore();
-
 export default function EditManualAccountModal({ user, account, show, onClose, onAccountUpdated }) {
+  const { updateManualAccount, deleteManualAccount } = useYNAB();
   const [formData, setFormData] = useState({
     name: '',
     type: 'checking',
@@ -37,12 +35,10 @@ export default function EditManualAccountModal({ user, account, show, onClose, o
     setIsLoading(true);
 
     try {
-      const accountRef = doc(dbClient, 'manual_accounts', account.id);
-      await updateDoc(accountRef, {
+      await updateManualAccount(account.id, {
         name: formData.name.trim(),
         type: formData.type,
         balance: parseFloat(formData.balance) || 0,
-        updated_at: new Date().toISOString(),
       });
 
       onAccountUpdated?.();
@@ -61,8 +57,7 @@ export default function EditManualAccountModal({ user, account, show, onClose, o
     setIsLoading(true);
 
     try {
-      const accountRef = doc(dbClient, 'manual_accounts', account.id);
-      await deleteDoc(accountRef);
+      await deleteManualAccount(account.id);
       onAccountUpdated?.();
     } catch (err) {
       console.error('Error deleting account:', err);

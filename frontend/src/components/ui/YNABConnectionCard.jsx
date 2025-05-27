@@ -10,38 +10,83 @@ import {
 
 export default function YNABConnectionCard({ onConnect, isConnected, compact = false }) {
   const [isConnecting, setIsConnecting] = useState(false);
+  const [isProcessingToken, setIsProcessingToken] = useState(false);
   const { disconnectYNAB } = useYNAB();
   
   const handleConnect = async () => {
     try {
       setIsConnecting(true);
+      console.log('Starting YNAB connection process...');
       
       // Fetch auth URL from backend
+      console.log('Fetching auth URL from backend...');
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/ynab/auth`);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Failed to get auth URL:', response.status, errorText);
+        throw new Error(`Failed to get auth URL: ${response.status}`);
+      }
+      
       const { authUrl } = await response.json();
+      console.log('Got auth URL:', authUrl);
       
       // Open YNAB OAuth in new window
+      console.log('Opening YNAB OAuth window...');
       const authWindow = window.open(authUrl, 'ynab-auth', 'width=500,height=600');
+      
+      if (!authWindow) {
+        throw new Error('Failed to open authentication window. Please check popup blockers.');
+      }
       
       // Listen for OAuth callback
       const handleMessage = async (event) => {
-        if (event.origin !== window.location.origin) return;
+        console.log('Received message:', event);
+        if (event.origin !== window.location.origin) {
+          console.log('Ignoring message from different origin:', event.origin);
+          return;
+        }
         
         if (event.data.type === 'ynab-auth-success') {
-          const { code } = event.data;
-          
-          // Exchange code for tokens
-          const tokenResponse = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/ynab/token`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code })
-          });
-          
-          if (tokenResponse.ok) {
-            const { access_token, refresh_token } = await tokenResponse.json();
-            await onConnect(access_token, refresh_token);
+          // Prevent duplicate token exchanges
+          if (isProcessingToken) {
+            console.log('Token exchange already in progress, ignoring duplicate request');
+            return;
           }
           
+          setIsProcessingToken(true);
+          console.log('OAuth success, exchanging code for tokens...');
+          const { code } = event.data;
+          
+          try {
+            // Exchange code for tokens
+            const tokenResponse = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/ynab/token`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ code })
+            });
+            
+            if (tokenResponse.ok) {
+              const { access_token, refresh_token } = await tokenResponse.json();
+              console.log('Token exchange successful');
+              await onConnect(access_token, refresh_token);
+            } else {
+              const errorData = await tokenResponse.json();
+              console.error('Token exchange failed:', errorData);
+              alert(`Authentication failed: ${errorData.error || 'Unknown error'}`);
+            }
+          } catch (tokenError) {
+            console.error('Error during token exchange:', tokenError);
+            alert(`Token exchange error: ${tokenError.message}`);
+          } finally {
+            setIsProcessingToken(false);
+          }
+          
+          window.removeEventListener('message', handleMessage);
+          setIsConnecting(false);
+        } else if (event.data.type === 'ynab-auth-error') {
+          console.error('OAuth error:', event.data.error);
+          alert(`Authentication error: ${event.data.error}`);
           window.removeEventListener('message', handleMessage);
           setIsConnecting(false);
         }
@@ -52,15 +97,19 @@ export default function YNABConnectionCard({ onConnect, isConnected, compact = f
       // Clean up if window is closed
       const checkClosed = setInterval(() => {
         if (authWindow.closed) {
+          console.log('Auth window was closed');
           clearInterval(checkClosed);
           window.removeEventListener('message', handleMessage);
           setIsConnecting(false);
+          setIsProcessingToken(false);
         }
       }, 1000);
       
     } catch (error) {
       console.error('Error connecting to YNAB:', error);
+      alert(`Connection error: ${error.message}`);
       setIsConnecting(false);
+      setIsProcessingToken(false);
     }
   };
 

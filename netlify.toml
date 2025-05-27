@@ -1,6 +1,7 @@
 [build]
-  publish = "dist"
-  command = "npm install && npm run build"
+  base    = "frontend"
+  publish = "dist" # This path is relative to the 'base' directory
+  command = "npm install && npm run build" # This command is executed in the 'base' directory
 
 [build.environment]
   NODE_VERSION = "18"
