@@ -21,6 +21,22 @@ try {
     console.log('✅ Firebase service account loaded successfully');
   } else {
     console.log('⚠️ Firebase service account file not found, using environment variables');
+    
+    // Validate required environment variables
+    const requiredEnvVars = [
+      'FIREBASE_PROJECT_ID',
+      'FIREBASE_PRIVATE_KEY',
+      'FIREBASE_CLIENT_EMAIL',
+      'FIREBASE_CLIENT_ID'
+    ];
+    
+    const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+    if (missingVars.length > 0) {
+      console.error('❌ Missing required Firebase environment variables:', missingVars);
+      console.error('Available env vars:', Object.keys(process.env).filter(key => key.startsWith('FIREBASE')));
+      process.exit(1);
+    }
+    
     serviceAccount = {
       type: "service_account",
       project_id: process.env.FIREBASE_PROJECT_ID,
@@ -33,6 +49,8 @@ try {
       auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
       client_x509_cert_url: process.env.FIREBASE_CLIENT_CERT_URL
     };
+    
+    console.log('✅ Firebase service account constructed from environment variables');
   }
 } catch (error) {
   console.error('❌ Error loading Firebase service account:', error.message);
