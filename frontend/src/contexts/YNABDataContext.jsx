@@ -36,6 +36,8 @@ export const YNABDataProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [ynabToken, setYnabToken] = useState(null);
   const [manualAccounts, setManualAccounts] = useState([]);
+  const [showYNABErrorModal, setShowYNABErrorModal] = useState(false);
+  const [ynabError, setYnabError] = useState(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -79,6 +81,22 @@ export const YNABDataProvider = ({ children }) => {
 
   // Initialize YNAB data - only when we have a token
   const ynabData = useYNABData('last-used', !!ynabToken && !loading, ynabToken);
+  
+  // Handle YNAB errors
+  useEffect(() => {
+    if (ynabData.isError && ynabData.error && ynabToken) {
+      const errorMessage = ynabData.error?.message || '';
+      const errorStatus = ynabData.error?.response?.status;
+      
+      // Check for authentication errors or expired tokens
+      if (errorStatus === 401 || errorStatus === 403 || 
+          errorMessage.includes('unauthorized') || 
+          errorMessage.includes('authentication')) {
+        setYnabError(ynabData.error);
+        setShowYNABErrorModal(true);
+      }
+    }
+  }, [ynabData.isError, ynabData.error, ynabToken]);
 
   // Helper function to save YNAB token
   const saveYNABToken = async (accessToken, refreshToken) => {
@@ -188,7 +206,10 @@ export const YNABDataProvider = ({ children }) => {
         disconnectYNAB,
         createManualAccount,
         updateManualAccount,
-        deleteManualAccount
+        deleteManualAccount,
+        showYNABErrorModal,
+        setShowYNABErrorModal,
+        ynabError
       }}>
         {children}
       </YNABDataContext.Provider>

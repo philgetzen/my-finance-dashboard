@@ -7,6 +7,7 @@ import ManualAccountModal from '../ui/ManualAccountModal';
 import YNABConnectionCard from '../ui/YNABConnectionCard';
 import { DashboardSkeleton } from '../ui/Skeleton';
 import PageTransition from '../ui/PageTransition';
+import YNABConnectionErrorModal from '../ui/YNABConnectionErrorModal';
 import { getAccountBalance, getTransactionAmount, normalizeYNABAccountType } from '../../utils/ynabHelpers';
 import {
   BanknotesIcon,
@@ -27,6 +28,8 @@ const COLORS = ['#3B82F6', '#8B5CF6', '#EF4444', '#10B981', '#F59E0B', '#06B6D4'
 // Mobile-friendly transaction card component
 const TransactionCard = ({ transaction, account, isPrivacyMode }) => {
   const amount = getTransactionAmount(transaction);
+  // For YNAB transactions, positive amounts are outflows (expenses)
+  // For Plaid transactions, positive amounts are debits (expenses)
   const isExpense = amount > 0;
   
   return (
@@ -44,7 +47,7 @@ const TransactionCard = ({ transaction, account, isPrivacyMode }) => {
           </p>
         </div>
         <p className={`font-semibold text-sm ${isExpense ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'} ${isPrivacyMode ? 'filter blur' : ''}`}>
-          ${isExpense ? '-' : '+'}${Math.abs(amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          {isExpense ? '-' : '+'}${Math.abs(amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </p>
       </div>
       <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -65,7 +68,10 @@ export default function Dashboard() {
     error,
     saveYNABToken,
     disconnectYNAB,
-    refetch
+    refetch,
+    showYNABErrorModal,
+    setShowYNABErrorModal,
+    ynabError
   } = useYNAB();
   const { isPrivacyMode } = usePrivacy();
   
@@ -534,7 +540,7 @@ export default function Dashboard() {
                         )}
                       </td>
                       <td className={`px-4 py-3 text-sm font-medium text-right ${getTransactionAmount(txn) > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'} ${isPrivacyMode ? 'filter blur' : ''}`}>
-                        ${getTransactionAmount(txn) > 0 ? '-' : '+'}${Math.abs(getTransactionAmount(txn)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {getTransactionAmount(txn) > 0 ? '-' : '+'}${Math.abs(getTransactionAmount(txn)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
                         {allAccounts.find(acc => (acc.account_id || acc.id) === txn.account_id)?.name || txn.account_id}
@@ -559,6 +565,19 @@ export default function Dashboard() {
           onAccountAdded={() => {
             setShowManualModal(false);
           }} 
+        />
+        
+        <YNABConnectionErrorModal
+          show={showYNABErrorModal}
+          onClose={() => setShowYNABErrorModal(false)}
+          onReconnect={async (accessToken, refreshToken) => {
+            await saveYNABToken(accessToken, refreshToken);
+            setShowYNABErrorModal(false);
+            setTimeout(() => {
+              refetch();
+            }, 200);
+          }}
+          error={ynabError}
         />
       </div>
     </PageTransition>

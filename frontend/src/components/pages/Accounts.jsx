@@ -20,7 +20,7 @@ import {
   FunnelIcon,
 } from '@heroicons/react/24/outline';
 
-// Mobile-friendly account card component
+// Compact account card component
 const AccountCard = ({ account, isManual, isClosed, onEdit, onDelete, deleteConfirm, isPrivacyMode }) => {
   const getAccountTypeIcon = (type) => {
     const normalizedType = normalizeYNABAccountType(type);
@@ -92,47 +92,54 @@ const AccountCard = ({ account, isManual, isClosed, onEdit, onDelete, deleteConf
   };
 
   return (
-    <div className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md transition-shadow ${isClosed ? 'opacity-60' : ''}`}>
-      <div className="flex items-start justify-between">
-        <div className="flex items-start gap-3 flex-1">
-          <div className={`p-2 rounded-lg ${getAccountTypeColor(account.type)} ${isClosed ? 'opacity-50' : ''} flex-shrink-0`}>
-            {getAccountTypeIcon(account.type)}
+    <div className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 hover:shadow-md transition-shadow ${isClosed ? 'opacity-60' : ''}`}>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div className={`p-1.5 rounded-lg ${getAccountTypeColor(account.type)} ${isClosed ? 'opacity-50' : ''} flex-shrink-0`}>
+            {React.cloneElement(getAccountTypeIcon(account.type), { className: 'h-4 w-4' })}
           </div>
           <div className="flex-1 min-w-0">
-            <h4 className="font-medium text-gray-900 dark:text-white truncate">{account.name}</h4>
-            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-              {extractInstitution(account.name)} • {getDisplayAccountType(account.type)}
-            </p>
-            <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-              {account.account_id ? 'YNAB' : 'Manual'} {isClosed && '• Closed'}
-            </p>
+            <div className="flex items-baseline gap-2">
+              <h4 className="font-medium text-sm text-gray-900 dark:text-white truncate">{account.name}</h4>
+              <span className="text-xs text-gray-500 dark:text-gray-500 flex-shrink-0">
+                {extractInstitution(account.name)}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="text-xs text-gray-600 dark:text-gray-400">
+                {getDisplayAccountType(account.type)}
+              </span>
+              <span className="text-xs text-gray-500 dark:text-gray-500">
+                • {account.account_id ? 'YNAB' : 'Manual'} {isClosed && '• Closed'}
+              </span>
+            </div>
           </div>
         </div>
         
-        <div className="text-right ml-3">
-          <p className={`font-semibold text-gray-900 dark:text-white ${isPrivacyMode ? 'filter blur' : ''}`}>
+        <div className="flex items-center gap-3 ml-3">
+          <p className={`font-semibold text-sm text-gray-900 dark:text-white ${isPrivacyMode ? 'filter blur' : ''}`}>
             ${formatCurrency(getAccountBalance(account))}
           </p>
           {isManual && !isClosed && (
-            <div className="flex gap-1 mt-2 justify-end">
+            <div className="flex gap-1 flex-shrink-0">
               <button
                 onClick={() => onEdit(account)}
-                className="p-1.5 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                className="p-1 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/20 rounded transition-colors"
                 title="Edit account"
               >
-                <PencilIcon className="h-4 w-4" />
+                <PencilIcon className="h-3.5 w-3.5" />
               </button>
               
               <button
                 onClick={() => onDelete(account.id)}
-                className={`p-1.5 rounded-lg transition-colors ${
+                className={`p-1 rounded transition-colors ${
                   deleteConfirm === account.id
                     ? 'text-white bg-red-600 hover:bg-red-700'
                     : 'text-red-600 hover:bg-red-100 dark:hover:bg-red-900/20'
                 }`}
                 title={deleteConfirm === account.id ? 'Tap again to confirm' : 'Delete account'}
               >
-                <TrashIcon className="h-4 w-4" />
+                <TrashIcon className="h-3.5 w-3.5" />
               </button>
             </div>
           )}

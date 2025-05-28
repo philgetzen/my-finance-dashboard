@@ -4,27 +4,31 @@
 .env
 .idea
 .vscode/*
+# Ignore all .env files
 *.env
-*.firebase.js
+# Ignore Firebase service account keys
 *.firebaseServiceAccount.json
+# Ignore local config files
 *.local
+# Log files
 *.log
+# Editor directories and files
 *.njsproj
 *.ntvs*
 *.sln
 *.suo
 *.sw?
-/Users/philgetzen/development/my-finance-dashboard/backend/firebaseServiceAccount.jsonbackend/firebaseServiceAccount.json
-# Editor directories and files
-# Logs
-backend/.env
-backend/firebaseServiceAccount.json
+
+# Build output
 dist
 dist-ssr
+
+# Dependency directories
+node_modules
+
+# Debug logs
 lerna-debug.log*
 logs
-node_modules
 npm-debug.log*
 pnpm-debug.log*
 yarn-debug.log*
-yarn-error.log*

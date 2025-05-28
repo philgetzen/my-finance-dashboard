@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import { auth } from '../../firebase';
 import { usePrivacy } from '../../contexts/YNABDataContext';
+import Button from '../ui/Button';
 import {
   HomeIcon,
   CreditCardIcon,
@@ -68,59 +69,57 @@ export default function MobileLayout({ children, darkMode, setDarkMode }) {
     }
   };
 
-  // Settings drawer for mobile
+  // Settings drawer for mobile - iOS style
   const SettingsDrawer = () => (
     <div 
-      className={`fixed inset-0 z-50 lg:hidden ${showSettings ? 'block' : 'hidden'}`}
+      className={`fixed inset-0 z-50 lg:hidden transition-opacity duration-300 ${showSettings ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
       onClick={() => setShowSettings(false)}
     >
-      <div className="absolute inset-0 bg-black/50" />
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
       <div 
-        className="absolute bottom-0 left-0 right-0 bg-white dark:bg-gray-800 rounded-t-2xl p-6 space-y-4"
+        className={`absolute bottom-0 left-0 right-0 bg-white dark:bg-gray-800 rounded-t-2xl shadow-xl transform transition-transform duration-300 ease-out ${showSettings ? 'translate-y-0' : 'translate-y-full'}`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Settings</h2>
-          <button onClick={() => setShowSettings(false)}>
-            <XMarkIcon className="h-6 w-6 text-gray-500" />
-          </button>
+        <div className="w-12 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mt-3 mb-6" />
+        <div className="px-6 pb-8 space-y-2">
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setDarkMode(!darkMode);
+              setShowSettings(false);
+            }}
+            className="w-full justify-start text-base"
+            size="lg"
+          >
+            {darkMode ? <SunIcon className="h-5 w-5 mr-3" /> : <MoonIcon className="h-5 w-5 mr-3" />}
+            {darkMode ? 'Light Mode' : 'Dark Mode'}
+          </Button>
+          
+          <Button
+            variant="secondary"
+            onClick={() => {
+              togglePrivacyMode();
+              setShowSettings(false);
+            }}
+            className="w-full justify-start text-base"
+            size="lg"
+          >
+            {isPrivacyMode ? <EyeIcon className="h-5 w-5 mr-3" /> : <EyeSlashIcon className="h-5 w-5 mr-3" />}
+            {isPrivacyMode ? 'Show Numbers' : 'Privacy Mode'}
+          </Button>
+          
+          <div className="pt-2 border-t border-gray-200 dark:border-gray-700 mt-4">
+            <Button
+              variant="outline"
+              onClick={handleLogout}
+              className="w-full justify-start text-base text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 border-red-200 dark:border-red-800"
+              size="lg"
+            >
+              <ArrowRightStartOnRectangleIcon className="h-5 w-5 mr-3" />
+              Sign Out
+            </Button>
+          </div>
         </div>
-        
-        <button
-          onClick={() => {
-            setDarkMode(!darkMode);
-            setShowSettings(false);
-          }}
-          className="w-full flex items-center justify-between p-4 rounded-lg bg-gray-50 dark:bg-gray-700"
-        >
-          <div className="flex items-center gap-3">
-            {darkMode ? <SunIcon className="h-5 w-5" /> : <MoonIcon className="h-5 w-5" />}
-            <span>{darkMode ? 'Light Mode' : 'Dark Mode'}</span>
-          </div>
-        </button>
-        
-        <button
-          onClick={() => {
-            togglePrivacyMode();
-            setShowSettings(false);
-          }}
-          className="w-full flex items-center justify-between p-4 rounded-lg bg-gray-50 dark:bg-gray-700"
-        >
-          <div className="flex items-center gap-3">
-            {isPrivacyMode ? <EyeIcon className="h-5 w-5" /> : <EyeSlashIcon className="h-5 w-5" />}
-            <span>{isPrivacyMode ? 'Show Numbers' : 'Privacy Mode'}</span>
-          </div>
-        </button>
-        
-        <button
-          onClick={handleLogout}
-          className="w-full flex items-center justify-between p-4 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600"
-        >
-          <div className="flex items-center gap-3">
-            <ArrowRightStartOnRectangleIcon className="h-5 w-5" />
-            <span>Sign Out</span>
-          </div>
-        </button>
       </div>
     </div>
   );
@@ -166,39 +165,45 @@ export default function MobileLayout({ children, darkMode, setDarkMode }) {
           
           {/* Settings */}
           <div className="flex-shrink-0 flex flex-col p-4 space-y-2 border-t border-gray-200 dark:border-gray-700">
-            <button
-              onClick={() => setDarkMode(!darkMode)}
-              className="flex items-center w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg"
-            >
-              {darkMode ? <SunIcon className="h-5 w-5 mr-3" /> : <MoonIcon className="h-5 w-5 mr-3" />}
-              {darkMode ? 'Light Mode' : 'Dark Mode'}
-            </button>
-            
-            <button
-              onClick={togglePrivacyMode}
-              className="flex items-center w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg"
-            >
-              {isPrivacyMode ? <EyeIcon className="h-5 w-5 mr-3" /> : <EyeSlashIcon className="h-5 w-5 mr-3" />}
-              {isPrivacyMode ? 'Show Numbers' : 'Privacy Mode'}
-            </button>
-            
-            <button
-              onClick={handleLogout}
-              className="flex items-center w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"
-            >
-              <ArrowRightStartOnRectangleIcon className="h-5 w-5 mr-3" />
-              Sign Out
-            </button>
-          </div>
+          <Button
+          variant="secondary"
+          onClick={() => setDarkMode(!darkMode)}
+            className="w-full justify-start"
+          size="sm"
+          >
+            {darkMode ? <SunIcon className="h-4 w-4 mr-2" /> : <MoonIcon className="h-4 w-4 mr-2" />}
+            {darkMode ? 'Light Mode' : 'Dark Mode'}
+          </Button>
+          
+          <Button
+            variant="secondary"
+          onClick={togglePrivacyMode}
+          className="w-full justify-start"
+            size="sm"
+          >
+            {isPrivacyMode ? <EyeIcon className="h-4 w-4 mr-2" /> : <EyeSlashIcon className="h-4 w-4 mr-2" />}
+          {isPrivacyMode ? 'Show Numbers' : 'Privacy Mode'}
+          </Button>
+          
+          <Button
+          variant="outline"
+            onClick={handleLogout}
+              className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 border-red-200 dark:border-red-800"
+            size="sm"
+          >
+            <ArrowRightStartOnRectangleIcon className="h-4 w-4 mr-2" />
+            Sign Out
+          </Button>
+        </div>
         </div>
       </div>
     </div>
   );
 
-  // Mobile bottom navigation
+  // Mobile bottom navigation - iOS style
   const MobileBottomNav = () => (
-    <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 lg:hidden z-40 safe-area-inset">
-      <div className="grid grid-cols-6 h-16 pb-safe">
+    <div className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-lg border-t border-gray-200/50 dark:border-gray-700/50 lg:hidden z-40 safe-area-inset">
+      <div className="grid grid-cols-6 h-[60px] pb-safe">
         {navItems.map((item) => {
           const isActive = location.pathname === item.path;
           const Icon = isActive ? item.iconActive : item.icon;
@@ -206,19 +211,19 @@ export default function MobileLayout({ children, darkMode, setDarkMode }) {
             <button
               key={item.name}
               onClick={() => navigate(item.path)}
-              className="flex flex-col items-center justify-center gap-1 text-xs"
+              className="flex flex-col items-center justify-center gap-0.5 text-[10px] transition-all duration-200"
             >
-              <Icon className={`h-5 w-5 ${
+              <Icon className={`h-6 w-6 transition-all duration-200 ${
                 isActive 
-                  ? 'text-blue-600 dark:text-blue-400' 
+                  ? 'text-blue-600 dark:text-blue-400 scale-110' 
                   : 'text-gray-400 dark:text-gray-500'
               }`} />
-              <span className={`${
+              <span className={`font-medium transition-all duration-200 ${
                 isActive 
                   ? 'text-blue-600 dark:text-blue-400' 
                   : 'text-gray-500 dark:text-gray-400'
               }`}>
-                {item.name.length > 8 ? item.name.substring(0, 7) + '.' : item.name}
+                {item.name}
               </span>
             </button>
           );
@@ -226,10 +231,10 @@ export default function MobileLayout({ children, darkMode, setDarkMode }) {
         
         <button
           onClick={() => setShowSettings(true)}
-          className="flex flex-col items-center justify-center gap-1 text-xs"
+          className="flex flex-col items-center justify-center gap-0.5 text-[10px] transition-all duration-200"
         >
-          <Cog6ToothIcon className="h-5 w-5 text-gray-400 dark:text-gray-500" />
-          <span className="text-gray-500 dark:text-gray-400">More</span>
+          <Cog6ToothIcon className="h-6 w-6 text-gray-400 dark:text-gray-500" />
+          <span className="text-gray-500 dark:text-gray-400 font-medium">More</span>
         </button>
       </div>
     </div>
