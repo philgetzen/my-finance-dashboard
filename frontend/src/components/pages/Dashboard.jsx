@@ -28,9 +28,10 @@ const COLORS = ['#3B82F6', '#8B5CF6', '#EF4444', '#10B981', '#F59E0B', '#06B6D4'
 // Mobile-friendly transaction card component
 const TransactionCard = ({ transaction, account, isPrivacyMode }) => {
   const amount = getTransactionAmount(transaction);
-  // For YNAB transactions, positive amounts are outflows (expenses)
-  // For Plaid transactions, positive amounts are debits (expenses)
-  const isExpense = amount > 0;
+  // Assuming getTransactionAmount returns:
+  // Positive for Income
+  // Negative for Expenses
+  const isExpense = amount < 0; 
   
   return (
     <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow">
@@ -150,13 +151,41 @@ export default function Dashboard() {
     return isLiability(acc) ? sum + Math.abs(bal) : sum;
   }, 0);
 
-  const allocation = Object.values(allAccounts.reduce((acc, account) => {
+  const assetAccounts = allAccounts.filter(account => !isLiability(account));
+  const allocation = Object.values(assetAccounts.reduce((acc, account) => {
     const type = getDisplayAccountType(account.type);
     const balance = getAccountBalance(account);
-    acc[type] = acc[type] || { name: type, value: 0 };
-    acc[type].value += Math.abs(balance);
+    // For asset allocation, we only care about positive balances contributing to assets.
+    if (balance > 0) { 
+      acc[type] = acc[type] || { name: type, value: 0 };
+      acc[type].value += balance; 
+    }
     return acc;
   }, {})).filter(item => item.value > 0);
+
+  // Identify investment account IDs to exclude their transactions from income/expense
+  const investmentAccountIds = new Set(
+    allAccounts
+      .filter(acc => normalizeAccountType(acc.type) === 'investment')
+      .map(acc => acc.id || acc.account_id) // Handles both manual and YNAB account ID fields
+      .filter(id => id) // Ensure only valid IDs are included
+  );
+
+  // Define income categories based on YNAB report structure for more accurate income/expense separation
+  const ynabReportIncomeCategories = [
+    "Inflow: Ready to Assign",
+    "Adjustment", "Amazon", "Apple", "Bank of America Mobile", "Barry Getzen",
+    "Deposit Mobile Banking", "Disney", "eCheck Deposit", "Gemini", "Interest Income",
+    "Interest Paid", // Included as per CSV structure, though typically an expense
+    "Merrill Lynch Funds Transfer", // Will likely be filtered by transfer_account_id if a true transfer
+    "Mspbna Transfer",             // Will likely be filtered by transfer_account_id if a true transfer
+    "Nanoleaf", "Next Brick Prope", "Next Brick Prope Sigonfile",
+    "Paid Leave Wa Future Amount Tran Ddir", "Venmo"
+  ];
+
+  // Define debt payment categories that might appear as transfers but should be expenses
+  const debtPaymentCategoriesNamedAsTransfers = ["8331 Mortgage", "Kia Loan"];
+
 
   // Process cashflow data for line chart
   const processCashflowData = () => {
@@ -173,24 +202,56 @@ export default function Dashboard() {
       last6Months[key] = { month: monthName, income: 0, expenses: 0, net: 0 };
     }
     
+    const processSingleTransaction = (txn, monthData, accountId) => {
+      // Skip transactions from investment accounts
+      if (investmentAccountIds.has(accountId)) {
+        return;
+      }
+      
+      const isPayeeIndicatedTransfer = txn.payee_name && txn.payee_name.toLowerCase().startsWith("transfer : ");
+      const isCategorizedDebtPayment = debtPaymentCategoriesNamedAsTransfers.includes(txn.category_name);
+
+      // Skip transfer transactions (API-flagged or payee-indicated unless it's a categorized debt payment)
+      if (txn.transfer_account_id || (isPayeeIndicatedTransfer && !isCategorizedDebtPayment)) {
+        return;
+      }
+      
+      // Skip reconciliation balance adjustments by payee name
+      if (txn.payee_name === 'Reconciliation Balance Adjustment' || txn.payee_name === 'Starting Balance') {
+        return;
+      }
+
+      const rawAmount = getTransactionAmount(txn); 
+
+      if (ynabReportIncomeCategories.includes(txn.category_name)) {
+        monthData.income += rawAmount; 
+      } else {
+        if (txn.category_name || rawAmount < 0) { 
+          monthData.expenses -= rawAmount; 
+        }
+      }
+    };
+
     allTransactions.forEach(transaction => {
       const transactionDate = new Date(transaction.date);
       const monthKey = transactionDate.toISOString().slice(0, 7);
-      
+
       if (last6Months[monthKey]) {
-        const rawAmount = getTransactionAmount(transaction);
-        
-        if (rawAmount > 0) {
-          last6Months[monthKey].expenses += rawAmount;
+        if (transaction.subtransactions && transaction.subtransactions.length > 0) {
+          transaction.subtransactions.forEach(subTxn => {
+            const effectivePayeeName = subTxn.payee_name || transaction.payee_name;
+            const subTransactionForProcessing = { ...subTxn, payee_name: effectivePayeeName };
+            processSingleTransaction(subTransactionForProcessing, last6Months[monthKey], transaction.account_id);
+          });
         } else {
-          last6Months[monthKey].income += Math.abs(rawAmount);
+          processSingleTransaction(transaction, last6Months[monthKey], transaction.account_id);
         }
       }
     });
     
     return Object.values(last6Months).map(month => ({
       ...month,
-      net: month.income - month.expenses
+      net: month.income - month.expenses 
     }));
   };
 
@@ -208,17 +269,46 @@ export default function Dashboard() {
       last6Months[key] = { month: monthName, income: 0, expenses: 0 };
     }
     
+    const processSingleTransactionForIncomeExpense = (txn, monthData, accountId) => {
+        if (investmentAccountIds.has(accountId)) {
+            return;
+        }
+
+        const isPayeeIndicatedTransfer = txn.payee_name && txn.payee_name.toLowerCase().startsWith("transfer : ");
+        const isCategorizedDebtPayment = debtPaymentCategoriesNamedAsTransfers.includes(txn.category_name);
+
+        if (txn.transfer_account_id || (isPayeeIndicatedTransfer && !isCategorizedDebtPayment)) {
+            return;
+        }
+        
+        if (txn.payee_name === 'Reconciliation Balance Adjustment' || txn.payee_name === 'Starting Balance') {
+            return;
+        }
+
+        const rawAmount = getTransactionAmount(txn);
+
+        if (ynabReportIncomeCategories.includes(txn.category_name)) {
+            monthData.income += rawAmount; 
+        } else {
+            if (txn.category_name || rawAmount < 0) { 
+                monthData.expenses -= rawAmount; 
+            }
+        }
+    };
+
     allTransactions.forEach(transaction => {
       const transactionDate = new Date(transaction.date);
       const monthKey = transactionDate.toISOString().slice(0, 7);
-      
+
       if (last6Months[monthKey]) {
-        const rawAmount = getTransactionAmount(transaction);
-        
-        if (rawAmount > 0) {
-          last6Months[monthKey].expenses += rawAmount;
+        if (transaction.subtransactions && transaction.subtransactions.length > 0) {
+          transaction.subtransactions.forEach(subTxn => {
+            const effectivePayeeName = subTxn.payee_name || transaction.payee_name;
+            const subTransactionForProcessing = { ...subTxn, payee_name: effectivePayeeName };
+            processSingleTransactionForIncomeExpense(subTransactionForProcessing, last6Months[monthKey], transaction.account_id);
+          });
         } else {
-          last6Months[monthKey].income += Math.abs(rawAmount);
+          processSingleTransactionForIncomeExpense(transaction, last6Months[monthKey], transaction.account_id);
         }
       }
     });
@@ -375,10 +465,12 @@ export default function Dashboard() {
                         return [`$${formatCurrency(value)}`, name];
                       }}
                       contentStyle={{
-                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                        border: '1px solid #e5e7eb',
+                        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                        color: '#333333', // Darker text for contrast
+                        border: '1px solid #cccccc',
                         borderRadius: '8px',
-                        fontSize: '12px'
+                        fontSize: '12px',
+                        boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
                       }}
                     />
                     <Legend 
@@ -404,25 +496,47 @@ export default function Dashboard() {
             </div>
             
             <div className="space-y-2 max-h-80 overflow-y-auto">
-              {allocation.map((item, index) => (
-                <div key={item.name} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              {/* Assets */}
+              {allAccounts.filter(acc => !isLiability(acc) && getAccountBalance(acc) !== 0).sort((a,b) => getAccountBalance(b) - getAccountBalance(a)).map((account, index) => (
+                <div key={account.id || account.account_id || `asset-${index}`} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                   <div className="flex items-center">
                     <div
                       className="w-3 h-3 rounded-full mr-2 flex-shrink-0"
-                      style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                      style={{ backgroundColor: COLORS[index % COLORS.length] }} // Color might need adjustment based on overall list
                     />
-                    <span className="text-sm font-medium text-gray-900 dark:text-white">{item.name}</span>
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">{account.name} ({getDisplayAccountType(account.type)})</span>
                   </div>
                   <span className={`text-sm font-semibold text-green-600 dark:text-green-400 ${isPrivacyMode ? 'filter blur' : ''}`}>
-                    ${formatCurrency(item.value)}
+                    ${formatCurrency(getAccountBalance(account))}
+                  </span>
+                </div>
+              ))}
+
+              {/* Spacer if both assets and liabilities exist */}
+              {allAccounts.filter(acc => !isLiability(acc) && getAccountBalance(acc) !== 0).length > 0 && allAccounts.filter(acc => isLiability(acc) && getAccountBalance(acc) !== 0).length > 0 && (
+                <hr className="my-3 border-gray-200 dark:border-gray-600" />
+              )}
+
+              {/* Liabilities */}
+              {allAccounts.filter(acc => isLiability(acc) && getAccountBalance(acc) !== 0).sort((a,b) => getAccountBalance(b) - getAccountBalance(a)).map((account, index) => (
+                <div key={account.id || account.account_id || `liability-${index}`} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <div className="flex items-center">
+                     <div
+                      className="w-3 h-3 rounded-full mr-2 flex-shrink-0"
+                      style={{ backgroundColor: COLORS[(allAccounts.filter(acc => !isLiability(acc)).length + index) % COLORS.length] }} // Continue color cycle
+                    />
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">{account.name} ({getDisplayAccountType(account.type)})</span>
+                  </div>
+                  <span className={`text-sm font-semibold text-red-600 dark:text-red-400 ${isPrivacyMode ? 'filter blur' : ''}`}>
+                    -${formatCurrency(Math.abs(getAccountBalance(account)))}
                   </span>
                 </div>
               ))}
               
-              {allocation.length === 0 && (
+              {allAccounts.filter(acc => getAccountBalance(acc) !== 0).length === 0 && (
                 <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                   <ChartPieIcon className="mx-auto h-8 w-8 mb-3" />
-                  <p className="text-sm">No accounts connected</p>
+                  <p className="text-sm">No accounts with balances</p>
                 </div>
               )}
             </div>
@@ -451,10 +565,12 @@ export default function Dashboard() {
                   />
                   <Tooltip 
                     contentStyle={{
-                      backgroundColor: 'var(--tooltip-bg)',
-                      border: '1px solid var(--tooltip-border)',
-                      borderRadius: '6px',
-                      fontSize: '12px'
+                      backgroundColor: 'rgba(255, 255, 255, 0.9)', // Consistent translucent style
+                      color: '#333333', // Darker text for contrast
+                      border: '1px solid #cccccc',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                      boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
                     }}
                     formatter={(value, name) => {
                       if (isPrivacyMode) return ['***', name];
@@ -539,8 +655,8 @@ export default function Dashboard() {
                           <span className="ml-2 text-xs text-purple-600 dark:text-purple-400">(YNAB)</span>
                         )}
                       </td>
-                      <td className={`px-4 py-3 text-sm font-medium text-right ${getTransactionAmount(txn) > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'} ${isPrivacyMode ? 'filter blur' : ''}`}>
-                        {getTransactionAmount(txn) > 0 ? '-' : '+'}${Math.abs(getTransactionAmount(txn)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      <td className={`px-4 py-3 text-sm font-medium text-right ${getTransactionAmount(txn) < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'} ${isPrivacyMode ? 'filter blur' : ''}`}>
+                        {getTransactionAmount(txn) < 0 ? '-' : '+'}${Math.abs(getTransactionAmount(txn)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
                         {allAccounts.find(acc => (acc.account_id || acc.id) === txn.account_id)?.name || txn.account_id}

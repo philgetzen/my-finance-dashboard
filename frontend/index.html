@@ -4,11 +4,41 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" /> <!-- Keeping for older iOS compatibility -->
+    <meta name="mobile-web-app-capable" content="yes" /> <!-- {/* Added for modern PWA standards */} -->
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="theme-color" content="#059669" />
     <link rel="manifest" href="/manifest.json" />
     <title>Healthy Wealth</title>
+    <script>
+      // IIFE to avoid polluting global scope
+      (function() {
+        try {
+          var savedMode = localStorage.getItem('darkMode');
+          var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+          var isDark;
+
+          if (savedMode !== null) {
+            isDark = JSON.parse(savedMode);
+          } else {
+            isDark = prefersDark;
+            // Optionally save the detected system preference if no user preference exists
+            // localStorage.setItem('darkMode', JSON.stringify(isDark)); 
+            // The Layout component already does this, so might be redundant here or could be primary.
+            // For now, let the Layout component handle saving the initial system preference.
+          }
+
+          if (isDark) {
+            document.documentElement.classList.add('dark');
+          } else {
+            document.documentElement.classList.remove('dark');
+          }
+        } catch (e) {
+          // In case of any error (e.g., localStorage not available), do nothing and let the app handle it.
+          console.error('Error applying initial theme:', e);
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

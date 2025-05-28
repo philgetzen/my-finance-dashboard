@@ -70,7 +70,7 @@ export default function ManualAccountModal({ user, show, onClose, onAccountAdded
             <h2 className="text-xl font-bold text-gray-900 dark:text-white">Add Manual Account</h2>
             <button
               onClick={handleClose}
-              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-700 transition-colors"
             >
               <XMarkIcon className="h-6 w-6" />
             </button>

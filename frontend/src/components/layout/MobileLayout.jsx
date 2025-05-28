@@ -148,14 +148,14 @@ export default function MobileLayout({ children, darkMode, setDarkMode }) {
                 <button
                   key={item.name}
                   onClick={() => navigate(item.path)}
-                  className={`group flex items-center w-full px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
+                  className={`group flex items-center w-full px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 border ${
                     isActive
-                      ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400'
-                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                      ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800'
+                      : 'text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
                   }`}
                 >
                   <Icon className={`mr-3 h-5 w-5 ${
-                    isActive ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400'
+                    isActive ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-300 group-hover:text-gray-500 dark:group-hover:text-gray-100'
                   }`} />
                   <span>{item.name}</span>
                 </button>
@@ -202,7 +202,7 @@ export default function MobileLayout({ children, darkMode, setDarkMode }) {
 
   // Mobile bottom navigation - iOS style
   const MobileBottomNav = () => (
-    <div className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-lg border-t border-gray-200/50 dark:border-gray-700/50 lg:hidden z-40 safe-area-inset">
+    <div className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-lg border-t border-gray-300 dark:border-gray-700 shadow-[0_-2px_5px_rgba(0,0,0,0.03)] dark:shadow-[0_-2px_5px_rgba(0,0,0,0.08)] lg:hidden z-40 safe-area-inset">
       <div className="grid grid-cols-6 h-[60px] pb-safe">
         {navItems.map((item) => {
           const isActive = location.pathname === item.path;
@@ -211,17 +211,21 @@ export default function MobileLayout({ children, darkMode, setDarkMode }) {
             <button
               key={item.name}
               onClick={() => navigate(item.path)}
-              className="flex flex-col items-center justify-center gap-0.5 text-[10px] transition-all duration-200"
+              className={`flex flex-col items-center justify-center gap-0.5 text-[10px] transition-all duration-200 rounded-md mx-1 my-1 py-1 dark:hover:bg-gray-700 ${
+                isActive 
+                  ? 'dark:bg-blue-900/20 dark:border-blue-800 border border-blue-200 bg-blue-50' // Added border for light active, bg for light active
+                  : 'dark:bg-transparent dark:border-transparent'
+              }`}
             >
               <Icon className={`h-6 w-6 transition-all duration-200 ${
                 isActive 
                   ? 'text-blue-600 dark:text-blue-400 scale-110' 
-                  : 'text-gray-400 dark:text-gray-500'
+                  : 'text-gray-400 dark:text-gray-300' // Adjusted inactive dark icon color
               }`} />
               <span className={`font-medium transition-all duration-200 ${
                 isActive 
                   ? 'text-blue-600 dark:text-blue-400' 
-                  : 'text-gray-500 dark:text-gray-400'
+                  : 'text-gray-500 dark:text-gray-300' // Adjusted inactive dark text color
               }`}>
                 {item.name}
               </span>
@@ -231,10 +235,10 @@ export default function MobileLayout({ children, darkMode, setDarkMode }) {
         
         <button
           onClick={() => setShowSettings(true)}
-          className="flex flex-col items-center justify-center gap-0.5 text-[10px] transition-all duration-200"
+          className="flex flex-col items-center justify-center gap-0.5 text-[10px] transition-all duration-200 dark:hover:bg-gray-700 rounded-md mx-1 my-1 py-1 dark:bg-transparent dark:border-transparent" // Added hover, bg, border for consistency
         >
-          <Cog6ToothIcon className="h-6 w-6 text-gray-400 dark:text-gray-500" />
-          <span className="text-gray-500 dark:text-gray-400 font-medium">More</span>
+          <Cog6ToothIcon className="h-6 w-6 text-gray-400 dark:text-gray-300" /> 
+          <span className="text-gray-500 dark:text-gray-300 font-medium">More</span>
         </button>
       </div>
     </div>

@@ -47,31 +47,58 @@ export function DashboardSkeleton() {
         ))}
       </div>
 
-      {/* Charts */}
+      {/* Charts: Asset Allocation & Account Summary */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Asset Allocation Skeleton */}
         <SkeletonCard>
-          <Skeleton className="h-6 w-32 mb-2" />
-          <Skeleton className="h-4 w-48 mb-6" />
-          <Skeleton className="h-80 w-full" />
+          <Skeleton className="h-6 w-32 mb-2" /> {/* Title: Asset Allocation */}
+          <Skeleton className="h-4 w-48 mb-6" /> {/* Subtitle */}
+          <Skeleton className="h-80 w-full" /> {/* Pie Chart Area */}
         </SkeletonCard>
+        {/* Account Summary Skeleton */}
         <SkeletonCard>
-          <Skeleton className="h-6 w-24 mb-2" />
-          <Skeleton className="h-4 w-40 mb-6" />
-          <Skeleton className="h-80 w-full" />
+          <Skeleton className="h-6 w-36 mb-2" /> {/* Title: Account Summary */}
+          <Skeleton className="h-4 w-52 mb-6" /> {/* Subtitle */}
+          <div className="space-y-3">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="flex items-center justify-between p-3 bg-gray-100 dark:bg-gray-700/50 rounded-lg">
+                <div className="flex items-center">
+                  <Skeleton className="w-3 h-3 rounded-full mr-2" />
+                  <Skeleton className="h-4 w-28" /> {/* Account Type Name */}
+                </div>
+                <Skeleton className="h-4 w-20" /> {/* Account Value */}
+              </div>
+            ))}
+          </div>
         </SkeletonCard>
       </div>
 
-      {/* Table */}
+      {/* Income vs Expenses Chart */}
       <SkeletonCard>
-        <Skeleton className="h-6 w-40 mb-2" />
-        <Skeleton className="h-4 w-56 mb-6" />
+        <Skeleton className="h-6 w-40 mb-2" /> {/* Title: Income vs Expenses */}
+        <Skeleton className="h-4 w-56 mb-6" /> {/* Subtitle */}
+        <Skeleton className="h-64 w-full" /> {/* Bar Chart Area */}
+      </SkeletonCard>
+
+      {/* Recent Transactions Table */}
+      <SkeletonCard>
+        <Skeleton className="h-6 w-44 mb-2" /> {/* Title: Recent Transactions */}
+        <Skeleton className="h-4 w-60 mb-6" /> {/* Subtitle */}
         <div className="space-y-3">
+          {/* Table Header Skeleton */}
+          <div className="hidden md:flex items-center space-x-4 px-4 py-2">
+            <Skeleton className="h-4 w-20" /> {/* Date */}
+            <Skeleton className="h-4 flex-1" /> {/* Description */}
+            <Skeleton className="h-4 w-24 text-right" /> {/* Amount */}
+            <Skeleton className="h-4 w-32" /> {/* Account */}
+          </div>
+          {/* Table Rows Skeleton */}
           {[...Array(5)].map((_, i) => (
-            <div key={i} className="flex items-center space-x-4">
-              <Skeleton className="h-4 w-20" />
-              <Skeleton className="h-4 w-48 flex-1" />
-              <Skeleton className="h-4 w-24" />
-              <Skeleton className="h-4 w-32" />
+            <div key={i} className="flex items-center space-x-4 p-3 md:px-4 md:py-3 bg-gray-100 dark:bg-gray-700/50 rounded-lg md:bg-transparent md:dark:bg-transparent md:rounded-none">
+              <Skeleton className="h-4 w-20" /> {/* Date */}
+              <Skeleton className="h-4 flex-1" /> {/* Description */}
+              <Skeleton className="h-4 w-24" /> {/* Amount */}
+              <Skeleton className="h-4 w-32 hidden md:block" /> {/* Account (desktop) */}
             </div>
           ))}
         </div>
