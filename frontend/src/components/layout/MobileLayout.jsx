@@ -31,7 +31,6 @@ const navItems = [
   { name: 'Accounts', path: '/accounts', icon: CreditCardIcon, iconActive: CreditCardIconSolid },
   { name: 'Balance', path: '/balance-sheet', icon: ListBulletIcon, iconActive: ListBulletIconSolid },
   { name: 'Invest', path: '/investment-allocation', icon: BanknotesIcon, iconActive: BanknotesIconSolid },
-  { name: 'Holdings', path: '/holdings', icon: TrophyIcon, iconActive: TrophyIconSolid },
 ];
 
 export default function MobileLayout({ children, darkMode, setDarkMode }) {

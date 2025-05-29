@@ -11,7 +11,7 @@ import Dashboard from './components/pages/Dashboard';
 import Accounts from './components/pages/Accounts';
 import BalanceSheet from './components/pages/BalanceSheet';
 import InvestmentAllocation from './components/pages/InvestmentAllocation';
-import Holdings from './components/pages/Holdings';
+// import Holdings from './components/pages/Holdings'; // Removed
 import LoadingSpinner from './components/ui/LoadingSpinner';
 import './App.css';
 
@@ -77,7 +77,7 @@ function ProtectedRoutes() {
         <Route path="/accounts" element={<Accounts />} />
         <Route path="/balance-sheet" element={<BalanceSheet />} />
         <Route path="/investment-allocation" element={<InvestmentAllocation />} />
-        <Route path="/holdings" element={<Holdings />} />
+        {/* <Route path="/holdings" element={<Holdings />} /> */} {/* Removed */}
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Layout>

@@ -23,7 +23,6 @@ const navItems = [
   { name: 'Accounts', path: '/accounts', icon: CreditCardIcon },
   { name: 'Balance Sheet', path: '/balance-sheet', icon: ListBulletIcon },
   { name: 'Investments', path: '/investment-allocation', icon: BanknotesIcon },
-  { name: 'Holdings', path: '/holdings', icon: TrophyIcon },
 ];
 
 export default function Sidebar({ darkMode, setDarkMode }) {

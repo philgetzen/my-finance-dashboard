@@ -10,9 +10,13 @@ import {
   ChartBarIcon,
   ArrowTrendingUpIcon,
   BanknotesIcon,
+  ArrowUpIcon, // Added from Holdings
+  ArrowDownIcon, // Added from Holdings
+  MinusIcon, // Added from Holdings
+  TrophyIcon, // For placeholder if needed, though header icon changes
 } from '@heroicons/react/24/outline';
 
-const COLORS = ['#3B82F6', '#8B5CF6', '#EF4444', '#10B981', '#F59E0B', '#06B6D4'];
+const COLORS = ['#3B82F6', '#8B5CF6', '#EF4444', '#10B981', '#F59E0B', '#06B6D4', '#EC4899', '#6366F1']; // Extended from Holdings
 
 // Mobile-friendly Investment Account Card
 const InvestmentAccountCard = ({ account, balance, percentage, isPrivacyMode }) => {
@@ -49,6 +53,11 @@ export default function InvestmentAllocation() {
   const [tab, setTab] = useState('summary');
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
+  // Helper from Holdings.jsx
+  const formatCurrency = (amount) => {
+    return `${(amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
+
   // Detect mobile screen
   React.useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -80,7 +89,20 @@ export default function InvestmentAllocation() {
 
   const totalInvestmentValue = investmentAllocation.reduce((sum, item) => sum + item.value, 0);
 
-  if (isLoading && !accounts && !isError) {
+  // --- Content moved from Holdings.jsx ---
+  // Placeholder holdings data (as in original Holdings.jsx)
+  const holdings = []; // This would typically come from Plaid or other investment data source
+
+  const allAccountsForNaming = [...(accounts || []), ...(manualAccounts || [])];
+  const accountIdToName = Object.fromEntries(allAccountsForNaming.map(acc => [acc.account_id || acc.id, acc.name]));
+
+  const totalMarketValue = holdings.reduce((sum, holding) => sum + (holding.market_value || 0), 0);
+  const totalCostBasis = holdings.reduce((sum, holding) => sum + (holding.cost_basis || 0), 0);
+  const totalGainLoss = totalMarketValue - totalCostBasis;
+  const totalGainLossPercent = totalCostBasis > 0 ? (totalGainLoss / totalCostBasis) * 100 : 0;
+  // --- End of content moved from Holdings.jsx ---
+
+  if (isLoading && !accounts && !manualAccounts && !isError) { // Adjusted loading condition
     return (
       <PageTransition>
         <div className="flex items-center justify-center h-64">
@@ -207,11 +229,158 @@ export default function InvestmentAllocation() {
               )}
             </Card>
 
+            {/* --- Holdings Cards (moved from Holdings.jsx) --- */}
+            {/* Portfolio Summary - Mobile Optimized */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <Card className="p-4">
+                <div className="text-center">
+                  <p className="text-xs text-gray-600 dark:text-gray-400">Holdings</p>
+                  <p className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white mt-1">
+                    {holdings.length}
+                  </p>
+                </div>
+              </Card>
+
+              <Card className="p-4">
+                <div className="text-center">
+                  <p className="text-xs text-gray-600 dark:text-gray-400">Market Value</p>
+                  <p className={`text-lg sm:text-xl font-bold text-blue-600 dark:text-blue-400 mt-1 ${isPrivacyMode ? 'filter blur' : ''}`}>
+                    ${formatCurrency(totalMarketValue)}
+                  </p>
+                </div>
+              </Card>
+
+              <Card className="p-4">
+                <div className="text-center">
+                  <p className="text-xs text-gray-600 dark:text-gray-400">Cost Basis</p>
+                  <p className={`text-lg sm:text-xl font-bold text-gray-600 dark:text-gray-400 mt-1 ${isPrivacyMode ? 'filter blur' : ''}`}>
+                    ${formatCurrency(totalCostBasis)}
+                  </p>
+                </div>
+              </Card>
+
+              <Card className="p-4">
+                <div className="text-center">
+                  <p className="text-xs text-gray-600 dark:text-gray-400">Gain/Loss</p>
+                  <div className="flex items-center justify-center mt-1">
+                    {totalGainLoss > 0 ? (
+                      <ArrowUpIcon className="h-4 w-4 text-green-500 mr-1" />
+                    ) : totalGainLoss < 0 ? (
+                      <ArrowDownIcon className="h-4 w-4 text-red-500 mr-1" />
+                    ) : (
+                      <MinusIcon className="h-4 w-4 text-gray-500 mr-1" />
+                    )}
+                    <div className={`text-base sm:text-lg font-bold ${totalGainLoss >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'} ${isPrivacyMode ? 'filter blur' : ''}`}>
+                      ${formatCurrency(Math.abs(totalGainLoss))}
+                    </div>
+                  </div>
+                  <p className={`text-xs ${totalGainLoss >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                    ({totalGainLossPercent >= 0 ? '+' : ''}{totalGainLossPercent.toFixed(2)}%)
+                  </p>
+                </div>
+              </Card>
+            </div>
+
+            {/* Holdings List/Table - Mobile Optimized (moved from Holdings.jsx) */}
+            <Card className="p-4">
+              <div className="mb-4">
+                <h3 className="text-base font-semibold text-gray-900 dark:text-white">Individual Holdings</h3>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Your investment positions</p>
+              </div>
+
+              {holdings.length > 0 ? (
+                isMobile ? (
+                  // Mobile: Card Layout
+                  <div className="space-y-3">
+                    {holdings.map(holding => (
+                      <HoldingCardMoved
+                        key={`holding-${holding.account_id}-${holding.security_id}`}
+                        holding={holding}
+                        accountName={accountIdToName[holding.account_id]}
+                        isPrivacyMode={isPrivacyMode}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  // Desktop: Table Layout
+                  <div className="overflow-x-auto">
+                    <table className="w-full divide-y divide-gray-200 dark:divide-gray-700">
+                      <thead className="bg-gray-50 dark:bg-gray-800">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Security</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Account</th>
+                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Quantity</th>
+                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Cost Basis</th>
+                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Market Value</th>
+                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Performance</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                        {holdings.map(holding => {
+                          const gainLoss = (holding.market_value || 0) - (holding.cost_basis || 0);
+                          const gainLossPercent = holding.cost_basis > 0 ? (gainLoss / holding.cost_basis) * 100 : 0;
+                          
+                          return (
+                            <tr key={`holding-${holding.account_id}-${holding.security_id}`}>
+                              <td className="px-4 py-3">
+                                <div>
+                                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                    {holding.security?.name || 'Unknown Security'}
+                                  </p>
+                                  <p className="text-xs text-gray-600 dark:text-gray-400">
+                                    {holding.security?.ticker_symbol || 'N/A'}
+                                  </p>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
+                                {accountIdToName[holding.account_id] || holding.account_id}
+                              </td>
+                              <td className="px-4 py-3 text-right text-sm text-gray-900 dark:text-white">
+                                {(holding.quantity || 0).toLocaleString()}
+                              </td>
+                              <td className={`px-4 py-3 text-right text-sm text-gray-900 dark:text-white ${isPrivacyMode ? 'filter blur' : ''}`}>
+                                ${formatCurrency(holding.cost_basis || 0)}
+                              </td>
+                              <td className={`px-4 py-3 text-right text-sm font-medium text-gray-900 dark:text-white ${isPrivacyMode ? 'filter blur' : ''}`}>
+                                ${formatCurrency(holding.market_value || 0)}
+                              </td>
+                              <td className="px-4 py-3 text-center">
+                                <div className="flex items-center justify-center">
+                                  {gainLoss > 0 ? (
+                                    <ArrowUpIcon className="h-4 w-4 text-green-500 mr-1" />
+                                  ) : gainLoss < 0 ? (
+                                    <ArrowDownIcon className="h-4 w-4 text-red-500 mr-1" />
+                                  ) : (
+                                    <MinusIcon className="h-4 w-4 text-gray-500 mr-1" />
+                                  )}
+                                  <span className={`text-sm font-medium ${gainLoss >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                    {gainLossPercent >= 0 ? '+' : ''}{gainLossPercent.toFixed(2)}%
+                                  </span>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )
+              ) : (
+                <div className="text-center py-8">
+                  <TrophyIcon className="mx-auto h-10 w-10 text-gray-400 mb-3" />
+                  <p className="text-sm text-gray-500 dark:text-gray-400">No holdings data available</p>
+                  <p className="text-xs mt-1">Connect your investment accounts to view holdings</p>
+                </div>
+              )}
+            </Card>
+            {/* --- End of Holdings Cards --- */}
+
+
             {/* Investment Accounts List - Mobile Optimized */}
             <Card className="p-4">
               <div className="mb-4">
-                <h3 className="text-base font-semibold text-gray-900 dark:text-white">Investment Accounts</h3>
-                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">All connected investment accounts</p>
+                <h3 className="text-base font-semibold text-gray-900 dark:text-white">Investment Accounts Summary</h3>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Summary of accounts included in allocation</p>
               </div>
               
               <div className="space-y-3">
@@ -260,3 +429,62 @@ export default function InvestmentAllocation() {
     </PageTransition>
   );
 }
+
+// Copied HoldingCard from Holdings.jsx - Renamed to HoldingCardMoved to avoid potential name collision if it were imported
+const HoldingCardMoved = ({ holding, accountName, isPrivacyMode }) => {
+  const gainLoss = (holding.market_value || 0) - (holding.cost_basis || 0);
+  const gainLossPercent = holding.cost_basis > 0 ? (gainLoss / holding.cost_basis) * 100 : 0;
+  
+  // formatCurrency is defined in the parent InvestmentAllocation component scope
+  const localFormatCurrency = (amount) => {
+    return `${(amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md transition-shadow">
+      <div className="flex justify-between items-start mb-3">
+        <div className="flex-1 min-w-0">
+          <p className="font-medium text-gray-900 dark:text-white text-sm truncate">
+            {holding.security?.name || 'Unknown Security'}
+          </p>
+          <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+            {holding.security?.ticker_symbol || 'N/A'} • {accountName || holding.account_id}
+          </p>
+        </div>
+        <div className="flex items-center ml-3">
+          {gainLoss > 0 ? (
+            <ArrowUpIcon className="h-4 w-4 text-green-500 mr-1" />
+          ) : gainLoss < 0 ? (
+            <ArrowDownIcon className="h-4 w-4 text-red-500 mr-1" />
+          ) : (
+            <MinusIcon className="h-4 w-4 text-gray-500 mr-1" />
+          )}
+          <span className={`text-sm font-medium ${gainLoss >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+            {gainLossPercent >= 0 ? '+' : ''}{gainLossPercent.toFixed(2)}%
+          </span>
+        </div>
+      </div>
+      
+      <div className="grid grid-cols-3 gap-3 text-xs">
+        <div>
+          <p className="text-gray-500 dark:text-gray-400">Quantity</p>
+          <p className="font-medium text-gray-900 dark:text-white mt-1">
+            {(holding.quantity || 0).toLocaleString()}
+          </p>
+        </div>
+        <div>
+          <p className="text-gray-500 dark:text-gray-400">Cost Basis</p>
+          <p className={`font-medium text-gray-900 dark:text-white mt-1 ${isPrivacyMode ? 'filter blur' : ''}`}>
+            ${localFormatCurrency(holding.cost_basis || 0)}
+          </p>
+        </div>
+        <div>
+          <p className="text-gray-500 dark:text-gray-400">Market Value</p>
+          <p className={`font-medium text-gray-900 dark:text-white mt-1 ${isPrivacyMode ? 'filter blur' : ''}`}>
+            ${localFormatCurrency(holding.market_value || 0)}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
