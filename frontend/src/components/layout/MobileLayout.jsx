@@ -9,13 +9,13 @@ import {
   CreditCardIcon,
   ListBulletIcon,
   BanknotesIcon,
-  TrophyIcon,
   Cog6ToothIcon,
   ArrowRightStartOnRectangleIcon,
   SunIcon,
   MoonIcon,
   EyeSlashIcon,
   EyeIcon,
+  Bars3Icon,
   XMarkIcon
 } from '@heroicons/react/24/outline';
 import {
@@ -23,27 +23,29 @@ import {
   CreditCardIcon as CreditCardIconSolid,
   ListBulletIcon as ListBulletIconSolid,
   BanknotesIcon as BanknotesIconSolid,
-  TrophyIcon as TrophyIconSolid,
 } from '@heroicons/react/24/solid';
 
 const navItems = [
   { name: 'Dashboard', path: '/', icon: HomeIcon, iconActive: HomeIconSolid },
   { name: 'Accounts', path: '/accounts', icon: CreditCardIcon, iconActive: CreditCardIconSolid },
-  { name: 'Balance', path: '/balance-sheet', icon: ListBulletIcon, iconActive: ListBulletIconSolid },
-  { name: 'Invest', path: '/investment-allocation', icon: BanknotesIcon, iconActive: BanknotesIconSolid },
+  { name: 'Income Report', path: '/balance-sheet', icon: ListBulletIcon, iconActive: ListBulletIconSolid },
+  { name: 'Investments', path: '/investment-allocation', icon: BanknotesIcon, iconActive: BanknotesIconSolid },
 ];
 
 export default function MobileLayout({ children, darkMode, setDarkMode }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { isPrivacyMode, togglePrivacyMode } = usePrivacy();
-  const [showSettings, setShowSettings] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1024);
 
   // Handle resize events
   useEffect(() => {
     const handleResize = () => {
       setIsDesktop(window.innerWidth >= 1024);
+      if (window.innerWidth >= 1024) {
+        setShowMobileMenu(false);
+      }
     };
     
     window.addEventListener('resize', handleResize);
@@ -68,69 +70,14 @@ export default function MobileLayout({ children, darkMode, setDarkMode }) {
     }
   };
 
-  // Settings drawer for mobile - iOS style
-  const SettingsDrawer = () => (
-    <div 
-      className={`fixed inset-0 z-50 lg:hidden transition-opacity duration-300 ${showSettings ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
-      onClick={() => setShowSettings(false)}
-    >
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-      <div 
-        className={`absolute bottom-0 left-0 right-0 bg-white dark:bg-gray-800 rounded-t-2xl shadow-xl transform transition-transform duration-300 ease-out ${showSettings ? 'translate-y-0' : 'translate-y-full'}`}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="w-12 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mt-3 mb-6" />
-        <div className="px-6 pb-8 space-y-2">
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setDarkMode(!darkMode);
-              setShowSettings(false);
-            }}
-            className="w-full justify-start text-base"
-            size="lg"
-          >
-            {darkMode ? <SunIcon className="h-5 w-5 mr-3" /> : <MoonIcon className="h-5 w-5 mr-3" />}
-            {darkMode ? 'Light Mode' : 'Dark Mode'}
-          </Button>
-          
-          <Button
-            variant="secondary"
-            onClick={() => {
-              togglePrivacyMode();
-              setShowSettings(false);
-            }}
-            className="w-full justify-start text-base"
-            size="lg"
-          >
-            {isPrivacyMode ? <EyeIcon className="h-5 w-5 mr-3" /> : <EyeSlashIcon className="h-5 w-5 mr-3" />}
-            {isPrivacyMode ? 'Show Numbers' : 'Privacy Mode'}
-          </Button>
-          
-          <div className="pt-2 border-t border-gray-200 dark:border-gray-700 mt-4">
-            <Button
-              variant="outline"
-              onClick={handleLogout}
-              className="w-full justify-start text-base text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 border-red-200 dark:border-red-800"
-              size="lg"
-            >
-              <ArrowRightStartOnRectangleIcon className="h-5 w-5 mr-3" />
-              Sign Out
-            </Button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  // Desktop sidebar
+  // Desktop sidebar with glassmorphism
   const DesktopSidebar = () => (
-    <div className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0">
-      <div className="flex-1 flex flex-col min-h-0 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700">
+    <div className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0 z-50">
+      <div className="flex-1 flex flex-col min-h-0 glass-sidebar">
         {/* Logo */}
-        <div className="flex items-center h-16 flex-shrink-0 px-4 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center h-16 flex-shrink-0 px-4 border-b border-white/10">
           <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-gradient-to-r from-emerald-500 to-green-600 rounded-lg flex items-center justify-center">
+            <div className="w-8 h-8 glass-card-emerald rounded-lg flex items-center justify-center glow-emerald">
               <span className="text-white font-bold text-sm">HW</span>
             </div>
             <span className="text-xl font-bold text-gray-900 dark:text-white">Healthy Wealth</span>
@@ -139,7 +86,7 @@ export default function MobileLayout({ children, darkMode, setDarkMode }) {
         
         {/* Navigation */}
         <div className="flex-1 flex flex-col overflow-y-auto">
-          <nav className="flex-1 px-2 py-4 space-y-1">
+          <nav className="flex-1 px-4 py-6 space-y-2">
             {navItems.map((item) => {
               const isActive = location.pathname === item.path;
               const Icon = isActive ? item.iconActive : item.icon;
@@ -147,14 +94,14 @@ export default function MobileLayout({ children, darkMode, setDarkMode }) {
                 <button
                   key={item.name}
                   onClick={() => navigate(item.path)}
-                  className={`group flex items-center w-full px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 border ${
+                  className={`group flex items-center w-full px-4 py-3 text-sm font-medium rounded-xl transition-all duration-300 ${
                     isActive
-                      ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800'
-                      : 'text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
+                      ? 'glass-card-blue text-white glow-blue'
+                      : 'glass-button text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
                   }`}
                 >
                   <Icon className={`mr-3 h-5 w-5 ${
-                    isActive ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-300 group-hover:text-gray-500 dark:group-hover:text-gray-100'
+                    isActive ? 'text-white' : 'text-gray-400 dark:text-gray-300 group-hover:text-gray-600 dark:group-hover:text-gray-100'
                   }`} />
                   <span>{item.name}</span>
                 </button>
@@ -162,38 +109,157 @@ export default function MobileLayout({ children, darkMode, setDarkMode }) {
             })}
           </nav>
           
-          {/* Settings */}
-          <div className="flex-shrink-0 flex flex-col p-4 space-y-2 border-t border-gray-200 dark:border-gray-700">
+          {/* Settings Section */}
+          <div className="flex-shrink-0 flex flex-col p-4 space-y-2 border-t border-white/10">
+            <Button
+              variant="ghost"
+              onClick={() => setDarkMode(!darkMode)}
+              className="w-full justify-start glass-button"
+              size="sm"
+            >
+              {darkMode ? <SunIcon className="h-4 w-4 mr-2" /> : <MoonIcon className="h-4 w-4 mr-2" />}
+              {darkMode ? 'Light Mode' : 'Dark Mode'}
+            </Button>
+            
+            <Button
+              variant="ghost"
+              onClick={togglePrivacyMode}
+              className="w-full justify-start glass-button"
+              size="sm"
+            >
+              {isPrivacyMode ? <EyeIcon className="h-4 w-4 mr-2" /> : <EyeSlashIcon className="h-4 w-4 mr-2" />}
+              {isPrivacyMode ? 'Show Numbers' : 'Privacy Mode'}
+            </Button>
+            
+            <Button
+              variant="ghost"
+              onClick={handleLogout}
+              className="w-full justify-start glass-button text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+              size="sm"
+            >
+              <ArrowRightStartOnRectangleIcon className="h-4 w-4 mr-2" />
+              Sign Out
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Mobile header with hamburger menu
+  const MobileHeader = () => (
+    <div className="lg:hidden sticky top-0 z-50 glass-nav">
+      <div className="flex items-center justify-between h-16 px-4">
+        <div className="flex items-center space-x-3">
+          <div className="w-8 h-8 glass-card-emerald rounded-lg flex items-center justify-center glow-emerald">
+            <span className="text-white font-bold text-sm">HW</span>
+          </div>
+          <span className="text-lg font-bold text-gray-900 dark:text-white">Healthy Wealth</span>
+        </div>
+        
+        <button
+          onClick={() => setShowMobileMenu(!showMobileMenu)}
+          className="glass-button p-2 rounded-lg"
+        >
+          {showMobileMenu ? (
+            <XMarkIcon className="h-6 w-6 text-gray-600 dark:text-gray-300" />
+          ) : (
+            <Bars3Icon className="h-6 w-6 text-gray-600 dark:text-gray-300" />
+          )}
+        </button>
+      </div>
+    </div>
+  );
+
+  // Mobile menu overlay
+  const MobileMenu = () => (
+    <div 
+      className={`fixed inset-0 z-50 lg:hidden transition-opacity duration-300 ${
+        showMobileMenu ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+      }`}
+      onClick={() => setShowMobileMenu(false)}
+    >
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+      <div 
+        className={`absolute top-0 left-0 bottom-0 w-80 max-w-[85vw] glass-sidebar transform transition-transform duration-300 ease-out ${
+          showMobileMenu ? 'translate-x-0' : '-translate-x-full'
+        }`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Logo */}
+        <div className="flex items-center h-16 px-4 border-b border-white/10">
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 glass-card-emerald rounded-lg flex items-center justify-center glow-emerald">
+              <span className="text-white font-bold text-sm">HW</span>
+            </div>
+            <span className="text-xl font-bold text-gray-900 dark:text-white">Healthy Wealth</span>
+          </div>
+        </div>
+        
+        {/* Navigation */}
+        <nav className="flex-1 px-4 py-6 space-y-2">
+          {navItems.map((item) => {
+            const isActive = location.pathname === item.path;
+            const Icon = isActive ? item.iconActive : item.icon;
+            return (
+              <button
+                key={item.name}
+                onClick={() => {
+                  navigate(item.path);
+                  setShowMobileMenu(false);
+                }}
+                className={`group flex items-center w-full px-4 py-3 text-sm font-medium rounded-xl transition-all duration-300 ${
+                  isActive
+                    ? 'glass-card-blue text-white glow-blue'
+                    : 'glass-button text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                <Icon className={`mr-3 h-5 w-5 ${
+                  isActive ? 'text-white' : 'text-gray-400 dark:text-gray-300 group-hover:text-gray-600 dark:group-hover:text-gray-100'
+                }`} />
+                <span>{item.name}</span>
+              </button>
+            );
+          })}
+        </nav>
+        
+        {/* Settings Section */}
+        <div className="px-4 py-4 space-y-2 border-t border-white/10">
           <Button
-          variant="secondary"
-          onClick={() => setDarkMode(!darkMode)}
-            className="w-full justify-start"
-          size="sm"
+            variant="ghost"
+            onClick={() => {
+              setDarkMode(!darkMode);
+              setShowMobileMenu(false);
+            }}
+            className="w-full justify-start glass-button"
+            size="sm"
           >
             {darkMode ? <SunIcon className="h-4 w-4 mr-2" /> : <MoonIcon className="h-4 w-4 mr-2" />}
             {darkMode ? 'Light Mode' : 'Dark Mode'}
           </Button>
           
           <Button
-            variant="secondary"
-          onClick={togglePrivacyMode}
-          className="w-full justify-start"
+            variant="ghost"
+            onClick={() => {
+              togglePrivacyMode();
+              setShowMobileMenu(false);
+            }}
+            className="w-full justify-start glass-button"
             size="sm"
           >
             {isPrivacyMode ? <EyeIcon className="h-4 w-4 mr-2" /> : <EyeSlashIcon className="h-4 w-4 mr-2" />}
-          {isPrivacyMode ? 'Show Numbers' : 'Privacy Mode'}
+            {isPrivacyMode ? 'Show Numbers' : 'Privacy Mode'}
           </Button>
           
           <Button
-          variant="outline"
+            variant="ghost"
             onClick={handleLogout}
-              className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 border-red-200 dark:border-red-800"
+            className="w-full justify-start glass-button text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
             size="sm"
           >
             <ArrowRightStartOnRectangleIcon className="h-4 w-4 mr-2" />
             Sign Out
           </Button>
-        </div>
         </div>
       </div>
     </div>
@@ -201,8 +267,8 @@ export default function MobileLayout({ children, darkMode, setDarkMode }) {
 
   // Mobile bottom navigation - iOS style
   const MobileBottomNav = () => (
-    <div className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-lg border-t border-gray-300 dark:border-gray-700 shadow-[0_-2px_5px_rgba(0,0,0,0.03)] dark:shadow-[0_-2px_5px_rgba(0,0,0,0.08)] lg:hidden z-40 safe-area-inset">
-      <div className="grid grid-cols-6 h-[60px] pb-safe">
+    <div className="fixed bottom-0 left-0 right-0 glass-nav border-t border-white/10 lg:hidden z-40 pb-safe">
+      <div className="grid grid-cols-5 h-[60px]">
         {navItems.map((item) => {
           const isActive = location.pathname === item.path;
           const Icon = isActive ? item.iconActive : item.icon;
@@ -210,21 +276,21 @@ export default function MobileLayout({ children, darkMode, setDarkMode }) {
             <button
               key={item.name}
               onClick={() => navigate(item.path)}
-              className={`flex flex-col items-center justify-center gap-0.5 text-[10px] transition-all duration-200 rounded-md mx-1 my-1 py-1 dark:hover:bg-gray-700 ${
+              className={`flex flex-col items-center justify-center gap-0.5 text-[10px] transition-all duration-200 rounded-md mx-1 my-1 py-1 hover:bg-white/5 ${
                 isActive 
-                  ? 'dark:bg-blue-900/20 dark:border-blue-800 border border-blue-200 bg-blue-50' // Added border for light active, bg for light active
-                  : 'dark:bg-transparent dark:border-transparent'
+                  ? 'glass-card-blue text-white' 
+                  : 'text-gray-400 dark:text-gray-300'
               }`}
             >
               <Icon className={`h-6 w-6 transition-all duration-200 ${
                 isActive 
-                  ? 'text-blue-600 dark:text-blue-400 scale-110' 
-                  : 'text-gray-400 dark:text-gray-300' // Adjusted inactive dark icon color
+                  ? 'text-white scale-110' 
+                  : 'text-gray-400 dark:text-gray-300'
               }`} />
               <span className={`font-medium transition-all duration-200 ${
                 isActive 
-                  ? 'text-blue-600 dark:text-blue-400' 
-                  : 'text-gray-500 dark:text-gray-300' // Adjusted inactive dark text color
+                  ? 'text-white' 
+                  : 'text-gray-500 dark:text-gray-300'
               }`}>
                 {item.name}
               </span>
@@ -233,8 +299,8 @@ export default function MobileLayout({ children, darkMode, setDarkMode }) {
         })}
         
         <button
-          onClick={() => setShowSettings(true)}
-          className="flex flex-col items-center justify-center gap-0.5 text-[10px] transition-all duration-200 dark:hover:bg-gray-700 rounded-md mx-1 my-1 py-1 dark:bg-transparent dark:border-transparent" // Added hover, bg, border for consistency
+          onClick={() => setShowMobileMenu(true)}
+          className="flex flex-col items-center justify-center gap-0.5 text-[10px] transition-all duration-200 hover:bg-white/5 rounded-md mx-1 my-1 py-1 text-gray-400 dark:text-gray-300"
         >
           <Cog6ToothIcon className="h-6 w-6 text-gray-400 dark:text-gray-300" /> 
           <span className="text-gray-500 dark:text-gray-300 font-medium">More</span>
@@ -248,10 +314,16 @@ export default function MobileLayout({ children, darkMode, setDarkMode }) {
       {/* Desktop sidebar */}
       <DesktopSidebar />
       
+      {/* Mobile header */}
+      <MobileHeader />
+      
+      {/* Mobile menu */}
+      <MobileMenu />
+      
       {/* Main content */}
       <div className={`flex flex-col min-h-screen ${isDesktop ? 'lg:pl-64' : ''}`}>
         <main className="flex-1 pb-20 lg:pb-0">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 lg:py-8 safe-area-inset">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 lg:py-8">
             {children}
           </div>
         </main>
@@ -259,9 +331,6 @@ export default function MobileLayout({ children, darkMode, setDarkMode }) {
       
       {/* Mobile bottom navigation */}
       <MobileBottomNav />
-      
-      {/* Mobile settings drawer */}
-      <SettingsDrawer />
     </>
   );
 }

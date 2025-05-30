@@ -1,3 +1,6 @@
+/* Import glassmorphism design system */
+@import './styles/glassmorphism.css';
+
 /* Root styles for the finance dashboard */
 #root {
   max-width: none;

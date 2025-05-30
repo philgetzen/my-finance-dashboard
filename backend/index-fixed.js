@@ -42,30 +42,27 @@ app.use(cors({
   optionsSuccessStatus: 200
 }));
 
-// Handle preflight requests (avoiding '*' pattern)
-app.use((req, res, next) => {
-  if (req.method === 'OPTIONS') {
-    const origin = req.headers.origin;
-    const allowedOrigins = [
-      'http://localhost:3000',
-      'http://localhost:5173',
-      'https://serene-kelpie-1319e6.netlify.app',
-      'https://ynabwealthdashboard.netlify.app',
-      'https://my-finance-dashboard.onrender.com'
-    ];
-    
-    if (!origin || allowedOrigins.includes(origin)) {
-      res.header('Access-Control-Allow-Origin', origin || '*');
-      res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-      res.header('Access-Control-Allow-Credentials', 'true');
-      return res.status(200).end();
-    } else {
-      console.log('Preflight request blocked for origin:', origin);
-      return res.status(403).end();
-    }
+// Handle preflight requests
+app.options('*', (req, res) => {
+  const origin = req.headers.origin;
+  const allowedOrigins = [
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'https://serene-kelpie-1319e6.netlify.app',
+    'https://ynabwealthdashboard.netlify.app',
+    'https://my-finance-dashboard.onrender.com'
+  ];
+  
+  if (!origin || allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin || '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.status(200).end();
+  } else {
+    console.log('Preflight request blocked for origin:', origin);
+    res.status(403).end();
   }
-  next();
 });
 
 app.use(express.json());
@@ -134,14 +131,6 @@ try {
 const db = admin.firestore();
 console.log('✅ Firestore initialized');
 
-// Test database connection
-try {
-  db.settings({ ignoreUndefinedProperties: true });
-  console.log('✅ Firestore settings configured');
-} catch (error) {
-  console.error('⚠️ Firestore settings warning:', error.message);
-}
-
 // YNAB configuration
 const YNAB_CLIENT_ID = process.env.YNAB_CLIENT_ID;
 const YNAB_CLIENT_SECRET = process.env.YNAB_CLIENT_SECRET;
@@ -169,7 +158,6 @@ app.get('/', (req, res) => {
     port: process.env.PORT || 5001
   });
 });
-console.log('✅ Registered route: GET /');
 
 app.get('/health', (req, res) => {
   res.status(200).json({ 
@@ -178,7 +166,6 @@ app.get('/health', (req, res) => {
     uptime: process.uptime()
   });
 });
-console.log('✅ Registered route: GET /health');
 
 app.get('/api/debug/env', (req, res) => {
   res.json({

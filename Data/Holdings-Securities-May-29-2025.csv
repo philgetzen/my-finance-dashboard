@@ -1,0 +1,176 @@
+Ticker,Description,Account,Held,Price,Quantity,Amount
+AAPL,Apple Inc. - Common Stock,31810,1.49%,$198.97,33.466,"$6,658.73"
+NVO,Novo Nordisk A/S Common Stock,31810,0.32%,$69.03,20.47,"$1,412.94"
+IHI,iShares U.S. Medical Devices ETF,31813,0.46%,$61.82,33.424,"$2,066.27"
+IHI,iShares U.S. Medical Devices ETF,31811,0.11%,$61.82,8.041,$497.09
+IHI,iShares U.S. Medical Devices ETF,32508,0.2%,$61.82,14.573,$900.90
+SCZ,iShares MSCI EAFE Small-Cap ETF,32507,0.06%,$70.35,3.666,$257.90
+FTGC,First Trust Global Tactical Commodity Strategy Fund,31810,0.47%,$24.11,87.542,"$2,111.08"
+OHI,"Omega Healthcare Investors, Inc. Common Stock",32507,0.02%,$36.67,2.617,$95.95
+OHI,"Omega Healthcare Investors, Inc. Common Stock",31810,0.45%,$36.67,54.299,"$1,990.87"
+OHI,"Omega Healthcare Investors, Inc. Common Stock",32508,0.3%,$36.67,36.646,"$1,343.63"
+OHI,"Omega Healthcare Investors, Inc. Common Stock",31811,0.17%,$36.67,20.226,$741.59
+OHI,"Omega Healthcare Investors, Inc. Common Stock",31813,0.69%,$36.67,84.32,"$3,091.59"
+IYE,iShares U.S. Energy ETF,31811,0.02%,$43.61,2.277,$99.30
+IYE,iShares U.S. Energy ETF,32508,0.04%,$43.61,4.127,$179.98
+IYE,iShares U.S. Energy ETF,31813,0.09%,$43.61,9.398,$409.85
+BITW,BITWISE 10 CRYPTO INDEX FD UNIT BENEFICIAL COMMON STOCK,31811,0.34%,$60.30,24.924,"$1,502.92"
+BITW,BITWISE 10 CRYPTO INDEX FD UNIT BENEFICIAL COMMON STOCK,31813,1.33%,$60.30,98.583,"$5,944.55"
+BITW,BITWISE 10 CRYPTO INDEX FD UNIT BENEFICIAL COMMON STOCK,32508,0.62%,$60.30,45.595,"$2,749.38"
+VNQ,Vanguard Real Estate ETF,31811,0.11%,$89.04,5.623,$500.70
+VNQ,Vanguard Real Estate ETF,32507,0.01%,$89.04,0.704,$62.69
+VNQ,Vanguard Real Estate ETF,32508,0.2%,$89.04,10.182,$906.66
+VNQ,Vanguard Real Estate ETF,31810,0.65%,$89.04,32.582,"$2,901.26"
+VNQ,Vanguard Real Estate ETF,31813,0.47%,$89.04,23.451,"$2,088.19"
+SBRA,"Sabra Health Care REIT, Inc. - Common Stock",31811,0.11%,$17.48,27.982,$489.13
+SBRA,"Sabra Health Care REIT, Inc. - Common Stock",31813,0.46%,$17.48,118.607,"$2,073.25"
+SBRA,"Sabra Health Care REIT, Inc. - Common Stock",31810,0.24%,$17.48,61.453,"$1,074.20"
+SBRA,"Sabra Health Care REIT, Inc. - Common Stock",32508,0.2%,$17.48,50.675,$885.80
+SBRA,"Sabra Health Care REIT, Inc. - Common Stock",32507,0.01%,$17.48,3.504,$61.25
+DOC,"Healthpeak Properties, Inc. Common Stock",31811,0.23%,$17.51,57.825,"$1,012.80"
+DOC,"Healthpeak Properties, Inc. Common Stock",32507,0.03%,$17.51,7.185,$125.85
+DOC,"Healthpeak Properties, Inc. Common Stock",31813,0.95%,$17.51,243.557,"$4,265.90"
+DOC,"Healthpeak Properties, Inc. Common Stock",32508,0.41%,$17.51,104.745,"$1,834.61"
+LQTI,First Trust Exchange-Traded Fund IV FT Vest Investment Grade & Target Income ETF,31811,0.15%,$20.05,33.625,$674.18
+LQTI,First Trust Exchange-Traded Fund IV FT Vest Investment Grade & Target Income ETF,32508,0.27%,$20.05,61.005,"$1,223.15"
+LQTI,First Trust Exchange-Traded Fund IV FT Vest Investment Grade & Target Income ETF,31813,0.62%,$20.05,138.398,"$2,774.88"
+SPUT,Innovator ETFs Trust Innovator Equity Premium Income - Daily PutWrite ETF,31811,0.41%,$25.35,72.101,"$1,827.76"
+SPUT,Innovator ETFs Trust Innovator Equity Premium Income - Daily PutWrite ETF,31813,1.69%,$25.35,297.826,"$7,549.89"
+SPUT,Innovator ETFs Trust Innovator Equity Premium Income - Daily PutWrite ETF,32508,0.74%,$25.35,130.84,"$3,316.79"
+UWMC,UWM Holdings Corporation Class A Common Stock,31813,0.49%,$4.28,516.255,"$2,206.99"
+UWMC,UWM Holdings Corporation Class A Common Stock,31811,0.11%,$4.28,119.266,$509.86
+UWMC,UWM Holdings Corporation Class A Common Stock,32507,0.01%,$4.28,15.265,$65.26
+UWMC,UWM Holdings Corporation Class A Common Stock,32508,0.21%,$4.28,216.053,$923.63
+FTRI,First Trust Indxx Global Natural Resources Income ETF,31810,1.16%,$13.74,375.647,"$5,160.45"
+IBIT,iShares Bitcoin Trust,31810,2.59%,$60.09,192.347,"$11,558.13"
+DFAX,Dimensional World ex U.S. Core Equity 2 ETF,32508,0.52%,$28.52,81.835,"$2,334.34"
+DFAX,Dimensional World ex U.S. Core Equity 2 ETF,31811,0.29%,$28.52,45.154,"$1,288.02"
+DFAX,Dimensional World ex U.S. Core Equity 2 ETF,31813,1.17%,$28.52,183.793,"$5,242.70"
+PSI,Invesco Semiconductors ETF,31811,0.15%,$52.15,12.616,$657.92
+PSI,Invesco Semiconductors ETF,31813,0.61%,$52.15,52.462,"$2,735.89"
+PSI,Invesco Semiconductors ETF,32508,0.27%,$52.15,22.848,"$1,191.52"
+BCI,abrdn Bloomberg All Commodity Strategy K-1 Free ETF,31811,0.04%,$20.43,9.79,$200.06
+BCI,abrdn Bloomberg All Commodity Strategy K-1 Free ETF,32508,0.08%,$20.43,17.069,$348.81
+BCI,abrdn Bloomberg All Commodity Strategy K-1 Free ETF,31813,0.18%,$20.43,39.471,$806.59
+GBTC,Grayscale Bitcoin Trust (BTC) Common Units of fractional undivided beneficial interest,31813,0.89%,$83.38,47.814,"$3,986.49"
+GBTC,Grayscale Bitcoin Trust (BTC) Common Units of fractional undivided beneficial interest,32508,0.4%,$83.38,21.678,"$1,807.40"
+GBTC,Grayscale Bitcoin Trust (BTC) Common Units of fractional undivided beneficial interest,31811,0.22%,$83.38,11.985,$999.25
+DYNF,iShares U.S. Equity Factor Rotation Active ETF,31813,0.74%,$51.92,63.811,"$3,313.06"
+DYNF,iShares U.S. Equity Factor Rotation Active ETF,32508,0.33%,$51.92,28.08,"$1,457.91"
+DYNF,iShares U.S. Equity Factor Rotation Active ETF,31811,0.18%,$51.92,15.787,$819.66
+BUYW,Northern Lights Fund Trust IV Main BuyWrite ETF,31813,1.68%,$13.88,542.178,"$7,525.43"
+BUYW,Northern Lights Fund Trust IV Main BuyWrite ETF,32508,0.74%,$13.88,238.461,"$3,309.84"
+BUYW,Northern Lights Fund Trust IV Main BuyWrite ETF,31811,0.41%,$13.88,132.167,"$1,834.48"
+IFRA,iShares U.S. Infrastructure ETF,32508,0.06%,$47.78,5.727,$273.66
+IFRA,iShares U.S. Infrastructure ETF,31811,0.03%,$47.78,3.188,$152.34
+IFRA,iShares U.S. Infrastructure ETF,31813,0.14%,$47.78,12.956,$619.10
+VTSAX,Vanguard Total Stock Market Index Fd Admiral Shs,31810,1.08%,$140.75,34.131,"$4,803.94"
+VWO,Vanguard FTSE Emerging Markets ETF,31813,0.27%,$47.54,25.775,"$1,225.34"
+VWO,Vanguard FTSE Emerging Markets ETF,31811,0.07%,$47.54,6.388,$303.69
+VWO,Vanguard FTSE Emerging Markets ETF,32507,0.09%,$47.54,8.394,$399.05
+VWO,Vanguard FTSE Emerging Markets ETF,32508,0.12%,$47.54,11.492,$546.33
+SMH,VanEck Semiconductor ETF,31810,1.37%,$243.58,25.051,"$6,101.92"
+CAPIX,Calamos Aksia Alternative Credit and Income Fund Class I Shares,31813,3.36%,$10.70,"1,401.869","$15,000.00"
+SOUNW,"SoundHound AI, Inc. - Warrant",31810,0.12%,$4.58,117.096,$536.30
+VOO,Vanguard S&P 500 ETF,32507,0.4%,$541.93,3.322,"$1,800.29"
+VOO,Vanguard S&P 500 ETF,31813,2.32%,$541.93,19.127,"$10,365.49"
+VOO,Vanguard S&P 500 ETF,32508,1.02%,$541.93,8.406,"$4,555.46"
+VOO,Vanguard S&P 500 ETF,31811,0.56%,$541.93,4.64,"$2,514.56"
+XSOE,WisdomTree Emerging Markets Ex-State Owned Enterprises Fund,31813,0.46%,$32.88,62.202,"$2,045.20"
+XSOE,WisdomTree Emerging Markets Ex-State Owned Enterprises Fund,32508,0.2%,$32.88,27.743,$912.19
+XSOE,WisdomTree Emerging Markets Ex-State Owned Enterprises Fund,31811,0.11%,$32.88,15.296,$502.93
+DFAC,Dimensional ETF U.S. Core Equity 2 ETF,31811,1.13%,$34.26,147.919,"$5,068.44"
+DFAC,Dimensional ETF U.S. Core Equity 2 ETF,31813,4.69%,$34.26,611.38,"$20,948.94"
+DFAC,Dimensional ETF U.S. Core Equity 2 ETF,32508,2.06%,$34.26,267.962,"$9,181.72"
+ESGU,iShares ESG Aware MSCI USA ETF,32508,0.61%,$128.76,21.163,"$2,724.97"
+ESGU,iShares ESG Aware MSCI USA ETF,31811,0.34%,$128.76,11.683,"$1,504.31"
+ESGU,iShares ESG Aware MSCI USA ETF,31813,1.39%,$128.76,48.206,"$6,207.05"
+DFUV,Dimensional ETF Trust Dimensional US Marketwide Value ETF,31810,0.77%,$40.59,84.935,"$3,447.51"
+DCOR,Dimensional ETF Trust Dimensional US Core Equity 1 ETF,31810,3.3%,$63.91,231.028,"$14,765.00"
+EFG,iShares MSCI EAFE Growth ETF,31811,0.09%,$109.50,3.693,$404.40
+EFG,iShares MSCI EAFE Growth ETF,31813,0.37%,$109.50,15.112,"$1,654.82"
+EFG,iShares MSCI EAFE Growth ETF,32508,0.16%,$109.50,6.696,$733.24
+VXUS,Vanguard Total International Stock ETF,31810,2.65%,$67.07,176.65,"$11,847.92"
+VTI,Vanguard Total Stock Market ETF,31810,8.35%,$289.95,128.731,"$37,324.91"
+FIXD,First Trust Smith Opportunistic Fixed Income ETF,32508,0.27%,$43.25,27.928,"$1,207.89"
+FIXD,First Trust Smith Opportunistic Fixed Income ETF,31813,0.62%,$43.25,63.968,"$2,766.62"
+FIXD,First Trust Smith Opportunistic Fixed Income ETF,31811,0.15%,$43.25,15.591,$674.31
+MSFT,Microsoft Corporation - Common Stock,31810,12.31%,$457.77,120.142,"$54,997.39"
+IJR,iShares Core S&P Small-Cap ETF,32507,0.15%,$105.59,6.29,$664.16
+IJR,iShares Core S&P Small-Cap ETF,31813,0.65%,$105.59,27.422,"$2,895.49"
+IJR,iShares Core S&P Small-Cap ETF,31811,0.16%,$105.59,6.572,$693.94
+IJR,iShares Core S&P Small-Cap ETF,32508,0.28%,$105.59,11.94,"$1,260.74"
+EFV,iShares MSCI EAFE Value ETF,31813,0.78%,$63.55,55.087,"$3,500.78"
+EFV,iShares MSCI EAFE Value ETF,31811,0.19%,$63.55,13.546,$860.85
+EFV,iShares MSCI EAFE Value ETF,32508,0.35%,$63.55,24.556,"$1,560.53"
+VTV,Vanguard Value ETF,32508,0.4%,$170.83,10.591,"$1,809.26"
+VTV,Vanguard Value ETF,31813,0.92%,$170.83,24.13,"$4,122.13"
+VTV,Vanguard Value ETF,31811,0.22%,$170.83,5.842,$997.99
+MTUM,iShares MSCI USA Momentum Factor ETF,31811,0.07%,$230.21,1.316,$302.96
+MTUM,iShares MSCI USA Momentum Factor ETF,31813,0.28%,$230.21,5.439,"$1,252.11"
+MTUM,iShares MSCI USA Momentum Factor ETF,32508,0.13%,$230.21,2.447,$563.32
+XLP,SPDR Select Sector Fund - Consumer Staples,31813,0.37%,$82.14,20.084,"$1,649.70"
+XLP,SPDR Select Sector Fund - Consumer Staples,32508,0.16%,$82.14,8.911,$731.95
+XLP,SPDR Select Sector Fund - Consumer Staples,31811,0.09%,$82.14,4.906,$402.98
+ETHW,Bitwise Ethereum ETF Common shares of beneficial interest,31811,0.08%,$19.03,18.77,$357.19
+ETHW,Bitwise Ethereum ETF Common shares of beneficial interest,32508,0.14%,$19.03,33.988,$646.79
+ETHW,Bitwise Ethereum ETF Common shares of beneficial interest,31813,0.32%,$19.03,75.699,"$1,440.55"
+XLU,SPDR Select Sector Fund - Utilities,32508,0.16%,$81.14,8.799,$713.99
+XLU,SPDR Select Sector Fund - Utilities,31811,0.09%,$81.14,4.869,$395.09
+XLU,SPDR Select Sector Fund - Utilities,31813,0.37%,$81.14,20.178,"$1,637.34"
+USMV,iShares MSCI USA Min Vol Factor ETF,31813,0.27%,$92.78,13.223,"$1,226.76"
+USMV,iShares MSCI USA Min Vol Factor ETF,32508,0.12%,$92.78,5.803,$538.37
+USMV,iShares MSCI USA Min Vol Factor ETF,31811,0.07%,$92.78,3.192,$296.14
+STAG,"Stag Industrial, Inc. Common Stock",31813,0.48%,$35.79,59.58,"$2,132.37"
+STAG,"Stag Industrial, Inc. Common Stock",31810,0.15%,$35.79,18.828,$673.85
+STAG,"Stag Industrial, Inc. Common Stock",32507,0.02%,$35.79,1.884,$67.43
+STAG,"Stag Industrial, Inc. Common Stock",31811,0.11%,$35.79,14.202,$508.29
+STAG,"Stag Industrial, Inc. Common Stock",32508,0.21%,$35.79,25.786,$922.88
+BXMT,"Blackstone Mortgage Trust, Inc. Common Stock",31811,0.11%,$19.07,26.11,$497.79
+BXMT,"Blackstone Mortgage Trust, Inc. Common Stock",31810,0.33%,$19.07,76.361,"$1,455.82"
+BXMT,"Blackstone Mortgage Trust, Inc. Common Stock",31813,0.47%,$19.07,110.487,"$2,106.43"
+BXMT,"Blackstone Mortgage Trust, Inc. Common Stock",32508,0.2%,$19.07,47.287,$901.53
+BXMT,"Blackstone Mortgage Trust, Inc. Common Stock",32507,0.01%,$19.07,3.35,$63.87
+XLV,SPDR Select Sector Fund - Health Care,31811,0.09%,$132.21,2.995,$395.97
+XLV,SPDR Select Sector Fund - Health Care,31813,0.37%,$132.21,12.462,"$1,647.60"
+XLV,SPDR Select Sector Fund - Health Care,32508,0.16%,$132.21,5.434,$718.43
+FTXL,First Trust Nasdaq Semiconductor ETF,31813,0.61%,$83.34,32.684,"$2,723.88"
+FTXL,First Trust Nasdaq Semiconductor ETF,32508,0.27%,$83.34,14.35,"$1,195.93"
+FTXL,First Trust Nasdaq Semiconductor ETF,31811,0.15%,$83.34,7.924,$660.39
+WELL,Welltower Inc. Common Stock,32508,0.21%,$152.85,6.053,$925.23
+WELL,Welltower Inc. Common Stock,31810,0.28%,$152.85,8.15,"$1,245.77"
+WELL,Welltower Inc. Common Stock,32507,0.01%,$152.85,0.416,$63.59
+WELL,Welltower Inc. Common Stock,31811,0.11%,$152.85,3.356,$512.98
+WELL,Welltower Inc. Common Stock,31813,0.48%,$152.85,13.888,"$2,122.85"
+RYN,Rayonier Inc. REIT Common Stock,32507,0.01%,$23.78,1.363,$32.41
+RYN,Rayonier Inc. REIT Common Stock,32508,0.1%,$23.78,19.128,$454.86
+RYN,Rayonier Inc. REIT Common Stock,31813,0.23%,$23.78,44.02,"$1,046.80"
+RYN,Rayonier Inc. REIT Common Stock,31810,0.12%,$23.78,23.259,$553.10
+RYN,Rayonier Inc. REIT Common Stock,31811,0.06%,$23.78,10.57,$251.35
+ROBT,First Trust Nasdaq Artificial Intelligence and Robotics ETF,31810,0.63%,$44.81,62.871,"$2,817.25"
+HODL,VanEck Bitcoin Trust Common Shares of Beneficial Interest,31811,0.11%,$29.93,16.72,$500.43
+HODL,VanEck Bitcoin Trust Common Shares of Beneficial Interest,32508,0.2%,$29.93,30.231,$904.81
+HODL,VanEck Bitcoin Trust Common Shares of Beneficial Interest,31813,0.45%,$29.93,66.717,"$1,996.84"
+FTHI,First Trust BuyWrite Income ETF,31813,0.31%,$22.13,62.448,"$1,381.97"
+FTHI,First Trust BuyWrite Income ETF,32508,0.14%,$22.13,27.339,$605.01
+FTHI,First Trust BuyWrite Income ETF,31811,0.07%,$22.13,15.037,$332.77
+Cash reserve,Cash,31813,0.32%,-,"1,411.98","$1,411.98"
+Cash reserve,Cash,31810,0.15%,-,659.24,$659.24
+Cash reserve,Cash,31811,0.07%,-,299.58,$299.58
+Cash reserve,Cash,32506,0%,-,1.04,$1.04
+Cash reserve,Cash,32507,0.01%,-,42.22,$42.22
+Cash reserve,Cash,32508,0.14%,-,634.4,$634.40
+VTEB,Vanguard Tax-Exempt Bond ETF,31810,1.52%,$48.88,138.66,"$6,778.39"
+VEA,Vanguard FTSE Developed Markets ETF,32508,0.29%,$55.53,23.212,"$1,288.85"
+VEA,Vanguard FTSE Developed Markets ETF,31811,0.16%,$55.53,12.804,$710.94
+VEA,Vanguard FTSE Developed Markets ETF,31813,0.65%,$55.53,52.265,"$2,902.01"
+VEA,Vanguard FTSE Developed Markets ETF,32507,0.13%,$55.53,10.591,$588.07
+FVD,First Trust VL Dividend,31810,0.98%,$44.62,98.564,"$4,397.43"
+DFSV,Dimensional US Small Cap Value ETF,31810,0.48%,$28.38,75.377,"$2,138.82"
+DFSU,Dimensional ETF Trust Dimensional US Sustainability Core 1 ETF,31810,1.13%,$37.55,134.92,"$5,066.23"
+TEM,"Tempus AI, Inc. - Class A Common Stock",31810,0.18%,$54.80,14.455,$792.06
+"This report is provided for information purposes only, is not meant for further distribution and is intended for your personal use. It should not be used in place of/does not replace your official statements as provided by Altruist Financial LLC, the Custodian for your account(s). Information in this report is based on the date of report creation and is subject to change"
+
+"Brokerage related products and services are provided by Altruist Financial LLC, a member of FINRA/SIPC. Advisory and certain other services are provided by Altruist LLC, an SEC registered investment adviser. Nothing in this communication should be construed as an offer, recommendation, or solicitation to buy or sell any security. Additionally, Altruist or its affiliates do not provide tax advice and investors are encouraged to consult with their personal tax advisors."
+
+"Download date: 05/29/2025"

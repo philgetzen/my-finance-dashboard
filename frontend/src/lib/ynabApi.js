@@ -40,6 +40,10 @@ class YNABService {
         
         // Handle specific error cases
         if (response.status === 401) {
+          this.accessToken = null; // Clear the token
+          console.warn('YNAB access token cleared due to 401 error.');
+          // Dispatch a global event for auth failure
+          window.dispatchEvent(new CustomEvent('ynab-auth-failure'));
           throw new Error('YNAB authentication failed - please reconnect your account');
         }
         

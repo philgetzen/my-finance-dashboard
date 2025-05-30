@@ -84,18 +84,35 @@ export const YNABDataProvider = ({ children }) => {
   
   // Handle YNAB errors
   useEffect(() => {
+    const handleAuthFailure = () => {
+      console.warn('Authentication failure detected in YNABDataContext. Clearing YNAB token.');
+      setYnabToken(null);
+      // Optionally, you might want to set an error message here too if not already handled
+      // setYnabError(new Error('YNAB authentication failed. Please reconnect.'));
+      // setShowYNABErrorModal(true);
+    };
+
     if (ynabData.isError && ynabData.error && ynabToken) {
       const errorMessage = ynabData.error?.message || '';
-      const errorStatus = ynabData.error?.response?.status;
+      // Attempt to get status from a potential error object structure if ynabData.error is not a direct response
+      const errorStatus = ynabData.error?.response?.status || (ynabData.error?.name === 'Error' && errorMessage.includes('authentication failed') ? 401 : null);
       
       // Check for authentication errors or expired tokens
       if (errorStatus === 401 || errorStatus === 403 || 
-          errorMessage.includes('unauthorized') || 
-          errorMessage.includes('authentication')) {
+          errorMessage.toLowerCase().includes('unauthorized') || 
+          errorMessage.toLowerCase().includes('authentication failed')) {
         setYnabError(ynabData.error);
         setShowYNABErrorModal(true);
+        handleAuthFailure(); // Clear token on detected error
       }
     }
+
+    // Listen for global auth failure events
+    window.addEventListener('ynab-auth-failure', handleAuthFailure);
+
+    return () => {
+      window.removeEventListener('ynab-auth-failure', handleAuthFailure);
+    };
   }, [ynabData.isError, ynabData.error, ynabToken]);
 
   // Helper function to save YNAB token

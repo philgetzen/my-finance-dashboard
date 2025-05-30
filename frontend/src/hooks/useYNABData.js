@@ -27,6 +27,15 @@ export const useInitializeYNAB = (accessToken) => {
   }, [accessToken]);
 };
 
+const ynabQueryRetryFn = (failureCount, error) => {
+  // Check if the error message indicates an authentication failure
+  if (error && error.message && error.message.toLowerCase().includes('authentication failed')) {
+    return false; // Do not retry on auth errors
+  }
+  // Default retry behavior for other errors (e.g., network issues)
+  return failureCount < 2;
+};
+
 // Get YNAB Budgets
 export const useYNABBudgets = (enabled = false) => {
   return useQuery({
@@ -34,7 +43,7 @@ export const useYNABBudgets = (enabled = false) => {
     queryFn: () => ynabService.getBudgets(),
     enabled: enabled,
     staleTime: 10 * 60 * 1000, // 10 minutes
-    retry: 2,
+    retry: ynabQueryRetryFn,
   });
 };
 
@@ -45,6 +54,7 @@ export const useYNABAccounts = (budgetId = 'last-used', enabled = false) => {
     queryFn: () => ynabService.getAccounts(budgetId),
     enabled: enabled,
     staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: ynabQueryRetryFn,
   });
 };
 
@@ -55,6 +65,7 @@ export const useYNABTransactions = (budgetId = 'last-used', enabled = false) => 
     queryFn: () => ynabService.getTransactions(budgetId),
     enabled: enabled,
     staleTime: 2 * 60 * 1000, // 2 minutes
+    retry: ynabQueryRetryFn,
   });
 };
 
@@ -65,6 +76,7 @@ export const useYNABCategories = (budgetId = 'last-used', enabled = false) => {
     queryFn: () => ynabService.getCategories(budgetId),
     enabled: enabled,
     staleTime: 10 * 60 * 1000, // 10 minutes
+    retry: ynabQueryRetryFn,
   });
 };
 
@@ -75,6 +87,7 @@ export const useYNABMonths = (budgetId = 'last-used', enabled = false) => {
     queryFn: () => ynabService.getMonths(budgetId),
     enabled: enabled,
     staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: ynabQueryRetryFn,
   });
 };
 
@@ -85,6 +98,7 @@ export const useYNABSummary = (budgetId = 'last-used', enabled = false) => {
     queryFn: () => ynabService.getBudgetSummary(budgetId),
     enabled: enabled,
     staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: ynabQueryRetryFn,
   });
 };
 

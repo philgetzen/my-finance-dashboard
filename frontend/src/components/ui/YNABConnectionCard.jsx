@@ -11,9 +11,11 @@ import {
 export default function YNABConnectionCard({ onConnect, isConnected, compact = false }) {
   const [isConnecting, setIsConnecting] = useState(false);
   const [isProcessingToken, setIsProcessingToken] = useState(false);
+  const [connectionError, setConnectionError] = useState(null); // For displaying errors
   const { disconnectYNAB } = useYNAB();
   
   const handleConnect = async () => {
+    setConnectionError(null); // Clear previous errors
     try {
       setIsConnecting(true);
       console.log('Starting YNAB connection process...');
@@ -39,6 +41,28 @@ export default function YNABConnectionCard({ onConnect, isConnected, compact = f
         throw new Error('Failed to open authentication window. Please check popup blockers.');
       }
       
+      let checkClosedIntervalId = null;
+      let messageListenerAttached = false;
+
+      const cleanupAuthProcess = () => {
+        if (messageListenerAttached) {
+          window.removeEventListener('message', handleMessage);
+          messageListenerAttached = false;
+          console.log('Message listener removed.');
+        }
+        if (checkClosedIntervalId) {
+          clearInterval(checkClosedIntervalId);
+          checkClosedIntervalId = null;
+          console.log('Auth window close checker stopped.');
+        }
+        if (authWindow && !authWindow.closed) {
+          authWindow.close();
+          console.log('Auth window closed programmatically.');
+        }
+        setIsConnecting(false);
+        setIsProcessingToken(false);
+      };
+
       // Listen for OAuth callback
       const handleMessage = async (event) => {
         console.log('Received message:', event);
@@ -46,68 +70,70 @@ export default function YNABConnectionCard({ onConnect, isConnected, compact = f
           console.log('Ignoring message from different origin:', event.origin);
           return;
         }
-        
-        if (event.data.type === 'ynab-auth-success') {
-          // Prevent duplicate token exchanges
-          if (isProcessingToken) {
-            console.log('Token exchange already in progress, ignoring duplicate request');
+
+        // Process only once
+        if (isProcessingToken && event.data.type === 'ynab-auth-success') {
+            console.log('Already processing a token or successfully processed, ignoring duplicate success message.');
             return;
-          }
-          
-          setIsProcessingToken(true);
-          console.log('OAuth success, exchanging code for tokens...');
-          const { code } = event.data;
-          
-          try {
-            // Exchange code for tokens
-            const tokenResponse = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/ynab/token`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ code })
-            });
+        }
+        
+        if (event.data.type === 'ynab-auth-success' || event.data.type === 'ynab-auth-error') {
+          // Immediately perform cleanup to prevent multiple processing
+          cleanupAuthProcess(); 
+
+          if (event.data.type === 'ynab-auth-success') {
+            setIsProcessingToken(true); // Set processing flag
+            console.log('OAuth success, exchanging code for tokens...');
+            const { code } = event.data;
             
-            if (tokenResponse.ok) {
-              const { access_token, refresh_token } = await tokenResponse.json();
-              console.log('Token exchange successful');
-              await onConnect(access_token, refresh_token);
-            } else {
-              const errorData = await tokenResponse.json();
-              console.error('Token exchange failed:', errorData);
-              alert(`Authentication failed: ${errorData.error || 'Unknown error'}`);
+            try {
+              const tokenResponse = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/ynab/token`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code })
+              });
+              
+              if (tokenResponse.ok) {
+                const { access_token, refresh_token } = await tokenResponse.json();
+                console.log('Token exchange successful');
+                await onConnect(access_token, refresh_token);
+              } else {
+                const errorData = await tokenResponse.json().catch(() => ({error: "Unknown error during token exchange"}));
+                console.error('Token exchange failed:', errorData);
+                setConnectionError(`Authentication failed: ${errorData.error || 'Unknown error'}`);
+              }
+            } catch (tokenError) {
+              console.error('Error during token exchange:', tokenError);
+              setConnectionError(`Token exchange error: ${tokenError.message}`);
+            } finally {
+              // Reset flags after processing is fully complete
+              setIsProcessingToken(false); 
+              setIsConnecting(false); 
             }
-          } catch (tokenError) {
-            console.error('Error during token exchange:', tokenError);
-            alert(`Token exchange error: ${tokenError.message}`);
-          } finally {
-            setIsProcessingToken(false);
+          } else if (event.data.type === 'ynab-auth-error') {
+            console.error('OAuth error:', event.data.error);
+            setConnectionError(`Authentication error: ${event.data.error}`);
+            // Flags are reset by cleanupAuthProcess, but ensure isConnecting is false
+            setIsConnecting(false);
           }
-          
-          window.removeEventListener('message', handleMessage);
-          setIsConnecting(false);
-        } else if (event.data.type === 'ynab-auth-error') {
-          console.error('OAuth error:', event.data.error);
-          alert(`Authentication error: ${event.data.error}`);
-          window.removeEventListener('message', handleMessage);
-          setIsConnecting(false);
         }
       };
       
       window.addEventListener('message', handleMessage);
+      messageListenerAttached = true;
       
-      // Clean up if window is closed
-      const checkClosed = setInterval(() => {
+      // Clean up if window is closed by user
+      checkClosedIntervalId = setInterval(() => {
         if (authWindow.closed) {
-          console.log('Auth window was closed');
-          clearInterval(checkClosed);
-          window.removeEventListener('message', handleMessage);
-          setIsConnecting(false);
-          setIsProcessingToken(false);
+          console.log('Auth window was closed by user or completed.');
+          cleanupAuthProcess(); // Perform full cleanup
         }
       }, 1000);
       
     } catch (error) {
       console.error('Error connecting to YNAB:', error);
-      alert(`Connection error: ${error.message}`);
+      setConnectionError(`Connection error: ${error.message}`);
+      // Ensure flags are reset on outer catch
       setIsConnecting(false);
       setIsProcessingToken(false);
     }
@@ -186,20 +212,31 @@ export default function YNABConnectionCard({ onConnect, isConnected, compact = f
               <LinkIcon className="h-4 w-4 mr-2" />
               {isConnecting ? 'Connecting...' : 'Connect YNAB'}
             </Button>
-            
-            <div className="mt-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-              <div className="flex items-start">
-                <ExclamationCircleIcon className="h-5 w-5 text-blue-500 mr-2 mt-0.5 flex-shrink-0" />
-                <div className="text-left">
-                  <p className="text-sm text-blue-700 dark:text-blue-400 font-medium mb-1">
-                    Secure Connection
-                  </p>
-                  <p className="text-xs text-blue-600 dark:text-blue-300">
-                    Your YNAB credentials are never stored. We use OAuth to securely connect to your budget.
-                  </p>
+
+            {connectionError && (
+              <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg text-sm text-red-700 dark:text-red-300">
+                <div className="flex items-center">
+                  <ExclamationCircleIcon className="h-5 w-5 mr-2 flex-shrink-0" />
+                  <span>{connectionError}</span>
                 </div>
               </div>
-            </div>
+            )}
+            
+            {!connectionError && (
+              <div className="mt-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                <div className="flex items-start">
+                  <ExclamationCircleIcon className="h-5 w-5 text-blue-500 mr-2 mt-0.5 flex-shrink-0" />
+                  <div className="text-left">
+                    <p className="text-sm text-blue-700 dark:text-blue-400 font-medium mb-1">
+                      Secure Connection
+                    </p>
+                    <p className="text-xs text-blue-600 dark:text-blue-300">
+                      Your YNAB credentials are never stored. We use OAuth to securely connect to your budget.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>
