@@ -78,7 +78,7 @@ class YNABService {
 
   async getCategories(budgetId = 'last-used') {
     const result = await this.makeRequest(`/api/ynab/budgets/${budgetId}/categories`);
-    return result.data?.category_groups || [];
+    return result.data || { category_groups: [] };
   }
 
   async getMonths(budgetId = 'last-used') {
@@ -100,7 +100,7 @@ class YNABService {
         budgets,
         accounts,
         transactions,
-        categories,
+        categories: categories,
         months
       };
     } catch (error) {

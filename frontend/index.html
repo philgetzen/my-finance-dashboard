@@ -18,14 +18,18 @@
           var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
           var isDark;
 
-          if (savedMode !== null) {
-            isDark = JSON.parse(savedMode);
+          // Check if savedMode exists and is valid JSON
+          if (savedMode !== null && savedMode !== 'undefined' && savedMode !== '') {
+            try {
+              isDark = JSON.parse(savedMode);
+            } catch (parseError) {
+              // If parsing fails, clear the invalid value and use system preference
+              localStorage.removeItem('darkMode');
+              isDark = prefersDark;
+            }
           } else {
+            // If no valid saved preference, use system preference
             isDark = prefersDark;
-            // Optionally save the detected system preference if no user preference exists
-            // localStorage.setItem('darkMode', JSON.stringify(isDark)); 
-            // The Layout component already does this, so might be redundant here or could be primary.
-            // For now, let the Layout component handle saving the initial system preference.
           }
 
           if (isDark) {

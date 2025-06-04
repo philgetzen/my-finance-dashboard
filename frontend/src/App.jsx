@@ -1,50 +1,79 @@
-import React from 'react';
+import React, { Suspense, lazy, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { YNABDataProvider, PrivacyProvider, useYNAB } from './contexts/YNABDataContext.jsx';
+import { FinanceDataProvider, PrivacyProvider, useFinanceData } from './contexts/ConsolidatedDataContext';
 import { queryClient } from './lib/queryClient';
-import Layout from './components/layout/Layout';
-import LoginCard from './components/auth/LoginCard';
-import YNABCallback from './components/auth/YNABCallback';
-import Dashboard from './components/pages/Dashboard';
-import Accounts from './components/pages/Accounts';
-import BalanceSheet from './components/pages/BalanceSheet';
-import InvestmentAllocation from './components/pages/InvestmentAllocation';
-// import Holdings from './components/pages/Holdings'; // Removed
+import ErrorBoundary from './components/ErrorBoundary';
 import LoadingSpinner from './components/ui/LoadingSpinner';
 import './App.css';
 
+// Lazy load pages for better initial load performance
+const Layout = lazy(() => import('./components/layout/Layout'));
+const LoginCard = lazy(() => import('./components/auth/LoginCard'));
+const YNABCallback = lazy(() => import('./components/auth/YNABCallback'));
+const Dashboard = lazy(() => import('./components/pages/Dashboard'));
+const Accounts = lazy(() => import('./components/pages/Accounts'));
+const BalanceSheet = lazy(() => import('./components/pages/BalanceSheet'));
+const InvestmentAllocation = lazy(() => import('./components/pages/InvestmentAllocation'));
+
+// Loading component
+const PageLoader = () => (
+  <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+    <LoadingSpinner size="lg" />
+  </div>
+);
+
 // Root App component
 export default function App() {
+  // Add resize animation stopper for better performance
+  useEffect(() => {
+    let resizeTimer;
+    const handleResize = () => {
+      document.body.classList.add('resize-animation-stopper');
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        document.body.classList.remove('resize-animation-stopper');
+      }, 400);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      clearTimeout(resizeTimer);
+    };
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
-      <PrivacyProvider>
-        <YNABDataProvider>
-          <Router>
-            <Routes>
-              <Route path="/login" element={<LoginWrapper />} />
-              <Route path="/auth/ynab/callback" element={<YNABCallback />} />
-              <Route path="/*" element={<ProtectedRoutes />} />
-            </Routes>
-          </Router>
-        </YNABDataProvider>
-      </PrivacyProvider>
-      <ReactQueryDevtools initialIsOpen={false} />
+      <ErrorBoundary>
+        <PrivacyProvider>
+          <FinanceDataProvider>
+            <Suspense fallback={<PageLoader />}>
+              <Router>
+                <Routes>
+                  <Route path="/login" element={<LoginWrapper />} />
+                  <Route path="/auth/ynab/callback" element={<YNABCallback />} />
+                  <Route path="/*" element={<ProtectedRoutes />} />
+                </Routes>
+              </Router>
+            </Suspense>
+          </FinanceDataProvider>
+        </PrivacyProvider>
+      </ErrorBoundary>
+      {process.env.NODE_ENV === 'development' && (
+        <ReactQueryDevtools initialIsOpen={false} />
+      )}
     </QueryClientProvider>
   );
 }
 
 // Login wrapper component
 function LoginWrapper() {
-  const { user, loading } = useYNAB();
+  const { user, loading } = useFinanceData();
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <LoadingSpinner size="lg" />
-      </div>
-    );
+    return <PageLoader />;
   }
 
   if (user) {
@@ -56,14 +85,10 @@ function LoginWrapper() {
 
 // Protected routes wrapper
 function ProtectedRoutes() {
-  const { user, loading } = useYNAB();
+  const { user, loading } = useFinanceData();
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <LoadingSpinner size="lg" />
-      </div>
-    );
+    return <PageLoader />;
   }
 
   if (!user) {
@@ -72,14 +97,15 @@ function ProtectedRoutes() {
 
   return (
     <Layout>
-      <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/accounts" element={<Accounts />} />
-        <Route path="/balance-sheet" element={<BalanceSheet />} />
-        <Route path="/investment-allocation" element={<InvestmentAllocation />} />
-        {/* <Route path="/holdings" element={<Holdings />} /> */} {/* Removed */}
-        <Route path="*" element={<Navigate to="/" />} />
-      </Routes>
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/accounts" element={<Accounts />} />
+          <Route path="/balance-sheet" element={<BalanceSheet />} />
+          <Route path="/investment-allocation" element={<InvestmentAllocation />} />
+          <Route path="*" element={<Navigate to="/" />} />
+        </Routes>
+      </Suspense>
     </Layout>
   );
 }

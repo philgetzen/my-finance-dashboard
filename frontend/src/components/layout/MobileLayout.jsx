@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import { auth } from '../../firebase';
-import { usePrivacy } from '../../contexts/YNABDataContext';
+import { usePrivacy, useYNAB } from '../../contexts/ConsolidatedDataContext';
 import Button from '../ui/Button';
 import {
   HomeIcon,
@@ -28,14 +28,15 @@ import {
 const navItems = [
   { name: 'Dashboard', path: '/', icon: HomeIcon, iconActive: HomeIconSolid },
   { name: 'Accounts', path: '/accounts', icon: CreditCardIcon, iconActive: CreditCardIconSolid },
-  { name: 'Income Report', path: '/balance-sheet', icon: ListBulletIcon, iconActive: ListBulletIconSolid },
+  { name: 'Income vs Expense', path: '/balance-sheet', icon: ListBulletIcon, iconActive: ListBulletIconSolid },
   { name: 'Investments', path: '/investment-allocation', icon: BanknotesIcon, iconActive: BanknotesIconSolid },
 ];
 
-export default function MobileLayout({ children, darkMode, setDarkMode }) {
+export default function MobileLayout({ children }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { isPrivacyMode, togglePrivacyMode } = usePrivacy();
+  const { privacyMode, setPrivacyMode } = usePrivacy();
+  const { darkMode, toggleDarkMode } = useYNAB();
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1024);
 
@@ -52,15 +53,7 @@ export default function MobileLayout({ children, darkMode, setDarkMode }) {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Apply dark mode
-  useEffect(() => {
-    if (darkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-    localStorage.setItem('darkMode', JSON.stringify(darkMode));
-  }, [darkMode]);
+  // Dark mode is now handled by the context
 
   const handleLogout = async () => {
     try {
@@ -113,7 +106,7 @@ export default function MobileLayout({ children, darkMode, setDarkMode }) {
           <div className="flex-shrink-0 flex flex-col p-4 space-y-2 border-t border-white/10">
             <Button
               variant="ghost"
-              onClick={() => setDarkMode(!darkMode)}
+              onClick={toggleDarkMode}
               className="w-full justify-start glass-button"
               size="sm"
             >
@@ -123,12 +116,12 @@ export default function MobileLayout({ children, darkMode, setDarkMode }) {
             
             <Button
               variant="ghost"
-              onClick={togglePrivacyMode}
+              onClick={() => setPrivacyMode(!privacyMode)}
               className="w-full justify-start glass-button"
               size="sm"
             >
-              {isPrivacyMode ? <EyeIcon className="h-4 w-4 mr-2" /> : <EyeSlashIcon className="h-4 w-4 mr-2" />}
-              {isPrivacyMode ? 'Show Numbers' : 'Privacy Mode'}
+              {privacyMode ? <EyeIcon className="h-4 w-4 mr-2" /> : <EyeSlashIcon className="h-4 w-4 mr-2" />}
+              {privacyMode ? 'Show Numbers' : 'Privacy Mode'}
             </Button>
             
             <Button
@@ -228,7 +221,7 @@ export default function MobileLayout({ children, darkMode, setDarkMode }) {
           <Button
             variant="ghost"
             onClick={() => {
-              setDarkMode(!darkMode);
+              toggleDarkMode();
               setShowMobileMenu(false);
             }}
             className="w-full justify-start glass-button"
@@ -241,14 +234,14 @@ export default function MobileLayout({ children, darkMode, setDarkMode }) {
           <Button
             variant="ghost"
             onClick={() => {
-              togglePrivacyMode();
+              setPrivacyMode(!privacyMode);
               setShowMobileMenu(false);
             }}
             className="w-full justify-start glass-button"
             size="sm"
           >
-            {isPrivacyMode ? <EyeIcon className="h-4 w-4 mr-2" /> : <EyeSlashIcon className="h-4 w-4 mr-2" />}
-            {isPrivacyMode ? 'Show Numbers' : 'Privacy Mode'}
+            {privacyMode ? <EyeIcon className="h-4 w-4 mr-2" /> : <EyeSlashIcon className="h-4 w-4 mr-2" />}
+            {privacyMode ? 'Show Numbers' : 'Privacy Mode'}
           </Button>
           
           <Button

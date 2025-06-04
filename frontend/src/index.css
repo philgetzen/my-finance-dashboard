@@ -151,6 +151,101 @@ button:focus-visible {
   }
 }
 
+/* Privacy Mode Blur Effect */
+.privacy-blur {
+  filter: blur(6px);
+  user-select: none;
+  transition: filter 0.3s ease;
+}
+
+.privacy-blur:hover {
+  filter: blur(8px);
+}
+
+/* Ensure cards don't clip their content */
+.overflow-visible {
+  overflow: visible !important;
+}
+
+/* Smooth theme transitions for the HTML element */
+html {
+  transition: background-color 150ms ease-in-out;
+}
+
+/* Chart tooltip styles that adapt to theme */
+.chart-tooltip {
+  /* Default light mode styles */
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  border: 1px solid rgba(229, 231, 235, 1) !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+.chart-tooltip .recharts-tooltip-label {
+  color: #374151 !important;
+}
+
+.chart-tooltip .recharts-tooltip-item {
+  color: #374151 !important;
+}
+
+/* Dark mode tooltip styles */
+.dark .chart-tooltip {
+  background-color: rgba(31, 41, 55, 0.95) !important;
+  border: 1px solid rgba(55, 65, 81, 0.5) !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2) !important;
+}
+
+.dark .chart-tooltip .recharts-tooltip-label {
+  color: #e5e7eb !important;
+}
+
+.dark .chart-tooltip .recharts-tooltip-item {
+  color: #e5e7eb !important;
+}
+
+/* Limit transitions to specific properties to prevent lag */
+/* Only transition UI elements, not data visualizations */
+button, a, input, select, textarea, label,
+.btn, .card, .glass-card, .glass-hero, .glass-input,
+aside, nav, header, .sidebar,
+.hover\:bg-gray-50:hover, .hover\:bg-gray-100:hover,
+.hover\:bg-gray-800:hover, .dark\:hover\:bg-gray-800:hover {
+  transition-property: background-color, border-color, color, fill, stroke, box-shadow, opacity;
+  transition-duration: 150ms;
+  transition-timing-function: ease-in-out;
+}
+
+/* Exclude charts and complex elements from transitions */
+.recharts-wrapper,
+.recharts-surface,
+.recharts-layer,
+table,
+tbody,
+tr,
+td,
+th {
+  transition: none !important;
+}
+
+/* Disable transitions during theme switch */
+body.theme-transitioning * {
+  transition: none !important;
+}
+
+/* Glass morphism tooltip styles */
+.glass-tooltip {
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+}
+
+.glass-tooltip {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1) !important;
+}
+
+.dark .glass-tooltip {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3) !important;
+}
+
 .dark {
   --color-bg: #181a1b;
   --color-surface: #23272b;
@@ -162,6 +257,18 @@ button:focus-visible {
   --color-primary-dark: #2ea06b;
   --color-primary-light: #1a4736;
   --color-danger: #ff5a5f;
+}
+
+/* Ensure focus rings are never clipped */
+button:focus {
+  position: relative;
+  z-index: 10;
+}
+
+/* Add padding to button containers to accommodate focus rings */
+.button-container {
+  padding: 4px;
+  margin: -4px;
 }
 
 .card {
