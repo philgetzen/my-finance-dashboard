@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, Fragment, useCallback } from 'react';
-import { useYNAB, usePrivacy } from '../../contexts/YNABDataContext';
+import { useYNAB } from '../../contexts/YNABDataContext';
+import { usePrivacy } from '../../contexts/ConsolidatedDataContext';
 import PageTransition from '../ui/PageTransition';
 import LoadingSpinner from '../ui/LoadingSpinner';
 import Card from '../ui/Card';
@@ -120,6 +121,15 @@ export default function IncomeVsExpenseReport() {
     isLoading: isYnabLoading,
     error: ynabError
   } = useYNAB();
+
+  // Debug logging
+  console.log('BalanceSheet Debug:', {
+    ynabAccounts: ynabAccounts?.length || 0,
+    ynabTransactions: ynabTransactions?.length || 0,
+    categories: categories,
+    isYnabLoading,
+    ynabError
+  });
   const { privacyMode } = usePrivacy();
 
   // State

@@ -130,7 +130,7 @@ export const useYNABData = (budgetId = 'last-used', enabled = false, accessToken
     budgets: budgets.data || [],
     accounts: accounts.data || [],
     transactions: transactions.data || [],
-    categories: categories.data || [],
+    categories: categories.data || { category_groups: [] },
     months: months.data || [],
     summary: summary.data || null,
     isLoading,
