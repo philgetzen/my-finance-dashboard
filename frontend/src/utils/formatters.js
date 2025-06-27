@@ -27,13 +27,26 @@ export const getDisplayAccountType = (type) => {
   return displayMap[mapAccountType(type)] || (type ? type.charAt(0).toUpperCase() + type.slice(1) : 'Other');
 };
 
-// Currency formatting with privacy support
+// Currency formatting - privacy handled via CSS blur, not text conversion
 export const formatCurrency = (amount, isPrivacyMode = false) => {
-  if (isPrivacyMode) return '***';
+  // Always format numbers normally - privacy is handled via CSS blur effects
   return Math.abs(amount || 0).toLocaleString('en-US', { 
     minimumFractionDigits: 2, 
     maximumFractionDigits: 2 
   });
+};
+
+// Currency formatting for chart tooltips (privacy handled by tooltip CSS)
+export const formatCurrencyForTooltip = (amount, isPrivacyMode = false) => {
+  const formatted = Math.abs(amount || 0).toLocaleString('en-US', { 
+    minimumFractionDigits: 2, 
+    maximumFractionDigits: 2 
+  });
+  
+  if (isPrivacyMode) {
+    return '•••••';
+  }
+  return formatted;
 };
 
 // Percentage formatting

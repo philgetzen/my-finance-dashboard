@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
-import { useYNAB } from '../../contexts/YNABDataContext';
+import { useFinanceData } from '../../contexts/ConsolidatedDataContext';
+import { DemoModeWarning } from './DemoModeIndicator';
+import { useDemoMode } from '../../hooks/useDemoMode';
 import Card from './Card';
 import Button from './Button';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 
 export default function ManualAccountModal({ user, show, onClose, onAccountAdded }) {
-  const { createManualAccount } = useYNAB();
+  const { createManualAccount } = useFinanceData();
+  const { isFeatureEnabled, getDisabledMessage } = useDemoMode();
   const [manualForm, setManualForm] = useState({ 
     name: '', 
     type: 'checking', 
@@ -76,6 +79,11 @@ export default function ManualAccountModal({ user, show, onClose, onAccountAdded
             </button>
           </div>
 
+          <DemoModeWarning 
+            message={getDisabledMessage('create_account')}
+            className="mb-4"
+          />
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -84,9 +92,10 @@ export default function ManualAccountModal({ user, show, onClose, onAccountAdded
               <input
                 type="text"
                 placeholder="e.g., Chase Savings"
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white transition-colors"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 value={manualForm.name}
                 onChange={e => setManualForm(f => ({ ...f, name: e.target.value }))}
+                disabled={!isFeatureEnabled('create_account')}
               />
             </div>
 
@@ -95,9 +104,10 @@ export default function ManualAccountModal({ user, show, onClose, onAccountAdded
                 Account Type
               </label>
               <select
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white transition-colors"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 value={manualForm.type}
                 onChange={e => setManualForm(f => ({ ...f, type: e.target.value }))}
+                disabled={!isFeatureEnabled('create_account')}
               >
                 <option value="checking">Checking</option>
                 <option value="savings">Savings</option>
@@ -116,9 +126,10 @@ export default function ManualAccountModal({ user, show, onClose, onAccountAdded
               <input
                 type="text"
                 placeholder="e.g., savings, checking"
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white transition-colors"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 value={manualForm.subtype}
                 onChange={e => setManualForm(f => ({ ...f, subtype: e.target.value }))}
+                disabled={!isFeatureEnabled('create_account')}
               />
             </div>
 
@@ -130,9 +141,10 @@ export default function ManualAccountModal({ user, show, onClose, onAccountAdded
                 type="number"
                 step="any"
                 placeholder="0.00"
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white transition-colors"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 value={manualForm.balance}
                 onChange={e => setManualForm(f => ({ ...f, balance: e.target.value }))}
+                disabled={!isFeatureEnabled('create_account')}
               />
             </div>
 
@@ -145,7 +157,7 @@ export default function ManualAccountModal({ user, show, onClose, onAccountAdded
             <div className="flex space-x-3 pt-4">
               <Button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || !isFeatureEnabled('create_account')}
                 className="flex-1"
               >
                 {isSubmitting ? 'Adding...' : 'Add Account'}

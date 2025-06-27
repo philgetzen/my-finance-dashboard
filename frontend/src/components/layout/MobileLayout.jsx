@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import { auth } from '../../firebase';
-import { usePrivacy, useYNAB } from '../../contexts/ConsolidatedDataContext';
+import { usePrivacy, useFinanceData } from '../../contexts/ConsolidatedDataContext';
 import Button from '../ui/Button';
+import DemoModeIndicator from '../ui/DemoModeIndicator';
+import DemoModeFloatingModule from '../ui/DemoModeFloatingModule';
 import {
   HomeIcon,
   CreditCardIcon,
@@ -36,7 +38,7 @@ export default function MobileLayout({ children }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { privacyMode, setPrivacyMode } = usePrivacy();
-  const { darkMode, toggleDarkMode } = useYNAB();
+  const { darkMode, toggleDarkMode, isDemoMode, logout } = useFinanceData();
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1024);
 
@@ -56,11 +58,8 @@ export default function MobileLayout({ children }) {
   // Dark mode is now handled by the context
 
   const handleLogout = async () => {
-    try {
-      await signOut(auth);
-    } catch (error) {
-      console.error("Error signing out: ", error);
-    }
+    await logout();
+    navigate('/login');
   };
 
   // Desktop sidebar with glassmorphism
@@ -75,6 +74,11 @@ export default function MobileLayout({ children }) {
             </div>
             <span className="text-xl font-bold text-gray-900 dark:text-white">Healthy Wealth</span>
           </div>
+        </div>
+        
+        {/* Demo Mode Indicator */}
+        <div className="px-4 py-2">
+          <DemoModeIndicator />
         </div>
         
         {/* Navigation */}
@@ -150,16 +154,19 @@ export default function MobileLayout({ children }) {
           <span className="text-lg font-bold text-gray-900 dark:text-white">Healthy Wealth</span>
         </div>
         
-        <button
-          onClick={() => setShowMobileMenu(!showMobileMenu)}
-          className="glass-button p-2 rounded-lg"
-        >
-          {showMobileMenu ? (
-            <XMarkIcon className="h-6 w-6 text-gray-600 dark:text-gray-300" />
-          ) : (
-            <Bars3Icon className="h-6 w-6 text-gray-600 dark:text-gray-300" />
-          )}
-        </button>
+        <div className="flex items-center space-x-3">
+          <DemoModeIndicator />
+          <button
+            onClick={() => setShowMobileMenu(!showMobileMenu)}
+            className="glass-button p-2 rounded-lg"
+          >
+            {showMobileMenu ? (
+              <XMarkIcon className="h-6 w-6 text-gray-600 dark:text-gray-300" />
+            ) : (
+              <Bars3Icon className="h-6 w-6 text-gray-600 dark:text-gray-300" />
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -315,7 +322,7 @@ export default function MobileLayout({ children }) {
       
       {/* Main content */}
       <div className={`flex flex-col min-h-screen ${isDesktop ? 'lg:pl-64' : ''}`}>
-        <main className="flex-1 pb-20 lg:pb-0">
+        <main className="flex-1 pb-32 lg:pb-16">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 lg:py-8">
             {children}
           </div>
@@ -324,6 +331,9 @@ export default function MobileLayout({ children }) {
       
       {/* Mobile bottom navigation */}
       <MobileBottomNav />
+      
+      {/* Demo mode floating module */}
+      <DemoModeFloatingModule />
     </>
   );
 }

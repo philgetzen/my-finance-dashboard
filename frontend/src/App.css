@@ -64,16 +64,7 @@
   transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out, border-color 0.2s ease-in-out;
 }
 
-/* Privacy mode blur effect */
-.filter.blur {
-  filter: blur(8px);
-  user-select: none;
-}
-
-.privacy-blur {
-  filter: blur(8px);
-  user-select: none;
-}
+/* Privacy mode blur effect - handled in index.css */
 
 /* Custom scrollbar for desktop */
 @media (min-width: 768px) {

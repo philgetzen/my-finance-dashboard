@@ -1,11 +1,13 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { useYNAB, usePrivacy } from '../../contexts/YNABDataContext';
+import { useFinanceData, usePrivacy } from '../../contexts/ConsolidatedDataContext';
 import { useAccountManager } from '../../hooks/useAccountManager';
+import { useDemoMode } from '../../hooks/useDemoMode';
 import PageTransition from '../ui/PageTransition';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
 import ManualAccountModal from '../ui/ManualAccountModal';
 import EditManualAccountModal from '../ui/EditManualAccountModal';
+import PrivacyCurrency from '../ui/PrivacyCurrency';
 import { formatCurrency } from '../../utils/formatters';
 import {
   BanknotesIcon,
@@ -44,8 +46,12 @@ const AccountRow = React.memo(({ account, onEdit, onDelete, privacyMode }) => {
       </td>
       <td className={`px-4 py-3 text-sm font-medium text-right ${
         isLiability ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
-      } ${privacyMode ? 'privacy-blur' : ''}`}>
-        {isLiability ? '-' : ''}${formatCurrency(Math.abs(balance))}
+      }`}>
+        <PrivacyCurrency
+          amount={balance}
+          isPrivacyMode={privacyMode}
+          prefix={isLiability ? '-$' : '$'}
+        />
       </td>
       <td className="px-4 py-3 text-sm text-center">
         <span className={`text-xs ${
@@ -85,8 +91,9 @@ export default function Accounts() {
     updateManualAccount,
     deleteManualAccount,
     isLoading 
-  } = useYNAB();
+  } = useFinanceData();
   const { privacyMode } = usePrivacy();
+  const { isFeatureEnabled } = useDemoMode();
 
   // State
   const [showManualModal, setShowManualModal] = useState(false);
@@ -177,6 +184,8 @@ export default function Accounts() {
             <Button
               onClick={() => setShowManualModal(true)}
               className="flex items-center gap-2"
+              disabled={!isFeatureEnabled('create_account')}
+              title={!isFeatureEnabled('create_account') ? 'Account creation disabled in demo mode' : 'Add a new manual account'}
             >
               <PlusIcon className="h-4 w-4" />
               Add Account
@@ -187,26 +196,31 @@ export default function Accounts() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400">Total Assets</p>
-              <p className={`text-2xl font-bold text-green-600 dark:text-green-400 ${
-                privacyMode ? 'privacy-blur' : ''
-              }`}>
-                ${formatCurrency(totals.assets)}
+              <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                <PrivacyCurrency
+                  amount={totals.assets}
+                  isPrivacyMode={privacyMode}
+                />
               </p>
             </div>
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400">Total Liabilities</p>
-              <p className={`text-2xl font-bold text-red-600 dark:text-red-400 ${
-                privacyMode ? 'privacy-blur' : ''
-              }`}>
-                ${formatCurrency(totals.liabilities)}
+              <p className="text-2xl font-bold text-red-600 dark:text-red-400">
+                <PrivacyCurrency
+                  amount={totals.liabilities}
+                  isPrivacyMode={privacyMode}
+                />
               </p>
             </div>
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400">Net Worth</p>
               <p className={`text-2xl font-bold ${
                 totals.netWorth >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-              } ${privacyMode ? 'privacy-blur' : ''}`}>
-                ${formatCurrency(totals.netWorth)}
+              }`}>
+                <PrivacyCurrency
+                  amount={totals.netWorth}
+                  isPrivacyMode={privacyMode}
+                />
               </p>
             </div>
           </div>

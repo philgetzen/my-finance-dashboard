@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useYNAB } from '../../contexts/YNABDataContext';
+import { useFinanceData } from '../../contexts/ConsolidatedDataContext';
+import { DemoModeWarning } from './DemoModeIndicator';
+import { useDemoMode } from '../../hooks/useDemoMode';
 import Button from './Button';
 import {
   XMarkIcon,
@@ -7,7 +9,8 @@ import {
 } from '@heroicons/react/24/outline';
 
 export default function EditManualAccountModal({ user, account, show, onClose, onAccountUpdated }) {
-  const { updateManualAccount, deleteManualAccount } = useYNAB();
+  const { updateManualAccount, deleteManualAccount } = useFinanceData();
+  const { isFeatureEnabled, getDisabledMessage } = useDemoMode();
   const [formData, setFormData] = useState({
     name: '',
     type: 'checking',

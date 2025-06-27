@@ -10,7 +10,7 @@ import './App.css';
 
 // Lazy load pages for better initial load performance
 const Layout = lazy(() => import('./components/layout/Layout'));
-const LoginCard = lazy(() => import('./components/auth/LoginCard'));
+const AuthenticationPage = lazy(() => import('./components/auth/AuthenticationPage'));
 const YNABCallback = lazy(() => import('./components/auth/YNABCallback'));
 const Dashboard = lazy(() => import('./components/pages/Dashboard'));
 const Accounts = lazy(() => import('./components/pages/Accounts'));
@@ -70,28 +70,31 @@ export default function App() {
 
 // Login wrapper component
 function LoginWrapper() {
-  const { user, loading } = useFinanceData();
+  const { user, loading, isDemoMode } = useFinanceData();
 
   if (loading) {
     return <PageLoader />;
   }
 
-  if (user) {
+  // If in demo mode, redirect to dashboard
+  if (isDemoMode) {
     return <Navigate to="/" replace />;
   }
 
-  return <LoginCard />;
+  // Always show AuthenticationPage - it will handle the authenticated state
+  return <AuthenticationPage />;
 }
 
 // Protected routes wrapper
 function ProtectedRoutes() {
-  const { user, loading } = useFinanceData();
+  const { user, loading, isDemoMode } = useFinanceData();
 
   if (loading) {
     return <PageLoader />;
   }
 
-  if (!user) {
+  // Allow access if user is authenticated OR in demo mode
+  if (!user && !isDemoMode) {
     return <Navigate to="/login" replace />;
   }
 

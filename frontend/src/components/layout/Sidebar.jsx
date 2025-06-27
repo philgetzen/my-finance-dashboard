@@ -2,7 +2,7 @@ import React, { useCallback } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import { auth } from '../../firebase';
-import { useYNAB, usePrivacy } from '../../contexts/YNABDataContext';
+import { useFinanceData, usePrivacy } from '../../contexts/ConsolidatedDataContext';
 import {
   HomeIcon,
   BanknotesIcon,
@@ -17,7 +17,7 @@ import {
   Cog6ToothIcon,
 } from '@heroicons/react/24/outline';
 
-const NavItem = React.memo(({ to, icon: Icon, children, onClick }) => {
+const NavItem = React.memo(({ to, icon: IconComponent, children, onClick }) => {
   const baseClasses = "flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200";
   const activeClasses = "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-medium";
   const inactiveClasses = "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800";
@@ -28,7 +28,7 @@ const NavItem = React.memo(({ to, icon: Icon, children, onClick }) => {
         onClick={onClick}
         className={`${baseClasses} ${inactiveClasses} w-full text-left`}
       >
-        <Icon className="h-5 w-5" />
+        <IconComponent className="h-5 w-5" />
         <span>{children}</span>
       </button>
     );
@@ -51,7 +51,7 @@ NavItem.displayName = 'NavItem';
 
 export default function Sidebar({ onClose }) {
   const navigate = useNavigate();
-  const { user, darkMode, toggleDarkMode } = useYNAB();
+  const { user, darkMode, toggleDarkMode } = useFinanceData();
   const { privacyMode, setPrivacyMode } = usePrivacy();
 
   const handleLogout = useCallback(async () => {

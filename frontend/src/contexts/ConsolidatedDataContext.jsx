@@ -3,6 +3,14 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../firebase';
 import { useYNABData } from '../hooks/useYNABData';
 import { ErrorBoundary } from 'react-error-boundary';
+import { 
+  mockUser, 
+  mockAccounts, 
+  mockManualAccounts, 
+  mockTransactions, 
+  mockAccountSummary, 
+  mockYNABData 
+} from '../lib/mockData';
 
 // Single consolidated context for all finance data
 const FinanceDataContext = createContext();
@@ -48,6 +56,19 @@ export const FinanceDataProvider = ({ children }) => {
   const [manualAccounts, setManualAccounts] = useState([]);
   const [showYNABErrorModal, setShowYNABErrorModal] = useState(false);
   const [ynabError, setYnabError] = useState(null);
+  const [isAutoConnectingYNAB, setIsAutoConnectingYNAB] = useState(false);
+  const [autoConnectMessage, setAutoConnectMessage] = useState(null);
+  const [hasAutoConnected, setHasAutoConnected] = useState(false);
+  
+  // Demo mode state
+  const [isDemoMode, setIsDemoMode] = useState(false);
+  const [demoData, setDemoData] = useState({
+    accounts: [],
+    manualAccounts: [],
+    transactions: [],
+    accountSummary: null,
+    ynabData: null
+  });
   const [darkMode, setDarkMode] = useState(() => {
     try {
       const stored = localStorage.getItem('darkMode');
@@ -72,6 +93,68 @@ export const FinanceDataProvider = ({ children }) => {
     }
   }, [darkMode]);
 
+  // Demo mode cleanup on page unload/navigation
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (isDemoMode) {
+        try {
+          sessionStorage.removeItem('demoModeActive');
+          sessionStorage.removeItem('demoStartTime');
+        } catch (error) {
+          console.warn('Failed to clear demo session on unload:', error);
+        }
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden && isDemoMode) {
+        // Page is being hidden, potentially closing
+        try {
+          sessionStorage.setItem('demoModeHidden', Date.now().toString());
+        } catch (error) {
+          console.warn('Failed to track demo visibility change:', error);
+        }
+      }
+    };
+
+    // Check for existing demo session on mount
+    const checkExistingDemoSession = () => {
+      try {
+        const demoActive = sessionStorage.getItem('demoModeActive') === 'true';
+        const demoStartTime = sessionStorage.getItem('demoStartTime');
+        
+        if (demoActive && demoStartTime) {
+          const sessionAge = Date.now() - parseInt(demoStartTime);
+          const maxSessionAge = 24 * 60 * 60 * 1000; // 24 hours
+          
+          if (sessionAge < maxSessionAge) {
+            // Resume demo session
+            initializeDemoMode();
+          } else {
+            // Session expired, clear storage
+            sessionStorage.removeItem('demoModeActive');
+            sessionStorage.removeItem('demoStartTime');
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to check existing demo session:', error);
+      }
+    };
+
+    // Only check for existing session if not already in demo mode
+    if (!isDemoMode && !user) {
+      checkExistingDemoSession();
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isDemoMode, user]);
+
   const toggleDarkMode = useCallback(() => {
     // Add transitioning class to prevent lag
     document.body.classList.add('theme-transitioning');
@@ -89,14 +172,62 @@ export const FinanceDataProvider = ({ children }) => {
     });
   }, []);
 
+  // Demo mode management functions (defined early to avoid circular dependencies)
+  const initializeDemoMode = useCallback(() => {
+    setIsDemoMode(true);
+    setUser(mockUser);
+    setDemoData({
+      accounts: mockAccounts,
+      manualAccounts: mockManualAccounts,
+      transactions: mockTransactions,
+      accountSummary: mockAccountSummary,
+      ynabData: mockYNABData
+    });
+    setLoading(false);
+    
+    // Track demo session in sessionStorage
+    try {
+      sessionStorage.setItem('demoModeActive', 'true');
+      sessionStorage.setItem('demoStartTime', Date.now().toString());
+    } catch (error) {
+      console.warn('Failed to set demo session storage:', error);
+    }
+  }, []);
+
+  const exitDemoMode = useCallback(() => {
+    setIsDemoMode(false);
+    // Don't set user to null - let Firebase auth handle authentication state
+    setDemoData({
+      accounts: [],
+      manualAccounts: [],
+      transactions: [],
+      accountSummary: null,
+      ynabData: null
+    });
+    // Don't clear real user's YNAB token and manual accounts
+    // setYnabToken(null);
+    // setManualAccounts([]);
+    setLoading(true);
+    
+    // Clear any demo-related session storage
+    try {
+      sessionStorage.removeItem('demoModeActive');
+      sessionStorage.removeItem('demoStartTime');
+    } catch (error) {
+      console.warn('Failed to clear demo session storage:', error);
+    }
+  }, []);
+
   // Auth state management
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       try {
         setUser(currentUser);
         if (currentUser) {
-          // Fetch YNAB token
+          // Fetch YNAB token with auto-connect detection
           try {
+            setIsAutoConnectingYNAB(true);
+            
             const tokenResponse = await fetch(
               `${import.meta.env.VITE_API_BASE_URL}/api/ynab/token?user_id=${currentUser.uid}`
             );
@@ -104,11 +235,29 @@ export const FinanceDataProvider = ({ children }) => {
             if (tokenResponse.ok) {
               const tokenData = await tokenResponse.json();
               if (tokenData.access_token) {
+                setAutoConnectMessage('Found existing YNAB connection!');
+                console.log('Auto-connecting with existing YNAB token');
                 setYnabToken(tokenData.access_token);
+                setIsAutoConnectingYNAB(false);
+                setHasAutoConnected(true);
+                // Keep the message visible - don't clear it
+              } else {
+                // No existing token found
+                setAutoConnectMessage(null);
+                setIsAutoConnectingYNAB(false);
+                setHasAutoConnected(false);
               }
+            } else {
+              // No existing token or error fetching
+              setAutoConnectMessage(null);
+              setIsAutoConnectingYNAB(false);
+              setHasAutoConnected(false);
             }
           } catch (error) {
             console.error('Error fetching YNAB token:', error);
+            setAutoConnectMessage(null);
+            setIsAutoConnectingYNAB(false);
+            setHasAutoConnected(false);
           }
           
           // Fetch manual accounts
@@ -127,6 +276,9 @@ export const FinanceDataProvider = ({ children }) => {
           // Clear data on logout
           setYnabToken(null);
           setManualAccounts([]);
+          setAutoConnectMessage(null);
+          setIsAutoConnectingYNAB(false);
+          setHasAutoConnected(false);
         }
       } catch (error) {
         console.error('Error in authentication state change:', error);
@@ -150,12 +302,24 @@ export const FinanceDataProvider = ({ children }) => {
       if (errorStatus === 401 || errorStatus === 403 || 
           errorMessage.toLowerCase().includes('unauthorized') || 
           errorMessage.toLowerCase().includes('authentication failed')) {
-        setYnabError(ynabData.error);
-        setShowYNABErrorModal(true);
+        
+        console.log('YNAB access token cleared due to 401 error');
         setYnabToken(null);
+        
+        // Clear auto-connect message when token becomes invalid
+        setAutoConnectMessage(null);
+        setIsAutoConnectingYNAB(false);
+        setHasAutoConnected(false);
+        
+        // Only show error modal if this wasn't during initial token validation
+        // We check if user has been loaded and app is not in initial loading state
+        if (!loading && user) {
+          setYnabError(ynabData.error);
+          setShowYNABErrorModal(true);
+        }
       }
     }
-  }, [ynabData.isError, ynabData.error, ynabToken]);
+  }, [ynabData.isError, ynabData.error, ynabToken, loading, user]);
 
   // YNAB token management
   const saveYNABToken = useCallback(async (accessToken, refreshToken) => {
@@ -259,26 +423,104 @@ export const FinanceDataProvider = ({ children }) => {
     }
   }, []);
 
+  // Get current data based on demo mode
+  const getCurrentAccounts = useCallback(() => {
+    return isDemoMode ? demoData.accounts : [];
+  }, [isDemoMode, demoData.accounts]);
+
+  const getCurrentManualAccounts = useCallback(() => {
+    return isDemoMode ? demoData.manualAccounts : manualAccounts;
+  }, [isDemoMode, demoData.manualAccounts, manualAccounts]);
+
+  const getCurrentTransactions = useCallback(() => {
+    return isDemoMode ? demoData.transactions : [];
+  }, [isDemoMode, demoData.transactions]);
+
+  const getCurrentYNABData = useCallback(() => {
+    return isDemoMode ? demoData.ynabData : ynabData;
+  }, [isDemoMode, demoData.ynabData, ynabData]);
+
+  const getCurrentAccountSummary = useCallback(() => {
+    return isDemoMode ? demoData.accountSummary : null;
+  }, [isDemoMode, demoData.accountSummary]);
+
+  // Logout function
+  const logout = useCallback(async () => {
+    try {
+      // Exit demo mode if active
+      if (isDemoMode) {
+        exitDemoMode();
+      }
+      
+      // Disconnect YNAB first (if connected)
+      if (ynabToken && !isDemoMode) {
+        await disconnectYNAB();
+      }
+      
+      // Sign out from Google/Firebase auth
+      await auth.signOut();
+      
+      // Clear any remaining state
+      setYnabToken(null);
+      setManualAccounts([]);
+      setYnabError(null);
+      setShowYNABErrorModal(false);
+      setIsAutoConnectingYNAB(false);
+      setAutoConnectMessage(null);
+      setHasAutoConnected(false);
+      
+      console.log('Successfully logged out');
+    } catch (error) {
+      console.error('Error during logout:', error);
+    }
+  }, [ynabToken, isDemoMode, disconnectYNAB, exitDemoMode]);
+
   // Memoize the context value to prevent unnecessary re-renders
   const value = useMemo(() => ({
     // Auth
     user,
     loading,
+    logout,
     
-    // YNAB
-    ynabToken,
-    ...ynabData,
-    saveYNABToken,
-    disconnectYNAB,
+    // Demo mode
+    isDemoMode,
+    initializeDemoMode,
+    exitDemoMode,
+    
+    // Data getters (context-aware)
+    accounts: getCurrentAccounts(),
+    manualAccounts: getCurrentManualAccounts(),
+    transactions: getCurrentTransactions(),
+    accountSummary: getCurrentAccountSummary(),
+    
+    // YNAB (in demo mode, uses mock data)
+    ynabToken: isDemoMode ? null : ynabToken,
+    ...(isDemoMode ? demoData.ynabData : ynabData),
+    saveYNABToken: isDemoMode ? 
+      () => { console.log('YNAB operations disabled in demo mode'); return Promise.resolve(); } : 
+      saveYNABToken,
+    disconnectYNAB: isDemoMode ? 
+      () => { console.log('YNAB operations disabled in demo mode'); return Promise.resolve(); } : 
+      disconnectYNAB,
     showYNABErrorModal,
     setShowYNABErrorModal,
     ynabError,
     
-    // Manual accounts
-    manualAccounts,
-    createManualAccount,
-    updateManualAccount,
-    deleteManualAccount,
+    // Auto-connect state
+    isAutoConnectingYNAB,
+    autoConnectMessage,
+    hasAutoConnected,
+    
+    // Manual accounts (disabled in demo mode)
+    createManualAccount: isDemoMode ? 
+      () => { console.log('Account creation disabled in demo mode'); return Promise.resolve(); } : 
+      createManualAccount,
+    updateManualAccount: isDemoMode ? 
+      () => { console.log('Account editing disabled in demo mode'); return Promise.resolve(); } : 
+      updateManualAccount,
+    deleteManualAccount: isDemoMode ? 
+      () => { console.log('Account deletion disabled in demo mode'); return Promise.resolve(); } : 
+      deleteManualAccount,
     
     // UI settings
     darkMode,
@@ -286,13 +528,24 @@ export const FinanceDataProvider = ({ children }) => {
   }), [
     user,
     loading,
+    logout,
+    isDemoMode,
+    initializeDemoMode,
+    exitDemoMode,
+    getCurrentAccounts,
+    getCurrentManualAccounts,
+    getCurrentTransactions,
+    getCurrentAccountSummary,
+    demoData,
     ynabToken,
     ynabData,
     saveYNABToken,
     disconnectYNAB,
     showYNABErrorModal,
     ynabError,
-    manualAccounts,
+    isAutoConnectingYNAB,
+    autoConnectMessage,
+    hasAutoConnected,
     createManualAccount,
     updateManualAccount,
     deleteManualAccount,

@@ -21,8 +21,10 @@ export default defineConfig({
     ]
   },
   server: {
+    https: false, // Keep as HTTP for local development - Firebase should handle this
     fs: {
       allow: ['..'],
     },
+    host: true, // Allow external connections
   },
 })

@@ -3,7 +3,8 @@ import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer, 
   BarChart, Bar, XAxis, YAxis, CartesianGrid 
 } from 'recharts';
-import { useYNAB, usePrivacy } from '../../contexts/YNABDataContext';
+import { useFinanceData, usePrivacy } from '../../contexts/ConsolidatedDataContext';
+import { useDemoMode } from '../../hooks/useDemoMode';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
 import ManualAccountModal from '../ui/ManualAccountModal';
@@ -11,8 +12,9 @@ import YNABConnectionCard from '../ui/YNABConnectionCard';
 import { DashboardSkeleton } from '../ui/Skeleton';
 import PageTransition from '../ui/PageTransition';
 import YNABConnectionErrorModal from '../ui/YNABConnectionErrorModal';
+import PrivacyCurrency from '../ui/PrivacyCurrency';
 import { getAccountBalance, normalizeYNABAccountType } from '../../utils/ynabHelpers';
-import { formatCurrency, isLiability, getDisplayAccountType } from '../../utils/formatters';
+import { formatCurrency, formatCurrencyForTooltip, isLiability, getDisplayAccountType } from '../../utils/formatters';
 import { useTransactionProcessor, getMonthlyRangeData } from '../../hooks/useTransactionProcessor';
 import {
   BanknotesIcon,
@@ -36,9 +38,11 @@ const MetricCard = React.memo(({ title, value, icon: Icon, trend, color, isPriva
     <div className="flex items-center justify-between">
       <div>
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">{title}</p>
-        <p className={`text-2xl font-bold ${color} ${isPrivacyMode ? 'privacy-blur' : ''}`}>
-          ${formatCurrency(Math.abs(value))}
-        </p>
+        <PrivacyCurrency
+          amount={value}
+          isPrivacyMode={isPrivacyMode}
+          className={`text-2xl font-bold ${color}`}
+        />
       </div>
       <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
         trend === 'up' ? 'bg-green-100 dark:bg-green-900' : 
@@ -74,8 +78,11 @@ const TransactionRow = React.memo(({ transaction, account, isPrivacyMode }) => {
       </td>
       <td className={`px-4 py-3 text-sm font-medium text-right ${
         isExpense ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
-      } ${isPrivacyMode ? 'privacy-blur' : ''}`}>
-        {formatCurrency(amount)}
+      }`}>
+        <PrivacyCurrency
+          amount={amount}
+          isPrivacyMode={isPrivacyMode}
+        />
       </td>
       <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
         {account?.name || 'Unknown Account'}
@@ -99,9 +106,11 @@ export default function Dashboard() {
     refetch,
     showYNABErrorModal,
     setShowYNABErrorModal,
-    ynabError
-  } = useYNAB();
+    ynabError,
+    isDemoMode
+  } = useFinanceData();
   const { privacyMode } = usePrivacy();
+  const { isFeatureEnabled } = useDemoMode();
 
   const [showManualModal, setShowManualModal] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -239,6 +248,8 @@ export default function Dashboard() {
               onClick={() => setShowManualModal(true)}
               size="sm"
               className="whitespace-nowrap"
+              disabled={!isFeatureEnabled('create_account')}
+              title={!isFeatureEnabled('create_account') ? 'Account creation disabled in demo mode' : 'Add a new manual account'}
             >
               <PlusIcon className="h-4 w-4 mr-1" />
               Add Account
@@ -331,11 +342,32 @@ export default function Dashboard() {
                       ))}
                     </Pie>
                     <Tooltip
-                      formatter={(value) => privacyMode ? '***' : `${formatCurrency(value)}`}
+                      formatter={(value) => [formatCurrency(value), '']}
                       contentStyle={{
                         borderRadius: '8px',
                       }}
                       wrapperClassName="chart-tooltip"
+                      content={({ active, payload }) => {
+                        if (!active || !payload || payload.length === 0) return null;
+                        return (
+                          <div className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
+                            {payload.map((entry, index) => (
+                              <div key={index} className="flex items-center gap-2">
+                                <div 
+                                  className="w-3 h-3 rounded-full"
+                                  style={{ backgroundColor: entry.fill }}
+                                />
+                                <span className="text-sm text-gray-600 dark:text-gray-400">
+                                  {entry.name}:
+                                </span>
+                                <span className={`text-sm font-medium text-gray-900 dark:text-white ${privacyMode ? 'privacy-blur' : ''}`}>
+                                  ${formatCurrency(entry.value)}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      }}
                     />
                   </PieChart>
                 </ResponsiveContainer>
@@ -394,13 +426,14 @@ export default function Dashboard() {
                       {type}
                     </span>
                   </div>
-                  <span className={`text-base font-semibold ${
-                    data.isLiability ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
-                  } ${
-                    privacyMode ? 'privacy-blur' : ''
-                  }`}>
-                    {data.isLiability ? '-' : ''}${formatCurrency(data.total)}
-                  </span>
+                  <PrivacyCurrency
+                    amount={data.total}
+                    isPrivacyMode={privacyMode}
+                    prefix={data.isLiability ? '-$' : '$'}
+                    className={`text-base font-semibold ${
+                      data.isLiability ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
+                    }`}
+                  />
                 </div>
               ))}
               
@@ -440,11 +473,37 @@ export default function Dashboard() {
                     tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
                   />
                   <Tooltip
-                    formatter={(value) => privacyMode ? '***' : `${formatCurrency(value)}`}
+                    formatter={(value) => [formatCurrency(value), '']}
                     contentStyle={{
                       borderRadius: '8px',
                     }}
                     wrapperClassName="chart-tooltip"
+                    content={({ active, payload, label }) => {
+                      if (!active || !payload || payload.length === 0) return null;
+                      return (
+                        <div className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
+                          <p className="text-sm font-medium text-gray-900 dark:text-white mb-2">{label}</p>
+                          {payload.map((entry, index) => (
+                            <div key={index} className="flex items-center gap-2">
+                              <div 
+                                className="w-3 h-3 rounded-full"
+                                style={{ backgroundColor: entry.fill }}
+                              />
+                              <span className="text-sm text-gray-600 dark:text-gray-400">
+                                {entry.name}:
+                              </span>
+                              <span className={`text-sm font-medium ${
+                                entry.dataKey === 'income' 
+                                  ? 'text-green-600 dark:text-green-400' 
+                                  : 'text-red-600 dark:text-red-400'
+                              } ${privacyMode ? 'privacy-blur' : ''}`}>
+                                ${formatCurrency(entry.value)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    }}
                   />
                   <Bar dataKey="income" fill="#10B981" radius={[4, 4, 0, 0]} name="Income" />
                   <Bar dataKey="expenses" fill="#EF4444" radius={[4, 4, 0, 0]} name="Expenses" />

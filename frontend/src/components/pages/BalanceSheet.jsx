@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, Fragment, useCallback } from 'react';
-import { useYNAB } from '../../contexts/YNABDataContext';
+import { useFinanceData } from '../../contexts/ConsolidatedDataContext';
 import { usePrivacy } from '../../contexts/ConsolidatedDataContext';
 import PageTransition from '../ui/PageTransition';
 import LoadingSpinner from '../ui/LoadingSpinner';
@@ -120,7 +120,7 @@ export default function IncomeVsExpenseReport() {
     categories,
     isLoading: isYnabLoading,
     error: ynabError
-  } = useYNAB();
+  } = useFinanceData();
 
   // Debug logging
   console.log('BalanceSheet Debug:', {

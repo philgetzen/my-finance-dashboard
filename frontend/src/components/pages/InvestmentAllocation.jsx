@@ -1,12 +1,13 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
-import { useYNAB, usePrivacy } from '../../contexts/YNABDataContext';
+import { useFinanceData, usePrivacy } from '../../contexts/ConsolidatedDataContext';
 import { formatCurrency, formatPercent } from '../../utils/formatters';
 import { getAccountBalance, normalizeYNABAccountType } from '../../utils/ynabHelpers';
 import Button from '../ui/Button';
 import PageTransition from '../ui/PageTransition';
 import AddHoldingModal from '../ui/AddHoldingModal';
 import ManageHoldingsModal from '../ui/ManageHoldingsModal';
+import PrivacyCurrency from '../ui/PrivacyCurrency';
 import {
   BanknotesIcon,
   ChartPieIcon,
@@ -51,7 +52,7 @@ const riskMetrics = [
 
 export default function InvestmentAllocation() {
   const { privacyMode } = usePrivacy();
-  const { accounts: ynabAccounts, manualAccounts, user } = useYNAB();
+  const { accounts: ynabAccounts, manualAccounts, user } = useFinanceData();
   const [additionalHoldings, setAdditionalHoldings] = useState([]);
   const [selectedPeriod, setSelectedPeriod] = useState('1Y');
   const [selectedAccount, setSelectedAccount] = useState('all');
@@ -338,8 +339,11 @@ export default function InvestmentAllocation() {
           <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">{holding.name}</p>
         </div>
         <div className="text-right ml-2">
-          <p className={`font-semibold text-sm text-green-600 dark:text-green-400 ${privacyMode ? 'privacy-blur' : ''}`}>
-            ${formatCurrency(holding.value)}
+          <p className="font-semibold text-sm text-green-600 dark:text-green-400">
+            <PrivacyCurrency
+              amount={holding.value}
+              isPrivacyMode={privacyMode}
+            />
           </p>
           <p className="text-xs text-gray-500 dark:text-gray-400">
             {holding.shares} shares
@@ -348,9 +352,10 @@ export default function InvestmentAllocation() {
       </div>
       <div className="flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
         <span>{holding.type} • {holding.sector}</span>
-        <span className={privacyMode ? 'privacy-blur' : ''}>
-          ${holding.price.toFixed(2)}
-        </span>
+        <PrivacyCurrency
+          amount={holding.price}
+          isPrivacyMode={privacyMode}
+        />
       </div>
     </div>
   );

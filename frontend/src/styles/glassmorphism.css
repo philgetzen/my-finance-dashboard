@@ -106,22 +106,7 @@
   box-shadow: none;
 }
 
-/* Optimized privacy mode - no blur filter */
-.privacy-blur {
-  position: relative;
-  color: transparent !important;
-}
-
-.privacy-blur::after {
-  content: '\u2022\u2022\u2022\u2022\u2022';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  color: #6b7280;
-  font-size: 1em;
-  letter-spacing: 0.2em;
-}
+/* Privacy mode handled in index.css with blur filter */
 
 /* Remove animated gradients for performance */
 .animated-gradient {

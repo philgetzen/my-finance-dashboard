@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { useYNAB } from '../../contexts/YNABDataContext';
-import Card from './Card';
+import { useFinanceData } from '../../contexts/ConsolidatedDataContext';
+import { useDemoMode } from '../../hooks/useDemoMode';
+import { DemoModeWarning } from './DemoModeIndicator';
 import Button from './Button';
 import {
   CheckCircleIcon,
@@ -8,11 +9,25 @@ import {
   ExclamationCircleIcon,
 } from '@heroicons/react/24/outline';
 
-export default function YNABConnectionCard({ onConnect, isConnected, compact = false }) {
+export default function YNABConnectionCard({ 
+  onConnect, 
+  onError,
+  isConnected, 
+  isDisabled = false,
+  isConnecting: externalIsConnecting = false,
+  error: externalError = null,
+  onRetry,
+  compact = false 
+}) {
   const [isConnecting, setIsConnecting] = useState(false);
   const [isProcessingToken, setIsProcessingToken] = useState(false);
   const [connectionError, setConnectionError] = useState(null); // For displaying errors
-  const { disconnectYNAB } = useYNAB();
+  const { disconnectYNAB } = useFinanceData();
+  const { isFeatureEnabled, getDisabledMessage } = useDemoMode();
+  
+  // Use external states if provided, otherwise use internal state
+  const actuallyConnecting = externalIsConnecting || isConnecting;
+  const actualError = externalError || connectionError;
   
   const handleConnect = async () => {
     setConnectionError(null); // Clear previous errors
@@ -104,7 +119,9 @@ export default function YNABConnectionCard({ onConnect, isConnected, compact = f
               }
             } catch (tokenError) {
               console.error('Error during token exchange:', tokenError);
-              setConnectionError(`Token exchange error: ${tokenError.message}`);
+              const errorMsg = `Token exchange error: ${tokenError.message}`;
+              setConnectionError(errorMsg);
+              if (onError) onError(errorMsg);
             } finally {
               // Reset flags after processing is fully complete
               setIsProcessingToken(false); 
@@ -112,7 +129,9 @@ export default function YNABConnectionCard({ onConnect, isConnected, compact = f
             }
           } else if (event.data.type === 'ynab-auth-error') {
             console.error('OAuth error:', event.data.error);
-            setConnectionError(`Authentication error: ${event.data.error}`);
+            const errorMsg = `Authentication error: ${event.data.error}`;
+            setConnectionError(errorMsg);
+            if (onError) onError(errorMsg);
             // Flags are reset by cleanupAuthProcess, but ensure isConnecting is false
             setIsConnecting(false);
           }
@@ -132,7 +151,9 @@ export default function YNABConnectionCard({ onConnect, isConnected, compact = f
       
     } catch (error) {
       console.error('Error connecting to YNAB:', error);
-      setConnectionError(`Connection error: ${error.message}`);
+      const errorMsg = `Connection error: ${error.message}`;
+      setConnectionError(errorMsg);
+      if (onError) onError(errorMsg);
       // Ensure flags are reset on outer catch
       setIsConnecting(false);
       setIsProcessingToken(false);
@@ -164,82 +185,112 @@ export default function YNABConnectionCard({ onConnect, isConnected, compact = f
     return (
       <Button
         onClick={handleConnect}
-        disabled={isConnecting}
+        disabled={actuallyConnecting || isDisabled}
         variant="outline"
         className="flex items-center gap-2"
+        title={isDisabled ? 'Sign in with Google first' : undefined}
       >
         <LinkIcon className="h-4 w-4" />
-        {isConnecting ? 'Connecting...' : 'Connect YNAB'}
+        {actuallyConnecting ? 'Connecting...' : 'Connect YNAB'}
       </Button>
     );
   }
 
   return (
-    <Card>
-      <div className="text-center">
-        {isConnected ? (
-          <>
-            <CheckCircleIcon className="mx-auto h-12 w-12 text-green-500 mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-              YNAB Connected
-            </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-              Your YNAB budget is connected and syncing.
-            </p>
-            <Button
-              onClick={handleDisconnect}
-              variant="outline"
-              className="text-red-600 border-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-            >
-              Disconnect YNAB
-            </Button>
-          </>
-        ) : (
-          <>
-            <LinkIcon className="mx-auto h-12 w-12 text-blue-500 mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-              Connect Your YNAB Budget
-            </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-              Connect your YNAB account to sync your budget, accounts, and transactions.
-            </p>
-            
-            <Button
-              onClick={handleConnect}
-              disabled={isConnecting}
-              className="w-full sm:w-auto"
-            >
-              <LinkIcon className="h-4 w-4 mr-2" />
-              {isConnecting ? 'Connecting...' : 'Connect YNAB'}
-            </Button>
+    <div className="text-center">
+      {isConnected ? (
+        <>
+          <CheckCircleIcon className="mx-auto h-12 w-12 text-green-500 mb-4" />
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+            YNAB Connected
+          </h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            Your YNAB budget is connected and syncing.
+          </p>
+          <Button
+            onClick={handleDisconnect}
+            variant="outline"
+            className="text-red-600 border-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+          >
+            Disconnect YNAB
+          </Button>
+        </>
+      ) : (
+        <>
+          <LinkIcon className={`mx-auto h-12 w-12 mb-4 ${isDisabled ? 'text-gray-300 dark:text-gray-600' : 'text-blue-500'}`} />
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+            Connect Your YNAB Budget
+          </h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            {isDisabled 
+              ? "Sign in with Google first, then connect your YNAB account to sync your budget."
+              : "Connect your YNAB account to sync your budget, accounts, and transactions."}
+          </p>
+          
+          {isDisabled && (
+            <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg text-sm text-yellow-700 dark:text-yellow-300">
+              <div className="flex items-center">
+                <ExclamationCircleIcon className="h-5 w-5 mr-2 flex-shrink-0" />
+                <span>Google authentication required first</span>
+              </div>
+            </div>
+          )}
+          
+          <DemoModeWarning 
+            message={getDisabledMessage('ynab_connect')}
+            className="mb-4"
+          />
+          
+          <Button
+            onClick={handleConnect}
+            disabled={actuallyConnecting || isDisabled || !isFeatureEnabled('ynab_connect')}
+            className="w-full sm:w-auto"
+            title={
+              isDisabled ? 'Sign in with Google first' :
+              !isFeatureEnabled('ynab_connect') ? 'YNAB connection disabled in demo mode' : 
+              undefined
+            }
+          >
+            <LinkIcon className="h-4 w-4 mr-2" />
+            {actuallyConnecting ? 'Connecting...' : 'Connect YNAB'}
+          </Button>
 
-            {connectionError && (
-              <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg text-sm text-red-700 dark:text-red-300">
+          {actualError && onRetry && (
+            <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg text-sm text-red-700 dark:text-red-300">
+              <div className="flex items-center justify-between">
                 <div className="flex items-center">
                   <ExclamationCircleIcon className="h-5 w-5 mr-2 flex-shrink-0" />
-                  <span>{connectionError}</span>
+                  <span>{actualError}</span>
+                </div>
+                <Button
+                  onClick={onRetry}
+                  variant="ghost"
+                  size="sm"
+                  className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 ml-2"
+                >
+                  Retry
+                </Button>
+              </div>
+            </div>
+          )}
+          
+          {!actualError && !isDisabled && (
+            <div className="mt-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+              <div className="flex items-start">
+                <ExclamationCircleIcon className="h-5 w-5 text-blue-500 mr-2 mt-0.5 flex-shrink-0" />
+                <div className="text-left">
+                  <p className="text-sm text-blue-700 dark:text-blue-400 font-medium mb-1">
+                    Secure Connection
+                  </p>
+                  <p className="text-xs text-blue-600 dark:text-blue-300">
+                    Your YNAB credentials are never stored. We use OAuth to securely connect to your budget.
+                  </p>
                 </div>
               </div>
-            )}
-            
-            {!connectionError && (
-              <div className="mt-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-                <div className="flex items-start">
-                  <ExclamationCircleIcon className="h-5 w-5 text-blue-500 mr-2 mt-0.5 flex-shrink-0" />
-                  <div className="text-left">
-                    <p className="text-sm text-blue-700 dark:text-blue-400 font-medium mb-1">
-                      Secure Connection
-                    </p>
-                    <p className="text-xs text-blue-600 dark:text-blue-300">
-                      Your YNAB credentials are never stored. We use OAuth to securely connect to your budget.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-    </Card>
+            </div>
+          )}
+        </>
+      )}
+    </div>
   );
 }
