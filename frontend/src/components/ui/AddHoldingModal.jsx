@@ -111,7 +111,7 @@ export default function AddHoldingModal({ show, onClose, onAddHoldings }) {
           </h3>
           <button
             onClick={onClose}
-            className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
+            className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors bg-transparent border-0"
           >
             <XMarkIcon className="h-5 w-5 text-gray-500" />
           </button>
@@ -221,7 +221,7 @@ export default function AddHoldingModal({ show, onClose, onAddHoldings }) {
                       {holdings.length > 1 && (
                         <button
                           onClick={() => removeHolding(index)}
-                          className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                          className="p-1 text-gray-400 hover:text-red-600 transition-colors bg-transparent border-0"
                         >
                           <TrashIcon className="h-4 w-4" />
                         </button>

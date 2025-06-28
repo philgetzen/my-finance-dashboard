@@ -8,7 +8,6 @@ import Button from '../ui/Button';
 import ManualAccountModal from '../ui/ManualAccountModal';
 import EditManualAccountModal from '../ui/EditManualAccountModal';
 import PrivacyCurrency from '../ui/PrivacyCurrency';
-import { formatCurrency } from '../../utils/formatters';
 import {
   BanknotesIcon,
   PlusIcon,
@@ -53,27 +52,20 @@ const AccountRow = React.memo(({ account, onEdit, onDelete, privacyMode }) => {
           prefix={isLiability ? '-$' : '$'}
         />
       </td>
-      <td className="px-4 py-3 text-sm text-center">
-        <span className={`text-xs ${
-          account.source === 'ynab' ? 'text-purple-600 dark:text-purple-400' : 'text-gray-600 dark:text-gray-400'
-        }`}>
-          {account.source === 'ynab' ? 'YNAB' : 'Manual'}
-        </span>
-      </td>
       <td className="px-4 py-3 text-right">
         {account.source === 'manual' && !isClosed && (
           <div className="flex gap-1 justify-end pr-1">
             <button
               onClick={() => onEdit(account)}
-              className="p-1.5 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-800"
+              className="p-1.5 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-colors rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-800 bg-transparent border-0"
             >
-              <PencilIcon className="h-4 w-4" />
+              <PencilIcon className="h-4 w-4 stroke-current" />
             </button>
             <button
               onClick={() => onDelete(account)}
-              className="p-1.5 text-gray-500 hover:text-red-600 dark:hover:text-red-400 transition-colors rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-800"
+              className="p-1.5 text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 transition-colors rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-800 bg-transparent border-0"
             >
-              <TrashIcon className="h-4 w-4" />
+              <TrashIcon className="h-4 w-4 stroke-current" />
             </button>
           </div>
         )}
@@ -86,7 +78,7 @@ AccountRow.displayName = 'AccountRow';
 
 export default function Accounts() {
   const { 
-    accounts: ynabAccounts, 
+    accounts, 
     manualAccounts,
     updateManualAccount,
     deleteManualAccount,
@@ -107,13 +99,14 @@ export default function Accounts() {
   const [sortBy, setSortBy] = useState('institution');
 
   // Use account manager hook
+  // In demo mode, accounts array contains all accounts (both YNAB-style and manual)
+  // In real mode, accounts array contains YNAB accounts
   const { 
     allAccounts, 
-    accountsByType, 
     filterAccounts, 
     sortAccounts,
     totals 
-  } = useAccountManager(ynabAccounts, manualAccounts);
+  } = useAccountManager(accounts || [], manualAccounts || []);
 
   // Get filtered and sorted accounts
   const displayAccounts = useMemo(() => {
@@ -173,7 +166,7 @@ export default function Accounts() {
     <PageTransition>
       <div className="w-full max-w-none space-y-6 pb-4">
         {/* Header */}
-        <Card className="p-6">
+        <Card className="glass-hero p-6">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white text-left">Accounts</h1>
@@ -227,7 +220,7 @@ export default function Accounts() {
         </Card>
 
         {/* Filters */}
-        <Card className="p-4">
+        <Card className="glass-card p-4">
           <div className="flex flex-wrap gap-4 items-center">
             {/* Search */}
             <div className="flex-1 min-w-[200px]">
@@ -279,7 +272,7 @@ export default function Accounts() {
                 type="checkbox"
                 checked={filters.showActiveOnly}
                 onChange={(e) => setFilters(prev => ({ ...prev, showActiveOnly: e.target.checked }))}
-                className="rounded text-blue-600 focus:ring-blue-500"
+                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 focus:ring-2 focus:ring-offset-2 dark:border-gray-600 dark:bg-gray-800 dark:focus:ring-offset-gray-800"
               />
               <span className="text-sm text-gray-700 dark:text-gray-300">Active only</span>
             </label>
@@ -289,7 +282,7 @@ export default function Accounts() {
                 type="checkbox"
                 checked={filters.hideZeroBalance}
                 onChange={(e) => setFilters(prev => ({ ...prev, hideZeroBalance: e.target.checked }))}
-                className="rounded text-blue-600 focus:ring-blue-500"
+                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 focus:ring-2 focus:ring-offset-2 dark:border-gray-600 dark:bg-gray-800 dark:focus:ring-offset-gray-800"
               />
               <span className="text-sm text-gray-700 dark:text-gray-300">Hide zero balance</span>
             </label>
@@ -300,7 +293,7 @@ export default function Accounts() {
         <div className="space-y-6">
           {/* YNAB Active Accounts */}
           {ynabActive.length > 0 && (
-            <Card className="p-0">
+            <Card className="glass-card p-0">
               <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white text-left">
                   YNAB Accounts
@@ -321,9 +314,6 @@ export default function Accounts() {
                       </th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                         Balance
-                      </th>
-                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                        Source
                       </th>
                       <th className="px-4 py-3 w-28"></th>
                     </tr>
@@ -346,7 +336,7 @@ export default function Accounts() {
 
           {/* Manual Active Accounts */}
           {manualActive.length > 0 && (
-            <Card className="p-0">
+            <Card className="glass-card p-0">
               <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white text-left">
                   Manual Accounts
@@ -367,9 +357,6 @@ export default function Accounts() {
                       </th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                         Balance
-                      </th>
-                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                        Source
                       </th>
                       <th className="px-4 py-3 w-28"></th>
                     </tr>
@@ -392,7 +379,7 @@ export default function Accounts() {
 
           {/* Closed Accounts */}
           {displayAccounts.closed.length > 0 && (
-            <Card className="p-0">
+            <Card className="glass-card p-0">
               <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white text-left">
                   Closed Accounts
@@ -414,9 +401,6 @@ export default function Accounts() {
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                         Balance
                       </th>
-                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                        Source
-                      </th>
                       <th className="px-4 py-3 w-28"></th>
                     </tr>
                   </thead>
@@ -437,7 +421,7 @@ export default function Accounts() {
           )}
           
           {(ynabActive.length === 0 && manualActive.length === 0 && displayAccounts.closed.length === 0) && (
-            <Card className="p-8 text-center">
+            <Card className="glass-card p-8 text-center">
               <BanknotesIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
               <h3 className="text-lg font-medium text-gray-800 dark:text-gray-200">
                 No accounts found

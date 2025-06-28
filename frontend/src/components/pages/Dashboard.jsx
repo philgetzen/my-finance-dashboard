@@ -14,7 +14,7 @@ import PageTransition from '../ui/PageTransition';
 import YNABConnectionErrorModal from '../ui/YNABConnectionErrorModal';
 import PrivacyCurrency from '../ui/PrivacyCurrency';
 import { getAccountBalance, normalizeYNABAccountType } from '../../utils/ynabHelpers';
-import { formatCurrency, formatCurrencyForTooltip, isLiability, getDisplayAccountType } from '../../utils/formatters';
+import { formatCurrency, isLiability, getDisplayAccountType } from '../../utils/formatters';
 import { useTransactionProcessor, getMonthlyRangeData } from '../../hooks/useTransactionProcessor';
 import {
   BanknotesIcon,
@@ -34,7 +34,7 @@ const COLORS = ['#3B82F6', '#8B5CF6', '#EF4444', '#10B981', '#F59E0B', '#06B6D4'
 
 // Memoized components for better performance
 const MetricCard = React.memo(({ title, value, icon: Icon, trend, color, isPrivacyMode }) => (
-  <Card className="p-6">
+  <Card className="glass-card p-6">
     <div className="flex items-center justify-between">
       <div>
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">{title}</p>
@@ -207,7 +207,7 @@ export default function Dashboard() {
     <PageTransition>
       <div className="w-full max-w-none space-y-6 pb-4">
         {/* Header */}
-        <Card className="p-6">
+        <Card className="glass-hero p-6">
           <div className="flex items-center gap-4 mb-4">
             <div className="w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
               <HomeIcon className="h-6 w-6 text-blue-600 dark:text-blue-400" />
@@ -282,7 +282,7 @@ export default function Dashboard() {
 
         {/* Key Metrics */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <MetricCard
+          <MetricCard className="p-6"
             title="Net Worth"
             value={netWorth}
             icon={ScaleIcon}
@@ -290,7 +290,7 @@ export default function Dashboard() {
             color={netWorth >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}
             isPrivacyMode={privacyMode}
           />
-          <MetricCard
+          <MetricCard className="p-6"
             title="Total Assets"
             value={totalAssets}
             icon={ArrowTrendingUpIcon}
@@ -298,7 +298,7 @@ export default function Dashboard() {
             color="text-green-600 dark:text-green-400"
             isPrivacyMode={privacyMode}
           />
-          <MetricCard
+          <MetricCard className="p-6"
             title="Total Liabilities"
             value={totalLiabilities}
             icon={ArrowTrendingDownIcon}
@@ -311,7 +311,7 @@ export default function Dashboard() {
         {/* Charts Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Asset Allocation */}
-          <Card className="p-6">
+          <Card className="glass-card p-6">
             <div className="flex items-center mb-6">
               <ChartPieIcon className="h-5 w-5 text-gray-400 mr-3" />
               <div>
@@ -385,7 +385,7 @@ export default function Dashboard() {
           </Card>
 
           {/* Account Summary */}
-          <Card className="p-6">
+          <Card className="glass-card p-6">
             <div className="flex items-center mb-6">
               <BanknotesIcon className="h-5 w-5 text-gray-400 mr-3" />
               <div>
@@ -449,7 +449,7 @@ export default function Dashboard() {
         </div>
 
         {/* Income vs Expenses - Full Width */}
-        <Card className="p-6">
+        <Card className="glass-card p-6">
           <div className="flex items-center mb-6">
             <ChartBarIcon className="h-5 w-5 text-gray-400 mr-3" />
             <div>
@@ -523,7 +523,7 @@ export default function Dashboard() {
         </Card>
 
         {/* Recent Transactions */}
-        <Card className="p-6">
+        <Card className="glass-card p-6">
           <div className="flex items-center mb-6">
             <CreditCardIcon className="h-5 w-5 text-gray-400 mr-3" />
             <div>

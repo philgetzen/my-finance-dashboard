@@ -22,7 +22,7 @@ import {
 const CategoryRow = React.memo(({ item, monthHeaders, privacyMode, isIncome, isGrouped = false }) => {
   return (
     <tr className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-      <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white sticky left-0 bg-white dark:bg-gray-900 z-10">
+      <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white sticky left-0 bg-white dark:bg-transparent z-10">
         <span className={isGrouped ? 'pl-6' : ''}>
           {item.category}
         </span>
@@ -42,19 +42,19 @@ const CategoryRow = React.memo(({ item, monthHeaders, privacyMode, isIncome, isG
                 valIsZero ? 'text-gray-400 dark:text-gray-600' 
                 : (isIncome ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400')
               } ${privacyMode ? 'privacy-blur' : ''}`}>
-            {valIsZero ? '' : formatCurrency(displayVal)}
+            {valIsZero ? '' : `$${formatCurrency(displayVal)}`}
           </td>
         );
       })}
       <td className={`px-3 py-3 text-sm text-right font-medium ${
         isIncome ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
       } ${privacyMode ? 'privacy-blur' : ''}`}>
-        {formatCurrency(isIncome ? item.averageIncome : item.averageExpense)}
+        ${formatCurrency(isIncome ? item.averageIncome : item.averageExpense)}
       </td>
       <td className={`px-3 py-3 text-sm text-right font-bold ${
         isIncome ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
       } ${privacyMode ? 'privacy-blur' : ''}`}>
-        {formatCurrency(isIncome ? item.totalIncome : item.totalExpense)}
+        ${formatCurrency(isIncome ? item.totalIncome : item.totalExpense)}
       </td>
     </tr>
   );
@@ -66,15 +66,15 @@ CategoryRow.displayName = 'CategoryRow';
 const GroupHeaderRow = React.memo(({ group, monthHeaders, privacyMode, isIncome, isCollapsed, onToggle }) => {
   return (
     <tr className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-      <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white sticky left-0 bg-white dark:bg-gray-900 z-10">
+      <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white sticky left-0 bg-white dark:bg-transparent z-10">
         <button
           onClick={onToggle}
-          className="flex items-center gap-1 w-full text-left"
+          className="flex items-center gap-1 w-full text-left text-gray-900 dark:text-white hover:text-gray-700 dark:hover:text-gray-300 transition-colors bg-transparent border-0 p-0 m-0"
         >
           {isCollapsed ? (
-            <ChevronRightIcon className="w-4 h-4" />
+            <ChevronRightIcon className="w-4 h-4 stroke-current" />
           ) : (
-            <ChevronDownIcon className="w-4 h-4" />
+            <ChevronDownIcon className="w-4 h-4 stroke-current" />
           )}
           <span>{group.groupName}</span>
         </button>
@@ -93,19 +93,19 @@ const GroupHeaderRow = React.memo(({ group, monthHeaders, privacyMode, isIncome,
                 valIsZero ? 'text-gray-400 dark:text-gray-600' : 
                 (isIncome ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400')
               } ${privacyMode ? 'privacy-blur' : ''}`}>
-            {valIsZero ? '' : formatCurrency(monthTotal)}
+            {valIsZero ? '' : `$${formatCurrency(monthTotal)}`}
           </td>
         );
       })}
       <td className={`px-3 py-3 text-sm text-right ${
         isIncome ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
       } ${privacyMode ? 'privacy-blur' : ''}`}>
-        {formatCurrency(isIncome ? group.groupAverageIncome : group.groupAverageExpense)}
+        ${formatCurrency(isIncome ? group.groupAverageIncome : group.groupAverageExpense)}
       </td>
       <td className={`px-3 py-3 text-sm text-right ${
         isIncome ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
       } ${privacyMode ? 'privacy-blur' : ''}`}>
-        {formatCurrency(isIncome ? group.groupTotalIncome : group.groupTotalExpense)}
+        ${formatCurrency(isIncome ? group.groupTotalIncome : group.groupTotalExpense)}
       </td>
     </tr>
   );
@@ -335,7 +335,7 @@ export default function IncomeVsExpenseReport() {
     <PageTransition>
       <div className="w-full max-w-none space-y-6 pb-4">
         {/* Header */}
-        <Card className="p-6">
+        <Card className="glass-hero p-6">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white text-left">Income vs Expense Report</h1>
           <p className="mt-2 text-gray-600 dark:text-gray-400 text-left">
           {ynabError ? (
@@ -425,7 +425,7 @@ export default function IncomeVsExpenseReport() {
                   type="checkbox"
                   checked={showActiveOnly}
                   onChange={(e) => setShowActiveOnly(e.target.checked)}
-                  className="rounded text-blue-600 focus:ring-blue-500"
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 focus:ring-2 focus:ring-offset-2 dark:border-gray-600 dark:bg-gray-800 dark:focus:ring-offset-gray-800"
                 />
                 Active categories only
               </label>
@@ -434,7 +434,7 @@ export default function IncomeVsExpenseReport() {
                 {filteredData.incomeGroup && (
                   <button
                     onClick={() => setIncomeCollapsed(!incomeCollapsed)}
-                    className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 transition-colors"
+                    className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 transition-colors bg-transparent border border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500 px-3 py-1.5 rounded-lg"
                   >
                     {incomeCollapsed ? 'Show Income' : 'Hide Income'}
                   </button>
@@ -450,7 +450,7 @@ export default function IncomeVsExpenseReport() {
                         setCollapsedGroups(new Set(filteredData.expenseGroups.map(g => g.groupName)));
                       }
                     }}
-                    className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 transition-colors"
+                    className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 transition-colors bg-transparent border border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500 px-3 py-1.5 rounded-lg"
                   >
                     {collapsedGroups.size === filteredData.expenseGroups.length ? 'Expand All Groups' : 'Collapse All Groups'}
                   </button>
@@ -491,7 +491,7 @@ export default function IncomeVsExpenseReport() {
                   <>
                     {/* Income header row */}
                     <tr className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                      <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white sticky left-0 bg-white dark:bg-gray-900 z-10">
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white sticky left-0 bg-white dark:bg-transparent z-10">
                         <span className="uppercase text-xs tracking-wider">Income</span>
                       </td>
                       <td colSpan={monthHeaders.length + 3} className="px-4 py-3"></td>
@@ -515,18 +515,18 @@ export default function IncomeVsExpenseReport() {
                       />
                     ))}
                     <tr className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                      <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white sticky left-0 bg-white dark:bg-gray-900 z-10">Total Income</td>
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white sticky left-0 bg-white dark:bg-transparent z-10">Total Income</td>
                       <td className="px-4 py-3"></td>
                       {monthHeaders.map(month => (
                         <td key={`income-total-${month.key}`} className={`px-3 py-3 text-sm text-right font-medium text-green-600 dark:text-green-400 ${privacyMode ? 'privacy-blur' : ''}`}>
-                          {formatCurrency(filteredData.incomeGroup.monthlyIncomeTotals[month.key] || 0)}
+                          ${formatCurrency(filteredData.incomeGroup.monthlyIncomeTotals[month.key] || 0)}
                         </td>
                       ))}
                       <td className={`px-3 py-3 text-sm text-right font-medium text-green-600 dark:text-green-400 ${privacyMode ? 'privacy-blur' : ''}`}>
-                        {formatCurrency(filteredData.incomeGroup.groupAverageIncome)}
+                        ${formatCurrency(filteredData.incomeGroup.groupAverageIncome)}
                       </td>
                       <td className={`px-3 py-3 text-sm text-right font-medium text-green-600 dark:text-green-400 ${privacyMode ? 'privacy-blur' : ''}`}>
-                        {formatCurrency(filteredData.incomeGroup.groupTotalIncome)}
+                        ${formatCurrency(filteredData.incomeGroup.groupTotalIncome)}
                       </td>
                     </tr>
                   </>
@@ -544,7 +544,7 @@ export default function IncomeVsExpenseReport() {
                   <>
                     {/* Expense header row */}
                     <tr className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                      <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white sticky left-0 bg-white dark:bg-gray-900 z-10">
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white sticky left-0 bg-white dark:bg-transparent z-10">
                         <span className="uppercase text-xs tracking-wider">Expenses</span>
                       </td>
                       <td colSpan={monthHeaders.length + 3} className="px-4 py-3"></td>
@@ -605,45 +605,45 @@ export default function IncomeVsExpenseReport() {
                     
                     {/* Total Inflows */}
                     <tr className="border-t-2 border-gray-300 dark:border-gray-600">
-                      <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white sticky left-0 bg-white dark:bg-gray-900 z-10">
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white sticky left-0 bg-white dark:bg-transparent z-10">
                         Total Inflows
                       </td>
                       <td className="px-4 py-3"></td>
                       {monthHeaders.map(month => (
                         <td key={`income-total-${month.key}`} className={`px-3 py-3 text-sm text-right font-medium text-green-600 dark:text-green-400 ${privacyMode ? 'privacy-blur' : ''}`}>
-                          {formatCurrency(monthlySummaryTotals[month.key]?.income || 0)}
+                          ${formatCurrency(monthlySummaryTotals[month.key]?.income || 0)}
                         </td>
                       ))}
                       <td className={`px-3 py-3 text-sm text-right font-medium text-green-600 dark:text-green-400 ${privacyMode ? 'privacy-blur' : ''}`}>
-                        {formatCurrency(grandTotals.income / (monthHeaders.length || 1))}
+                        ${formatCurrency(grandTotals.income / (monthHeaders.length || 1))}
                       </td>
                       <td className={`px-3 py-3 text-sm text-right font-medium text-green-600 dark:text-green-400 ${privacyMode ? 'privacy-blur' : ''}`}>
-                        {formatCurrency(grandTotals.income)}
+                        ${formatCurrency(grandTotals.income)}
                       </td>
                     </tr>
                     
                     {/* Total Outflows */}
                     <tr>
-                      <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white sticky left-0 bg-white dark:bg-gray-900 z-10">
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white sticky left-0 bg-white dark:bg-transparent z-10">
                         Total Outflows
                       </td>
                       <td className="px-4 py-3"></td>
                       {monthHeaders.map(month => (
                         <td key={`expense-total-${month.key}`} className={`px-3 py-3 text-sm text-right font-medium text-red-600 dark:text-red-400 ${privacyMode ? 'privacy-blur' : ''}`}>
-                          {formatCurrency(monthlySummaryTotals[month.key]?.expenses || 0)}
+                          ${formatCurrency(monthlySummaryTotals[month.key]?.expenses || 0)}
                         </td>
                       ))}
                       <td className={`px-3 py-3 text-sm text-right font-medium text-red-600 dark:text-red-400 ${privacyMode ? 'privacy-blur' : ''}`}>
-                        {formatCurrency(grandTotals.expenses / (monthHeaders.length || 1))}
+                        ${formatCurrency(grandTotals.expenses / (monthHeaders.length || 1))}
                       </td>
                       <td className={`px-3 py-3 text-sm text-right font-medium text-red-600 dark:text-red-400 ${privacyMode ? 'privacy-blur' : ''}`}>
-                        {formatCurrency(grandTotals.expenses)}
+                        ${formatCurrency(grandTotals.expenses)}
                       </td>
                     </tr>
                     
                     {/* Net Income */}
                     <tr className="border-t-2 border-gray-300 dark:border-gray-600">
-                      <td className="px-4 py-3 text-sm font-bold text-gray-900 dark:text-white sticky left-0 bg-white dark:bg-gray-900 z-10">
+                      <td className="px-4 py-3 text-sm font-bold text-gray-900 dark:text-white sticky left-0 bg-white dark:bg-transparent z-10">
                         Net Income
                       </td>
                       <td className="px-4 py-3"></td>
@@ -653,19 +653,19 @@ export default function IncomeVsExpenseReport() {
                           <td key={`net-total-${month.key}`} className={`px-3 py-3 text-sm text-right font-bold ${
                             netValue >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
                           } ${privacyMode ? 'privacy-blur' : ''}`}>
-                            {formatCurrency(netValue)}
+                            ${formatCurrency(netValue)}
                           </td>
                         );
                       })}
                       <td className={`px-3 py-3 text-sm text-right font-bold ${
                         grandTotals.net >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
                       } ${privacyMode ? 'privacy-blur' : ''}`}>
-                        {formatCurrency(grandTotals.net / (monthHeaders.length || 1))}
+                        ${formatCurrency(grandTotals.net / (monthHeaders.length || 1))}
                       </td>
                       <td className={`px-3 py-3 text-sm text-right font-bold ${
                         grandTotals.net >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
                       } ${privacyMode ? 'privacy-blur' : ''}`}>
-                        {formatCurrency(grandTotals.net)}
+                        ${formatCurrency(grandTotals.net)}
                       </td>
                     </tr>
                   </>

@@ -11,7 +11,7 @@ import PrivacyCurrency from '../ui/PrivacyCurrency';
 import {
   BanknotesIcon,
   ChartPieIcon,
-  ArrowTrendingUpIcon, 
+  ArrowTrendingUpIcon,
   CalendarIcon,
   CurrencyDollarIcon,
   PlusIcon,
@@ -63,7 +63,7 @@ export default function InvestmentAllocation() {
   const [viewMode, setViewMode] = useState('cards'); // 'cards' or 'table'
   const [accountHoldings, setAccountHoldings] = useState({});
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
-  
+
   // Load saved holdings data on component mount
   useEffect(() => {
     if (user) {
@@ -77,7 +77,7 @@ export default function InvestmentAllocation() {
       }
     }
   }, [user]);
-  
+
   // Save holdings data when it changes
   const saveAccountHoldings = (accountId, holdings) => {
     const newHoldings = {
@@ -85,12 +85,12 @@ export default function InvestmentAllocation() {
       [accountId]: holdings
     };
     setAccountHoldings(newHoldings);
-    
+
     if (user) {
       localStorage.setItem(`investment_holdings_${user.uid}`, JSON.stringify(newHoldings));
     }
   };
-  
+
   // Default stock prices for common stocks (can be updated with real-time data)
   const DEFAULT_STOCK_PRICES = {
     DIS: 112.50,  // Disney stock price
@@ -104,7 +104,7 @@ export default function InvestmentAllocation() {
     BRK: 540000.00, // Berkshire Hathaway
     JPM: 190.00, // JP Morgan
   };
-  
+
   // Helper function to get clean account name
   const getCleanAccountName = (account) => {
     const name = account.name;
@@ -113,7 +113,7 @@ export default function InvestmentAllocation() {
       .replace(/\s*-\s*\d+$/g, '') // Remove trailing numbers like "- 31810"
       .replace(/\s*\(.*?\)\s*$/g, '') // Remove parentheses content at end
       .trim();
-    
+
     // Map common account names to cleaner versions
     const accountMappings = {
       'disney stock': 'Disney Stock (Merrill Edge)',
@@ -124,45 +124,45 @@ export default function InvestmentAllocation() {
       'altruist': 'Altruist',
       'fidelity': 'Fidelity',
     };
-    
+
     const lowerName = cleanName.toLowerCase();
     for (const [key, value] of Object.entries(accountMappings)) {
       if (lowerName.includes(key)) {
         return value;
       }
     }
-    
+
     return cleanName;
   };
-  
+
   // Generate holdings from YNAB investment accounts
   const holdings = useMemo(() => {
     const allAccounts = [...(ynabAccounts || []), ...(manualAccounts || [])];
-    const investmentAccounts = allAccounts.filter(acc => 
+    const investmentAccounts = allAccounts.filter(acc =>
       normalizeYNABAccountType(acc.type) === 'investment' && !acc.closed_on
     );
-    
+
     let holdingsList = [];
     let holdingId = 1;
-    
+
     investmentAccounts.forEach(account => {
       const balance = getAccountBalance(account);
       const accountName = getCleanAccountName(account);
       const savedHoldings = accountHoldings[account.id] || [];
-      
+
       // Skip accounts with zero balance
       if (balance === 0) return;
-      
+
       if (savedHoldings.length > 0) {
         // Use saved holdings for this account
         const totalSavedValue = savedHoldings.reduce((sum, h) => sum + (h.shares * h.price), 0);
         const scaleFactor = totalSavedValue > 0 ? balance / totalSavedValue : 1;
-        
+
         savedHoldings.forEach(holding => {
           const value = holding.shares * holding.price * scaleFactor;
           // Skip holdings with zero value
           if (value === 0) return;
-          
+
           const stockInfo = getStockInfo(holding.symbol);
           holdingsList.push({
             id: holdingId++,
@@ -194,11 +194,11 @@ export default function InvestmentAllocation() {
         });
       }
     });
-    
+
     // Combine with any additional manually added holdings
     return [...holdingsList, ...additionalHoldings].filter(h => h.value > 0);
   }, [ynabAccounts, manualAccounts, additionalHoldings, accountHoldings]);
-  
+
   // Helper function to get stock information
   const getStockInfo = (symbol) => {
     const stockDatabase = {
@@ -219,14 +219,14 @@ export default function InvestmentAllocation() {
       'QQQ': { name: 'Invesco QQQ Trust', type: 'ETF', sector: 'Technology' },
       'VTI': { name: 'Vanguard Total Stock Market ETF', type: 'ETF', sector: 'Diversified' },
     };
-    
+
     return stockDatabase[symbol.toUpperCase()] || {
       name: symbol,
       type: 'Stock',
       sector: 'Other'
     };
   };
-  
+
   // Handle adding new holdings
   const handleAddHoldings = (newHoldings) => {
     const processedHoldings = newHoldings.map((holding, index) => {
@@ -243,7 +243,7 @@ export default function InvestmentAllocation() {
         account: holding.account || 'Manual Entry'
       };
     });
-    
+
     setAdditionalHoldings([...additionalHoldings, ...processedHoldings]);
   };
 
@@ -284,7 +284,7 @@ export default function InvestmentAllocation() {
   const previousValue = mockPerformanceData[0].portfolio;
   const totalReturn = ((currentValue - previousValue) / previousValue) * 100;
   const benchmarkReturn = ((mockPerformanceData[mockPerformanceData.length - 1].benchmark - mockPerformanceData[0].benchmark) / mockPerformanceData[0].benchmark) * 100;
-  
+
   // Handle sorting
   const handleSort = (key) => {
     let direction = 'asc';
@@ -293,7 +293,7 @@ export default function InvestmentAllocation() {
     }
     setSortConfig({ key, direction });
   };
-  
+
   // Sort holdings based on current sort configuration
   const sortedHoldings = useMemo(() => {
     const sorted = [...filteredHoldings];
@@ -301,19 +301,19 @@ export default function InvestmentAllocation() {
       sorted.sort((a, b) => {
         let aValue = a[sortConfig.key];
         let bValue = b[sortConfig.key];
-        
+
         // Handle numeric values
         if (sortConfig.key === 'value' || sortConfig.key === 'shares' || sortConfig.key === 'price') {
           aValue = parseFloat(aValue) || 0;
           bValue = parseFloat(bValue) || 0;
         }
-        
+
         // Handle string values
         if (typeof aValue === 'string') {
           aValue = aValue.toLowerCase();
           bValue = bValue.toLowerCase();
         }
-        
+
         if (aValue < bValue) {
           return sortConfig.direction === 'asc' ? -1 : 1;
         }
@@ -378,10 +378,10 @@ export default function InvestmentAllocation() {
               </p>
             </div>
           </div>
-          
+
           {/* Quick Actions */}
           <div className="flex gap-3 flex-wrap">
-            <Button 
+            <Button
               onClick={() => setShowAddHoldingModal(true)}
               variant="primary"
               className="flex items-center gap-2"
@@ -397,62 +397,66 @@ export default function InvestmentAllocation() {
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-          <div className="glass-card p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Total Value</p>
-                <p className={`text-2xl font-bold text-green-600 dark:text-green-400 ${privacyMode ? 'privacy-blur' : ''}`}>
-                  ${formatCurrency(totalValue)}
-                </p>
+        <div className="grid gap-4 grid-cols-[repeat(auto-fit,_minmax(260px,_1fr))]">
+          <div className="flex flex-wrap md:flex-nowrap gap-4">
+            <div className="glass-card p-6 flex-[2] min-w-[260px]">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Total Value</p>
+                  <p className={`text-2xl font-bold tabular-nums text-green-600 dark:text-green-400 ${privacyMode ? 'privacy-blur' : ''}`}>
+                    ${formatCurrency(totalValue)}
+                  </p>
+                </div>
+                <div className="w-12 h-12 glass-card-green rounded-xl flex items-center justify-center glow-emerald flex-shrink-0">
+                  <CurrencyDollarIcon className="h-6 w-6 text-white" />
+                </div>
               </div>
-              <div className="w-12 h-12 glass-card-green rounded-xl flex items-center justify-center glow-emerald">
-                <CurrencyDollarIcon className="h-6 w-6 text-white" />
+            </div>
+
+            <div className="glass-card p-6 flex-1 min-w-[200px]">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Total Return</p>
+                  <p className={`text-2xl font-bold tabular-nums ${totalReturn >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'} ${privacyMode ? 'privacy-blur' : ''}`}>
+                    {totalReturn >= 0 ? '+' : ''}{formatPercent(totalReturn)}
+                  </p>
+                </div>
+                <div className={`w-12 h-12 ${totalReturn >= 0 ? 'glass-card-green' : 'glass-card-red'} rounded-xl flex items-center justify-center ${totalReturn >= 0 ? 'glow-emerald' : ''}`}>
+                  <ArrowTrendingUpIcon className="h-6 w-6 text-white" />
+                </div>
+              </div>
+            </div>
+
+            <div className="glass-card p-6 flex-1 min-w-[200px]">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">vs Benchmark</p>
+                  <p className={`text-2xl font-bold tabular-nums ${(totalReturn - benchmarkReturn) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'} ${privacyMode ? 'privacy-blur' : ''}`}>
+                    {(totalReturn - benchmarkReturn) >= 0 ? '+' : ''}{formatPercent(totalReturn - benchmarkReturn)}
+                  </p>
+                </div>
+                <div className="w-12 h-12 glass-card-blue rounded-xl flex items-center justify-center glow-blue">
+                  <ChartPieIcon className="h-6 w-6 text-white" />
+                </div>
+              </div>
+            </div>
+
+            <div className="glass-card p-6 flex-1 min-w-[200px]">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Holdings</p>
+                  <p className="text-2xl font-bold tabular-nums text-blue-600 dark:text-blue-400">
+                    {filteredHoldings.length}
+                  </p>
+                </div>
+                <div className="w-12 h-12 glass-card-gold rounded-xl flex items-center justify-center glow-gold">
+                  <BanknotesIcon className="h-6 w-6 text-white" />
+                </div>
               </div>
             </div>
           </div>
 
-          <div className="glass-card p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Total Return</p>
-                <p className={`text-2xl font-bold ${totalReturn >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'} ${privacyMode ? 'privacy-blur' : ''}`}>
-                  {totalReturn >= 0 ? '+' : ''}{formatPercent(totalReturn)}
-                </p>
-              </div>
-              <div className={`w-12 h-12 ${totalReturn >= 0 ? 'glass-card-green' : 'glass-card-red'} rounded-xl flex items-center justify-center ${totalReturn >= 0 ? 'glow-emerald' : ''}`}>
-                <ArrowTrendingUpIcon className="h-6 w-6 text-white" />
-              </div>
-            </div>
-          </div>
 
-          <div className="glass-card p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">vs Benchmark</p>
-                <p className={`text-2xl font-bold ${(totalReturn - benchmarkReturn) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'} ${privacyMode ? 'privacy-blur' : ''}`}>
-                  {(totalReturn - benchmarkReturn) >= 0 ? '+' : ''}{formatPercent(totalReturn - benchmarkReturn)}
-                </p>
-              </div>
-              <div className="w-12 h-12 glass-card-blue rounded-xl flex items-center justify-center glow-blue">
-                <ChartPieIcon className="h-6 w-6 text-white" />
-              </div>
-            </div>
-          </div>
-
-          <div className="glass-card p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Holdings</p>
-                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                  {filteredHoldings.length}
-                </p>
-              </div>
-              <div className="w-12 h-12 glass-card-gold rounded-xl flex items-center justify-center glow-gold">
-                <BanknotesIcon className="h-6 w-6 text-white" />
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Controls */}
@@ -460,13 +464,13 @@ export default function InvestmentAllocation() {
           <div className="flex flex-wrap gap-4 items-center">
             <div className="flex items-center gap-2">
               <CalendarIcon className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-              <select 
+              <select
                 value={selectedPeriod}
                 onChange={(e) => setSelectedPeriod(e.target.value)}
                 className="px-3 py-1 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
               >
                 <option value="1D">1 Day</option>
-                <option value="1W">1 Week</option>  
+                <option value="1W">1 Week</option>
                 <option value="1M">1 Month</option>
                 <option value="3M">3 Months</option>
                 <option value="6M">6 Months</option>
@@ -474,10 +478,10 @@ export default function InvestmentAllocation() {
                 <option value="ALL">All Time</option>
               </select>
             </div>
-            
+
             <div className="flex items-center gap-2">
               <FunnelIcon className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-              <select 
+              <select
                 value={selectedAccount}
                 onChange={(e) => setSelectedAccount(e.target.value)}
                 className="px-3 py-1 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
@@ -488,10 +492,10 @@ export default function InvestmentAllocation() {
                 ))}
               </select>
             </div>
-            
+
             <div className="flex items-center gap-2">
               <span className="text-sm text-gray-600 dark:text-gray-400">Group by:</span>
-              <select 
+              <select
                 value={groupBy}
                 onChange={(e) => setGroupBy(e.target.value)}
                 className="px-3 py-1 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
@@ -519,7 +523,7 @@ export default function InvestmentAllocation() {
                 <p className="text-sm text-gray-600 dark:text-gray-400">Portfolio breakdown</p>
               </div>
             </div>
-            
+
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -538,15 +542,28 @@ export default function InvestmentAllocation() {
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip 
-                    formatter={(value, name) => {
-                      if (privacyMode) return ['***', name];
-                      return [`${formatCurrency(value)}`, name];
+                  <Tooltip
+                    content={({ active, payload }) => {
+                      if (!active || !payload || payload.length === 0) return null;
+                      return (
+                        <div className="chart-tooltip glass-tooltip bg-white dark:bg-gray-800 p-3 rounded-xl border border-gray-200 dark:border-gray-700 shadow-lg">
+                          {payload.map((entry, index) => (
+                            <div key={index} className="flex items-center gap-2">
+                              <div
+                                className="w-3 h-3 rounded-full"
+                                style={{ backgroundColor: entry.fill }}
+                              />
+                              <span className="text-sm text-gray-600 dark:text-gray-400">
+                                {entry.name}:
+                              </span>
+                              <span className={`text-sm font-medium text-gray-900 dark:text-white ${privacyMode ? 'privacy-blur' : ''}`}>
+                                {formatCurrency(entry.value)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      );
                     }}
-                    contentStyle={{
-                      borderRadius: '12px',
-                    }}
-                    wrapperClassName="chart-tooltip glass-tooltip"
                   />
                 </PieChart>
               </ResponsiveContainer>
@@ -564,41 +581,55 @@ export default function InvestmentAllocation() {
                 <p className="text-sm text-gray-600 dark:text-gray-400">Portfolio vs benchmark</p>
               </div>
             </div>
-            
+
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={mockPerformanceData} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                  <XAxis 
-                    dataKey="month" 
+                  <XAxis
+                    dataKey="month"
                     tick={{ fontSize: 11 }}
                   />
-                  <YAxis 
+                  <YAxis
                     tick={{ fontSize: 11 }}
                     tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
                   />
-                  <Tooltip 
-                    formatter={(value, name) => {
-                      if (privacyMode) return ['***', name];
-                      return [`${formatCurrency(value)}`, name];
+                  <Tooltip
+                    content={({ active, payload, label }) => {
+                      if (!active || !payload || payload.length === 0) return null;
+                      return (
+                        <div className="chart-tooltip glass-tooltip bg-white dark:bg-gray-800 p-3 rounded-xl border border-gray-200 dark:border-gray-700 shadow-lg">
+                          <p className="text-sm font-medium text-gray-900 dark:text-white mb-2">{label}</p>
+                          {payload.map((entry, index) => (
+                            <div key={index} className="flex items-center gap-2">
+                              <div
+                                className="w-3 h-3 rounded-full"
+                                style={{ backgroundColor: entry.stroke }}
+                              />
+                              <span className="text-sm text-gray-600 dark:text-gray-400">
+                                {entry.name}:
+                              </span>
+                              <span className={`text-sm font-medium text-gray-900 dark:text-white ${privacyMode ? 'privacy-blur' : ''}`}>
+                                {formatCurrency(entry.value)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      );
                     }}
-                    contentStyle={{
-                      borderRadius: '12px',
-                    }}
-                    wrapperClassName="chart-tooltip glass-tooltip"
                   />
-                  <Line 
-                    type="monotone" 
-                    dataKey="portfolio" 
-                    stroke="#10B981" 
+                  <Line
+                    type="monotone"
+                    dataKey="portfolio"
+                    stroke="#10B981"
                     strokeWidth={3}
                     name="Portfolio"
                     dot={{ fill: '#10B981', strokeWidth: 2, r: 4 }}
                   />
-                  <Line 
-                    type="monotone" 
-                    dataKey="benchmark" 
-                    stroke="#6B7280" 
+                  <Line
+                    type="monotone"
+                    dataKey="benchmark"
+                    stroke="#6B7280"
                     strokeWidth={2}
                     strokeDasharray="5 5"
                     name="Benchmark"
@@ -621,17 +652,17 @@ export default function InvestmentAllocation() {
               <p className="text-sm text-gray-600 dark:text-gray-400">Portfolio risk metrics</p>
             </div>
           </div>
-          
+
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <RadarChart data={riskMetrics}>
                 <PolarGrid className="opacity-30" />
-                <PolarAngleAxis 
-                  dataKey="metric" 
+                <PolarAngleAxis
+                  dataKey="metric"
                   tick={{ fontSize: 11, fill: 'currentColor' }}
                 />
-                <PolarRadiusAxis 
-                  angle={90} 
+                <PolarRadiusAxis
+                  angle={90}
                   domain={[0, 100]}
                   tick={{ fontSize: 10, fill: 'currentColor' }}
                 />
@@ -644,11 +675,23 @@ export default function InvestmentAllocation() {
                   strokeWidth={2}
                 />
                 <Tooltip
-                  formatter={(value) => [`${value}/100`, 'Score']}
-                  contentStyle={{
-                    borderRadius: '12px',
+                  content={({ active, payload }) => {
+                    if (!active || !payload || payload.length === 0) return null;
+                    return (
+                      <div className="chart-tooltip glass-tooltip bg-white dark:bg-gray-800 p-3 rounded-xl border border-gray-200 dark:border-gray-700 shadow-lg">
+                        {payload.map((entry, index) => (
+                          <div key={index} className="flex items-center gap-2">
+                            <span className="text-sm text-gray-600 dark:text-gray-400">
+                              {entry.payload.metric}:
+                            </span>
+                            <span className="text-sm font-medium text-gray-900 dark:text-white">
+                              {entry.value}/100
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    );
                   }}
-                  wrapperClassName="chart-tooltip glass-tooltip"
                 />
               </RadarChart>
             </ResponsiveContainer>
@@ -711,12 +754,12 @@ export default function InvestmentAllocation() {
               <p className="text-sm text-gray-600 dark:text-gray-400">Complete portfolio breakdown by account</p>
             </div>
           </div>
-          
+
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50 dark:bg-gray-800">
                 <tr>
-                  <th 
+                  <th
                     className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                     onClick={() => handleSort('symbol')}
                   >
@@ -729,7 +772,7 @@ export default function InvestmentAllocation() {
                       )}
                     </div>
                   </th>
-                  <th 
+                  <th
                     className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                     onClick={() => handleSort('name')}
                   >
@@ -742,7 +785,7 @@ export default function InvestmentAllocation() {
                       )}
                     </div>
                   </th>
-                  <th 
+                  <th
                     className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                     onClick={() => handleSort('account')}
                   >
@@ -755,7 +798,7 @@ export default function InvestmentAllocation() {
                       )}
                     </div>
                   </th>
-                  <th 
+                  <th
                     className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                     onClick={() => handleSort('type')}
                   >
@@ -768,7 +811,7 @@ export default function InvestmentAllocation() {
                       )}
                     </div>
                   </th>
-                  <th 
+                  <th
                     className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                     onClick={() => handleSort('shares')}
                   >
@@ -781,7 +824,7 @@ export default function InvestmentAllocation() {
                       )}
                     </div>
                   </th>
-                  <th 
+                  <th
                     className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                     onClick={() => handleSort('price')}
                   >
@@ -794,7 +837,7 @@ export default function InvestmentAllocation() {
                       )}
                     </div>
                   </th>
-                  <th 
+                  <th
                     className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                     onClick={() => handleSort('value')}
                   >
@@ -890,7 +933,7 @@ export default function InvestmentAllocation() {
           onClose={() => setShowAddHoldingModal(false)}
           onAddHoldings={handleAddHoldings}
         />
-        
+
         {/* Manage Holdings Modal */}
         {selectedAccountForManage && (
           <ManageHoldingsModal

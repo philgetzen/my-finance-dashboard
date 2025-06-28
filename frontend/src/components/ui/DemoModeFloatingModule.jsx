@@ -54,25 +54,25 @@ export default function DemoModeFloatingModule() {
         <div className="bg-gradient-to-r from-emerald-500 to-green-600 px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <SparklesIcon className="h-5 w-5" style={{ color: 'white' }} />
+              <SparklesIcon className="h-5 w-5 text-white stroke-current" />
               <span className="text-white font-medium text-sm">Demo Mode</span>
             </div>
             <div className="flex items-center space-x-1">
               <button
                 onClick={handleToggleMinimized}
-                className="p-1 rounded-lg hover:bg-white/20 transition-colors"
-                aria-label="Minimize"
+                className="p-1 rounded-lg hover:bg-white/20 transition-colors text-white bg-transparent border-0" 
+                aria-label="Minimize" 
               >
-                <svg className="h-4 w-4" fill="none" stroke="black" viewBox="0 0 24 24">
+                <svg className="h-4 w-4 stroke-current" fill="none" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M20 12H4" />
                 </svg>
               </button>
               <button
                 onClick={handleDismiss}
-                className="p-1 rounded-lg hover:bg-white/20 transition-colors"
+                className="p-1 rounded-lg hover:bg-white/20 transition-colors text-white bg-transparent border-0"
                 aria-label="Dismiss"
               >
-                <XMarkIcon className="h-4 w-4" style={{ color: 'black' }} />
+                <XMarkIcon className="h-4 w-4 text-white stroke-current" />
               </button>
             </div>
           </div>

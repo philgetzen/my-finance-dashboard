@@ -88,8 +88,8 @@ export const mockManualAccounts = [
   {
     id: 'demo-manual-001',
     userId: 'demo-user-123',
-    accountName: 'Cash Wallet',
-    accountType: 'cash',
+    name: 'Cash Wallet',
+    type: 'cash',
     balance: 150, // $150
     isActive: true,
     createdAt: '2024-03-01T00:00:00Z',
@@ -98,8 +98,8 @@ export const mockManualAccounts = [
   {
     id: 'demo-manual-002',
     userId: 'demo-user-123',
-    accountName: 'Crypto Portfolio',
-    accountType: 'investment',
+    name: 'Crypto Portfolio',
+    type: 'investment',
     balance: 2500, // $2,500
     isActive: true,
     createdAt: '2024-02-15T00:00:00Z',
@@ -149,29 +149,29 @@ const generateTransactions = () => {
 };
 
 const generateSingleTransaction = (date, id) => {
-  // Weight transaction types based on realistic frequency
+  // Weight transaction types based on realistic frequency with YNAB category mapping
   const transactionTypes = [
-    { category: 'groceries', weight: 15 },
-    { category: 'restaurants', weight: 12 },
-    { category: 'gas', weight: 8 },
-    { category: 'shopping', weight: 10 },
-    { category: 'utilities', weight: 3 },
-    { category: 'entertainment', weight: 6 },
-    { category: 'transportation', weight: 5 },
-    { category: 'healthcare', weight: 2 },
-    { category: 'insurance', weight: 1 },
-    { category: 'income', weight: 3 }
+    { category: 'groceries', weight: 15, categoryId: 'cat-groceries' },
+    { category: 'restaurants', weight: 12, categoryId: 'cat-restaurants' },
+    { category: 'gas', weight: 8, categoryId: 'cat-gas' },
+    { category: 'shopping', weight: 10, categoryId: 'cat-general-shopping' },
+    { category: 'utilities', weight: 3, categoryId: 'cat-electric' },
+    { category: 'entertainment', weight: 6, categoryId: 'cat-streaming' },
+    { category: 'transportation', weight: 5, categoryId: 'cat-rideshare' },
+    { category: 'healthcare', weight: 2, categoryId: 'cat-medical' },
+    { category: 'insurance', weight: 1, categoryId: 'cat-auto-insurance' },
+    { category: 'income', weight: 3, categoryId: 'cat-salary' }
   ];
 
   // Calculate total weight and select random category
   const totalWeight = transactionTypes.reduce((sum, type) => sum + type.weight, 0);
   let random = Math.random() * totalWeight;
   
-  let selectedCategory = 'groceries';
+  let selectedType = transactionTypes[0];
   for (const type of transactionTypes) {
     random -= type.weight;
     if (random <= 0) {
-      selectedCategory = type.category;
+      selectedType = type;
       break;
     }
   }
@@ -190,44 +190,51 @@ const generateSingleTransaction = (date, id) => {
     income: { min: 1500, max: 3500 }
   };
 
-  const range = amounts[selectedCategory];
+  const range = amounts[selectedType.category];
   const amount = Math.floor(Math.random() * (range.max - range.min) + range.min); // Dollar amounts
   
   // Determine account based on transaction type
   let accountId;
-  if (selectedCategory === 'income') {
+  if (selectedType.category === 'income') {
     accountId = 'demo-checking-001'; // Income goes to checking
-  } else if (['groceries', 'restaurants', 'shopping', 'entertainment'].includes(selectedCategory)) {
+  } else if (['groceries', 'restaurants', 'shopping', 'entertainment'].includes(selectedType.category)) {
     // Mix of checking and credit card for daily expenses
     accountId = Math.random() > 0.4 ? 'demo-credit-001' : 'demo-checking-001';
-  } else if (selectedCategory === 'gas') {
+  } else if (selectedType.category === 'gas') {
     accountId = 'demo-credit-001'; // Gas usually on credit card
   } else {
     accountId = 'demo-checking-001'; // Utilities, insurance, etc. from checking
   }
 
   // Select random merchant from category
-  const merchantList = merchants[selectedCategory];
+  const merchantList = merchants[selectedType.category];
   const merchant = merchantList[Math.floor(Math.random() * merchantList.length)];
 
   // Add time to date
   const transactionDate = new Date(date);
   transactionDate.setHours(Math.floor(Math.random() * 24), Math.floor(Math.random() * 60));
 
+  // YNAB milliunits (multiply dollar amount by 1000)
+  const ynabAmount = (selectedType.category === 'income' ? amount : -amount) * 1000;
+
   return {
     id: `demo-transaction-${id}`,
     account_id: accountId,
-    amount: selectedCategory === 'income' ? amount : -amount, // Income positive, expenses negative
+    amount: ynabAmount, // YNAB uses milliunits
     date: transactionDate.toISOString().split('T')[0],
     datetime: transactionDate.toISOString(),
     name: merchant,
     merchant_name: merchant,
-    category: [selectedCategory === 'income' ? 'Payroll' : selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)],
-    subcategory: selectedCategory === 'income' ? 'Payroll' : 'General',
+    payee_name: merchant, // Essential for YNAB processing
+    category_id: selectedType.categoryId, // Map to YNAB category structure
+    category_name: selectedType.category.charAt(0).toUpperCase() + selectedType.category.slice(1),
+    category: [selectedType.category === 'income' ? 'Payroll' : selectedType.category.charAt(0).toUpperCase() + selectedType.category.slice(1)],
+    subcategory: selectedType.category === 'income' ? 'Payroll' : 'General',
     authorized_date: transactionDate.toISOString().split('T')[0],
     pending: Math.random() < 0.05, // 5% chance of pending
     iso_currency_code: 'USD',
-    account_owner: null
+    account_owner: null,
+    transfer_account_id: null // Not a transfer
   };
 };
 
@@ -275,14 +282,95 @@ export const mockYNABData = {
       }
     }
   ],
-  categories: [
-    { id: 'cat-001', name: 'Groceries', category_group_id: 'group-001', budgeted: 50000, activity: -45000, balance: 5000 },
-    { id: 'cat-002', name: 'Restaurants', category_group_id: 'group-001', budgeted: 25000, activity: -28000, balance: -3000 },
-    { id: 'cat-003', name: 'Gas', category_group_id: 'group-002', budgeted: 20000, activity: -18000, balance: 2000 },
-    { id: 'cat-004', name: 'Entertainment', category_group_id: 'group-003', budgeted: 15000, activity: -12000, balance: 3000 }
-  ],
-  isConnected: false, // Default to not connected in demo mode
-  error: null
+  accounts: mockAccounts,
+  transactions: mockTransactions,
+  categories: {
+    category_groups: [
+      {
+        id: 'group-income',
+        name: 'Income Sources',
+        categories: [
+          { id: 'cat-salary', name: 'Salary' },
+          { id: 'cat-freelance', name: 'Freelance' },
+          { id: 'cat-investment', name: 'Investment Income' },
+          { id: 'cat-other-income', name: 'Other Income' }
+        ]
+      },
+      {
+        id: 'group-food',
+        name: 'Food & Dining',
+        categories: [
+          { id: 'cat-groceries', name: 'Groceries' },
+          { id: 'cat-restaurants', name: 'Restaurants' }
+        ]
+      },
+      {
+        id: 'group-transportation',
+        name: 'Transportation',
+        categories: [
+          { id: 'cat-gas', name: 'Gas & Fuel' },
+          { id: 'cat-parking', name: 'Parking' },
+          { id: 'cat-rideshare', name: 'Rideshare' },
+          { id: 'cat-transit', name: 'Public Transit' }
+        ]
+      },
+      {
+        id: 'group-entertainment',
+        name: 'Entertainment',
+        categories: [
+          { id: 'cat-streaming', name: 'Streaming Services' },
+          { id: 'cat-movies', name: 'Movies & Theater' },
+          { id: 'cat-music', name: 'Music' }
+        ]
+      },
+      {
+        id: 'group-utilities',
+        name: 'Bills & Utilities',
+        categories: [
+          { id: 'cat-electric', name: 'Electricity' },
+          { id: 'cat-internet', name: 'Internet' },
+          { id: 'cat-phone', name: 'Phone' },
+          { id: 'cat-water', name: 'Water' },
+          { id: 'cat-waste', name: 'Waste Management' }
+        ]
+      },
+      {
+        id: 'group-shopping',
+        name: 'Shopping',
+        categories: [
+          { id: 'cat-general-shopping', name: 'General Shopping' },
+          { id: 'cat-electronics', name: 'Electronics' },
+          { id: 'cat-home-improvement', name: 'Home Improvement' },
+          { id: 'cat-clothing', name: 'Clothing' }
+        ]
+      },
+      {
+        id: 'group-healthcare',
+        name: 'Healthcare',
+        categories: [
+          { id: 'cat-medical', name: 'Medical' },
+          { id: 'cat-pharmacy', name: 'Pharmacy' },
+          { id: 'cat-dental', name: 'Dental' }
+        ]
+      },
+      {
+        id: 'group-insurance',
+        name: 'Insurance',
+        categories: [
+          { id: 'cat-auto-insurance', name: 'Auto Insurance' },
+          { id: 'cat-health-insurance', name: 'Health Insurance' },
+          { id: 'cat-home-insurance', name: 'Home Insurance' }
+        ]
+      }
+    ]
+  },
+  months: [],
+  summary: null,
+  isLoading: false,
+  isError: false,
+  error: null,
+  refetch: () => console.log('Demo mode: refetch disabled'),
+  isConnected: false // Default to not connected in demo mode
 };
 
 export default {

@@ -15,7 +15,7 @@ export default function DemoModeIndicator() {
 
   return (
     <div className="flex items-center space-x-2 px-3 py-1.5 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-full">
-      <EyeIcon className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+      <EyeIcon className="w-4 h-4 text-amber-600 dark:text-amber-400 stroke-current" />
       <span className="text-xs font-medium text-amber-700 dark:text-amber-300">
         Demo Mode
       </span>
@@ -36,7 +36,7 @@ export function DemoModeWarning({ message, className = "" }) {
 
   return (
     <div className={`flex items-center space-x-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg ${className}`}>
-      <ExclamationTriangleIcon className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+      <ExclamationTriangleIcon className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 stroke-current" />
       <div>
         <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
           Feature disabled in demo mode

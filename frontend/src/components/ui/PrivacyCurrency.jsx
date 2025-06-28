@@ -7,11 +7,8 @@ const PrivacyCurrency = ({ amount, isPrivacyMode, className = '', prefix = '$', 
   const formattedAmount = formatCurrency(Math.abs(amount || 0), false);
   
   return (
-    <span className={className} {...props}>
-      {prefix}
-      <span className={isPrivacyMode ? 'privacy-blur' : ''}>
-        {formattedAmount}
-      </span>
+    <span className={`${className} ${isPrivacyMode ? 'privacy-blur' : ''}`} {...props}>
+      {prefix}{formattedAmount}
     </span>
   );
 };

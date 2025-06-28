@@ -73,7 +73,7 @@ export default function ManualAccountModal({ user, show, onClose, onAccountAdded
             <h2 className="text-xl font-bold text-gray-900 dark:text-white">Add Manual Account</h2>
             <button
               onClick={handleClose}
-              className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-700 transition-colors"
+              className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-700 transition-colors bg-transparent border-0"
             >
               <XMarkIcon className="h-6 w-6" />
             </button>
@@ -92,7 +92,7 @@ export default function ManualAccountModal({ user, show, onClose, onAccountAdded
               <input
                 type="text"
                 placeholder="e.g., Chase Savings"
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 value={manualForm.name}
                 onChange={e => setManualForm(f => ({ ...f, name: e.target.value }))}
                 disabled={!isFeatureEnabled('create_account')}
@@ -104,7 +104,7 @@ export default function ManualAccountModal({ user, show, onClose, onAccountAdded
                 Account Type
               </label>
               <select
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 value={manualForm.type}
                 onChange={e => setManualForm(f => ({ ...f, type: e.target.value }))}
                 disabled={!isFeatureEnabled('create_account')}
@@ -126,7 +126,7 @@ export default function ManualAccountModal({ user, show, onClose, onAccountAdded
               <input
                 type="text"
                 placeholder="e.g., savings, checking"
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 value={manualForm.subtype}
                 onChange={e => setManualForm(f => ({ ...f, subtype: e.target.value }))}
                 disabled={!isFeatureEnabled('create_account')}
@@ -141,7 +141,7 @@ export default function ManualAccountModal({ user, show, onClose, onAccountAdded
                 type="number"
                 step="any"
                 placeholder="0.00"
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 value={manualForm.balance}
                 onChange={e => setManualForm(f => ({ ...f, balance: e.target.value }))}
                 disabled={!isFeatureEnabled('create_account')}

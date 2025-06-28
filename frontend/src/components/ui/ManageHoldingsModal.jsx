@@ -65,7 +65,7 @@ export default function ManageHoldingsModal({
           </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors bg-transparent border-0"
           >
             <XMarkIcon className="h-5 w-5 text-gray-500 dark:text-gray-400" />
           </button>
@@ -153,7 +153,7 @@ export default function ManageHoldingsModal({
                         <div className="flex justify-end">
                           <button
                             onClick={() => handleRemoveHolding(index)}
-                            className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                            className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors bg-transparent border-0"
                           >
                             <TrashIcon className="h-4 w-4 text-red-500" />
                           </button>

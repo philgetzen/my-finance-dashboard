@@ -38,7 +38,7 @@ export default function DemoModeBanner() {
           {/* Left side - Message */}
           <div className="flex items-center space-x-3 flex-1 mr-4">
             <div className="flex-shrink-0">
-              <SparklesIcon className="h-6 w-6 text-emerald-100" />
+              <SparklesIcon className="h-6 w-6 text-emerald-100 stroke-current" />
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-sm sm:text-base font-medium text-white">
@@ -53,15 +53,15 @@ export default function DemoModeBanner() {
           {/* Center - Features (hidden on mobile) */}
           <div className="hidden lg:flex items-center space-x-6 text-emerald-100 text-sm">
             <div className="flex items-center space-x-1">
-              <CheckIcon className="h-4 w-4" />
+              <CheckIcon className="h-4 w-4 stroke-current" />
               <span>Secure banking</span>
             </div>
             <div className="flex items-center space-x-1">
-              <CheckIcon className="h-4 w-4" />
+              <CheckIcon className="h-4 w-4 stroke-current" />
               <span>Budget tracking</span>
             </div>
             <div className="flex items-center space-x-1">
-              <CheckIcon className="h-4 w-4" />
+              <CheckIcon className="h-4 w-4 stroke-current" />
               <span>Investment insights</span>
             </div>
           </div>
@@ -76,14 +76,14 @@ export default function DemoModeBanner() {
             >
               <span className="hidden sm:inline">Sign Up Now</span>
               <span className="sm:hidden">Sign Up</span>
-              <ArrowRightIcon className="h-4 w-4 ml-1 sm:ml-2" />
+              <ArrowRightIcon className="h-4 w-4 ml-1 sm:ml-2 stroke-current" />
             </Button>
             <button
               onClick={handleDismiss}
-              className="p-1 rounded-lg text-emerald-100 hover:bg-emerald-700 transition-colors"
+              className="p-1 rounded-lg text-emerald-100 hover:bg-emerald-700 transition-colors bg-transparent border-0"
               aria-label="Dismiss banner"
             >
-              <XMarkIcon className="h-5 w-5" />
+              <XMarkIcon className="h-5 w-5 stroke-current" />
             </button>
           </div>
         </div>
@@ -112,7 +112,7 @@ export function CompactDemoModeBanner() {
     <div className="bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-900/20 dark:to-green-900/20 border border-emerald-200 dark:border-emerald-700 rounded-lg p-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3">
-          <SparklesIcon className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+          <SparklesIcon className="h-5 w-5 text-emerald-600 dark:text-emerald-400 stroke-current" />
           <div>
             <p className="text-sm font-medium text-emerald-800 dark:text-emerald-200">
               Enjoying the demo?
