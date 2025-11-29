@@ -2,26 +2,42 @@ import React, { useState } from 'react';
 import { useFinanceData } from '../../contexts/ConsolidatedDataContext';
 import { DemoModeWarning } from './DemoModeIndicator';
 import { useDemoMode } from '../../hooks/useDemoMode';
-import Card from './Card';
-import Button from './Button';
-import { XMarkIcon } from '@heroicons/react/24/outline';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from './dialog';
+import { Button } from './button';
+import { Input } from './input';
+import { Label } from './label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './select';
+import { Alert, AlertDescription } from './alert';
 
 export default function ManualAccountModal({ user, show, onClose, onAccountAdded }) {
   const { createManualAccount } = useFinanceData();
   const { isFeatureEnabled, getDisabledMessage } = useDemoMode();
-  const [manualForm, setManualForm] = useState({ 
-    name: '', 
-    type: 'checking', 
-    subtype: '', 
-    balance: '' 
+  const [manualForm, setManualForm] = useState({
+    name: '',
+    type: 'checking',
+    subtype: '',
+    balance: ''
   });
   const [manualError, setManualError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (isSubmitting) return; // Prevent double submission
-    
+    if (isSubmitting) return;
+
     setManualError('');
     setIsSubmitting(true);
 
@@ -42,8 +58,7 @@ export default function ManualAccountModal({ user, show, onClose, onAccountAdded
         subtype: manualForm.subtype.trim(),
         balance: parseFloat(manualForm.balance) || 0,
       });
-      
-      // Reset form and close modal
+
       setManualForm({ name: '', type: 'checking', subtype: '', balance: '' });
       onClose();
       onAccountAdded?.();
@@ -63,117 +78,105 @@ export default function ManualAccountModal({ user, show, onClose, onAccountAdded
     }
   };
 
-  if (!show) return null;
-
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="w-full max-w-md">
-        <Card>
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Add Manual Account</h2>
-            <button
-              onClick={handleClose}
-              className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-700 transition-colors bg-transparent border-0"
-            >
-              <XMarkIcon className="h-6 w-6" />
-            </button>
+    <Dialog open={show} onOpenChange={(open) => !open && handleClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Add Manual Account</DialogTitle>
+          <DialogDescription>
+            Add a manual account to track balances not connected to YNAB.
+          </DialogDescription>
+        </DialogHeader>
+
+        <DemoModeWarning
+          message={getDisabledMessage('create_account')}
+          className="mb-4"
+        />
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="name">Account Name</Label>
+            <Input
+              id="name"
+              type="text"
+              placeholder="e.g., Chase Savings"
+              value={manualForm.name}
+              onChange={e => setManualForm(f => ({ ...f, name: e.target.value }))}
+              disabled={!isFeatureEnabled('create_account')}
+            />
           </div>
 
-          <DemoModeWarning 
-            message={getDisabledMessage('create_account')}
-            className="mb-4"
-          />
+          <div className="space-y-2">
+            <Label htmlFor="type">Account Type</Label>
+            <Select
+              value={manualForm.type}
+              onValueChange={(value) => setManualForm(f => ({ ...f, type: value }))}
+              disabled={!isFeatureEnabled('create_account')}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select account type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="checking">Checking</SelectItem>
+                <SelectItem value="savings">Savings</SelectItem>
+                <SelectItem value="investment">Investment</SelectItem>
+                <SelectItem value="credit">Credit Card</SelectItem>
+                <SelectItem value="loan">Loan</SelectItem>
+                <SelectItem value="mortgage">Mortgage</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Account Name
-              </label>
-              <input
-                type="text"
-                placeholder="e.g., Chase Savings"
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                value={manualForm.name}
-                onChange={e => setManualForm(f => ({ ...f, name: e.target.value }))}
-                disabled={!isFeatureEnabled('create_account')}
-              />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="subtype">Subtype (Optional)</Label>
+            <Input
+              id="subtype"
+              type="text"
+              placeholder="e.g., savings, checking"
+              value={manualForm.subtype}
+              onChange={e => setManualForm(f => ({ ...f, subtype: e.target.value }))}
+              disabled={!isFeatureEnabled('create_account')}
+            />
+          </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Account Type
-              </label>
-              <select
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                value={manualForm.type}
-                onChange={e => setManualForm(f => ({ ...f, type: e.target.value }))}
-                disabled={!isFeatureEnabled('create_account')}
-              >
-                <option value="checking">Checking</option>
-                <option value="savings">Savings</option>
-                <option value="investment">Investment</option>
-                <option value="credit">Credit Card</option>
-                <option value="loan">Loan</option>
-                <option value="mortgage">Mortgage</option>
-                <option value="other">Other</option>
-              </select>
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="balance">Balance</Label>
+            <Input
+              id="balance"
+              type="number"
+              step="any"
+              placeholder="0.00"
+              value={manualForm.balance}
+              onChange={e => setManualForm(f => ({ ...f, balance: e.target.value }))}
+              disabled={!isFeatureEnabled('create_account')}
+            />
+          </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Subtype (Optional)
-              </label>
-              <input
-                type="text"
-                placeholder="e.g., savings, checking"
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                value={manualForm.subtype}
-                onChange={e => setManualForm(f => ({ ...f, subtype: e.target.value }))}
-                disabled={!isFeatureEnabled('create_account')}
-              />
-            </div>
+          {manualError && (
+            <Alert variant="destructive">
+              <AlertDescription>{manualError}</AlertDescription>
+            </Alert>
+          )}
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Balance
-              </label>
-              <input
-                type="number"
-                step="any"
-                placeholder="0.00"
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                value={manualForm.balance}
-                onChange={e => setManualForm(f => ({ ...f, balance: e.target.value }))}
-                disabled={!isFeatureEnabled('create_account')}
-              />
-            </div>
-
-            {manualError && (
-              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 p-3 rounded-lg text-sm">
-                {manualError}
-              </div>
-            )}
-
-            <div className="flex space-x-3 pt-4">
-              <Button
-                type="submit"
-                disabled={isSubmitting || !isFeatureEnabled('create_account')}
-                className="flex-1"
-              >
-                {isSubmitting ? 'Adding...' : 'Add Account'}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleClose}
-                className="flex-1"
-              >
-                Cancel
-              </Button>
-            </div>
-          </form>
-        </Card>
-      </div>
-    </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleClose}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={isSubmitting || !isFeatureEnabled('create_account')}
+              loading={isSubmitting}
+            >
+              {isSubmitting ? 'Adding...' : 'Add Account'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useFinanceData } from '../../contexts/ConsolidatedDataContext';
-import Button from './Button';
-import { 
-  XMarkIcon, 
-  ArrowRightIcon, 
+import { Button } from './button';
+import {
+  XMarkIcon,
+  ArrowRightIcon,
   SparklesIcon,
   CheckIcon
 } from '@heroicons/react/24/outline';

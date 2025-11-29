@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import Button from './Button';
-import LoadingSpinner from './LoadingSpinner'; // Import LoadingSpinner component
-import { usePlaid } from '../../contexts/PlaidDataContext'; // Use PlaidDataContext for user authentication
+import { Button } from './button';
+import LoadingSpinner from './LoadingSpinner';
+import { usePlaid } from '../../contexts/PlaidDataContext';
 
 const ManualHoldingModal = ({ isOpen, onClose, onHoldingAdded }) => {
   const { user } = usePlaid(); // Get user from PlaidDataContext

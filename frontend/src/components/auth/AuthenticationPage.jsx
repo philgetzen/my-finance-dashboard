@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Card from '../ui/Card';
-import Button from '../ui/Button';
+import { Card } from '../ui/card';
+import { Button } from '../ui/button';
 import YNABConnectionCard from '../ui/YNABConnectionCard';
 import { useFinanceData } from '../../contexts/ConsolidatedDataContext';
 

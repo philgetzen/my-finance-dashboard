@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useFinanceData } from '../../contexts/ConsolidatedDataContext';
-import Button from './Button';
-import { 
-  XMarkIcon, 
-  ArrowRightIcon, 
+import { Button } from './button';
+import {
+  XMarkIcon,
+  ArrowRightIcon,
   SparklesIcon
 } from '@heroicons/react/24/outline';
 

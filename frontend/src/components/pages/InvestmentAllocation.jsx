@@ -3,7 +3,7 @@ import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, BarChart, Ba
 import { useFinanceData, usePrivacy } from '../../contexts/ConsolidatedDataContext';
 import { formatCurrency, formatPercent } from '../../utils/formatters';
 import { getAccountBalance, normalizeYNABAccountType } from '../../utils/ynabHelpers';
-import Button from '../ui/Button';
+import { Button } from '../ui/button';
 import PageTransition from '../ui/PageTransition';
 import AddHoldingModal from '../ui/AddHoldingModal';
 import ManageHoldingsModal from '../ui/ManageHoldingsModal';

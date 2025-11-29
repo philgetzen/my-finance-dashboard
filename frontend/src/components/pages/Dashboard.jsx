@@ -1,15 +1,15 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  PieChart, Pie, Cell, Tooltip, ResponsiveContainer, 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid 
+import {
+  PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid
 } from 'recharts';
 import { useFinanceData, usePrivacy } from '../../contexts/ConsolidatedDataContext';
 import { useDemoMode } from '../../hooks/useDemoMode';
-import Card from '../ui/Card';
-import Button from '../ui/Button';
+import { Card } from '../ui/card';
+import { Button } from '../ui/button';
 import ManualAccountModal from '../ui/ManualAccountModal';
 import YNABConnectionCard from '../ui/YNABConnectionCard';
-import { DashboardSkeleton } from '../ui/Skeleton';
+import { DashboardSkeleton } from '../ui/skeleton';
 import PageTransition from '../ui/PageTransition';
 import YNABConnectionErrorModal from '../ui/YNABConnectionErrorModal';
 import PrivacyCurrency from '../ui/PrivacyCurrency';

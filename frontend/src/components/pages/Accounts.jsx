@@ -3,8 +3,9 @@ import { useFinanceData, usePrivacy } from '../../contexts/ConsolidatedDataConte
 import { useAccountManager } from '../../hooks/useAccountManager';
 import { useDemoMode } from '../../hooks/useDemoMode';
 import PageTransition from '../ui/PageTransition';
-import Card from '../ui/Card';
-import Button from '../ui/Button';
+import { Card } from '../ui/card';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
 import ManualAccountModal from '../ui/ManualAccountModal';
 import EditManualAccountModal from '../ui/EditManualAccountModal';
 import PrivacyCurrency from '../ui/PrivacyCurrency';

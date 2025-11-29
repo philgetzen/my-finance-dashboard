@@ -1,8 +1,18 @@
 import React, { useState, useRef } from 'react';
-import Button from './Button';
-import { 
-  XMarkIcon, 
-  PlusIcon, 
+import { Button } from './button';
+import { Input } from './input';
+import { Label } from './label';
+import { Alert, AlertDescription } from './alert';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from './dialog';
+import {
+  PlusIcon,
   TrashIcon,
   DocumentArrowUpIcon,
   InformationCircleIcon
@@ -38,23 +48,23 @@ export default function AddHoldingModal({ show, onClose, onAddHoldings }) {
     if (!file) return;
 
     setUploadError('');
-    
+
     try {
       const text = await file.text();
       const lines = text.split('\n').filter(line => line.trim());
-      
+
       // Parse CSV (expecting headers: ticker,shares,price,account)
       const headers = lines[0].toLowerCase().split(',').map(h => h.trim());
       const tickerIndex = headers.findIndex(h => h.includes('ticker') || h.includes('symbol'));
       const sharesIndex = headers.findIndex(h => h.includes('shares') || h.includes('quantity'));
       const priceIndex = headers.findIndex(h => h.includes('price') || h.includes('cost'));
       const accountIndex = headers.findIndex(h => h.includes('account'));
-      
+
       if (tickerIndex === -1 || sharesIndex === -1) {
         setUploadError('CSV must contain ticker/symbol and shares/quantity columns');
         return;
       }
-      
+
       const parsedHoldings = [];
       for (let i = 1; i < lines.length; i++) {
         const values = lines[i].split(',').map(v => v.trim());
@@ -67,7 +77,7 @@ export default function AddHoldingModal({ show, onClose, onAddHoldings }) {
           });
         }
       }
-      
+
       if (parsedHoldings.length > 0) {
         setHoldings(parsedHoldings);
       } else {
@@ -82,146 +92,133 @@ export default function AddHoldingModal({ show, onClose, onAddHoldings }) {
   const handleSubmit = () => {
     // Filter out empty rows and validate
     const validHoldings = holdings.filter(h => h.ticker && h.shares);
-    
+
     if (validHoldings.length === 0) {
       setUploadError('Please add at least one holding with ticker and shares');
       return;
     }
-    
+
     // Convert shares and price to numbers
     const processedHoldings = validHoldings.map(h => ({
       ...h,
       shares: parseFloat(h.shares) || 0,
       price: h.price ? parseFloat(h.price) : null
     }));
-    
+
     onAddHoldings(processedHoldings);
     onClose();
   };
 
-  if (!show) return null;
-
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh]">
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Add Investment Holdings
-          </h3>
-          <button
-            onClick={onClose}
-            className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors bg-transparent border-0"
-          >
-            <XMarkIcon className="h-5 w-5 text-gray-500" />
-          </button>
-        </div>
+    <Dialog open={show} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogHeader>
+          <DialogTitle>Add Investment Holdings</DialogTitle>
+          <DialogDescription>
+            Add holdings manually or upload a CSV file.
+          </DialogDescription>
+        </DialogHeader>
 
-        {/* Body */}
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+        <div className="overflow-y-auto flex-1 pr-2">
           {/* CSV Upload Section */}
-          <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-            <div className="flex items-start gap-3">
-              <InformationCircleIcon className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <p className="text-sm text-blue-800 dark:text-blue-200 font-medium mb-2">
-                  Upload CSV File
-                </p>
-                <p className="text-xs text-blue-700 dark:text-blue-300 mb-3">
-                  CSV should contain columns: ticker/symbol, shares/quantity, price (optional), account (optional)
-                </p>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".csv"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                />
-                <Button
-                  onClick={() => fileInputRef.current?.click()}
-                  variant="outline"
-                  size="sm"
-                  className="flex items-center gap-2"
-                >
-                  <DocumentArrowUpIcon className="h-4 w-4" />
-                  Choose CSV File
-                </Button>
-              </div>
-            </div>
-          </div>
+          <Alert variant="info" className="mb-4">
+            <InformationCircleIcon className="h-4 w-4" />
+            <AlertDescription>
+              <p className="font-medium mb-1">Upload CSV File</p>
+              <p className="text-xs mb-3">
+                CSV should contain columns: ticker/symbol, shares/quantity, price (optional), account (optional)
+              </p>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+              <Button
+                onClick={() => fileInputRef.current?.click()}
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2"
+              >
+                <DocumentArrowUpIcon className="h-4 w-4" />
+                Choose CSV File
+              </Button>
+            </AlertDescription>
+          </Alert>
 
           {uploadError && (
-            <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
-              <p className="text-sm text-red-700 dark:text-red-300">{uploadError}</p>
-            </div>
+            <Alert variant="destructive" className="mb-4">
+              <AlertDescription>{uploadError}</AlertDescription>
+            </Alert>
           )}
 
           {/* Manual Entry Table */}
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-gray-200 dark:border-gray-700">
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                <tr className="border-b border-border">
+                  <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground uppercase">
                     Ticker *
                   </th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground uppercase">
                     Shares *
                   </th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground uppercase">
                     Price
                   </th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground uppercase">
                     Account
                   </th>
                   <th className="px-3 py-2 w-10"></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+              <tbody className="divide-y divide-border">
                 {holdings.map((holding, index) => (
                   <tr key={index}>
                     <td className="px-3 py-2">
-                      <input
+                      <Input
                         type="text"
                         value={holding.ticker}
                         onChange={(e) => updateHolding(index, 'ticker', e.target.value.toUpperCase())}
                         placeholder="AAPL"
-                        className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                        className="h-8"
                       />
                     </td>
                     <td className="px-3 py-2">
-                      <input
+                      <Input
                         type="number"
                         value={holding.shares}
                         onChange={(e) => updateHolding(index, 'shares', e.target.value)}
                         placeholder="100"
                         step="0.001"
-                        className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                        className="h-8"
                       />
                     </td>
                     <td className="px-3 py-2">
-                      <input
+                      <Input
                         type="number"
                         value={holding.price}
                         onChange={(e) => updateHolding(index, 'price', e.target.value)}
                         placeholder="150.00"
                         step="0.01"
-                        className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                        className="h-8"
                       />
                     </td>
                     <td className="px-3 py-2">
-                      <input
+                      <Input
                         type="text"
                         value={holding.account}
                         onChange={(e) => updateHolding(index, 'account', e.target.value)}
                         placeholder="Brokerage"
-                        className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                        className="h-8"
                       />
                     </td>
                     <td className="px-3 py-2">
                       {holdings.length > 1 && (
                         <button
                           onClick={() => removeHolding(index)}
-                          className="p-1 text-gray-400 hover:text-red-600 transition-colors bg-transparent border-0"
+                          className="p-1 text-muted-foreground hover:text-destructive transition-colors bg-transparent border-0"
                         >
                           <TrashIcon className="h-4 w-4" />
                         </button>
@@ -247,22 +244,15 @@ export default function AddHoldingModal({ show, onClose, onAddHoldings }) {
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3">
-          <Button
-            onClick={onClose}
-            variant="outline"
-          >
+        <DialogFooter className="gap-2 sm:gap-0 mt-4">
+          <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button
-            onClick={handleSubmit}
-            variant="primary"
-          >
+          <Button onClick={handleSubmit}>
             Add Holdings
           </Button>
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import { auth } from '../../firebase';
 import { usePrivacy, useFinanceData } from '../../contexts/ConsolidatedDataContext';
-import Button from '../ui/Button';
+import { Button } from '../ui/button';
 import DemoModeIndicator from '../ui/DemoModeIndicator';
 import DemoModeFloatingModule from '../ui/DemoModeFloatingModule';
 import {

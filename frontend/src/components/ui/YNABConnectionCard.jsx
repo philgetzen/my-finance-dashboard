@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { useFinanceData } from '../../contexts/ConsolidatedDataContext';
 import { useDemoMode } from '../../hooks/useDemoMode';
 import { DemoModeWarning } from './DemoModeIndicator';
-import Button from './Button';
+import { Button } from './button';
+import { Alert, AlertDescription } from './alert';
 import {
   CheckCircleIcon,
   LinkIcon,

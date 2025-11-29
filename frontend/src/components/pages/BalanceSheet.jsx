@@ -3,7 +3,7 @@ import { useFinanceData } from '../../contexts/ConsolidatedDataContext';
 import { usePrivacy } from '../../contexts/ConsolidatedDataContext';
 import PageTransition from '../ui/PageTransition';
 import LoadingSpinner from '../ui/LoadingSpinner';
-import Card from '../ui/Card';
+import { Card } from '../ui/card';
 import { normalizeYNABAccountType } from '../../utils/ynabHelpers';
 import { formatCurrency } from '../../utils/formatters';
 import { useCategoryProcessor } from '../../hooks/useCategoryProcessor';
