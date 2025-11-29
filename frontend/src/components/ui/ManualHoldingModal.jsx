@@ -1,5 +1,16 @@
 import React, { useState } from 'react';
 import { Button } from './button';
+import { Input } from './input';
+import { Label } from './label';
+import { Alert, AlertDescription } from './alert';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from './dialog';
 import LoadingSpinner from './LoadingSpinner';
 import { usePlaid } from '../../contexts/PlaidDataContext';
 
@@ -76,52 +87,109 @@ const ManualHoldingModal = ({ isOpen, onClose, onHoldingAdded }) => {
     onClose();
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex justify-center items-center">
-      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-md">
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Add Manual Holding</h2>
-        {error && <p className="text-red-500 text-sm mb-3">{error}</p>}
+    <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Add Manual Holding</DialogTitle>
+          <DialogDescription>
+            Add a new investment holding to track manually.
+          </DialogDescription>
+        </DialogHeader>
+
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label htmlFor="ticker" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Ticker Symbol*</label>
-            <input type="text" id="ticker" value={ticker} onChange={(e) => setTicker(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white" />
+          <div className="space-y-2">
+            <Label htmlFor="ticker">Ticker Symbol *</Label>
+            <Input
+              type="text"
+              id="ticker"
+              value={ticker}
+              onChange={(e) => setTicker(e.target.value)}
+              required
+              placeholder="e.g. AAPL"
+            />
           </div>
-          <div>
-            <label htmlFor="description" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Description*</label>
-            <input type="text" id="description" value={description} onChange={(e) => setDescription(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white" />
+
+          <div className="space-y-2">
+            <Label htmlFor="description">Description *</Label>
+            <Input
+              type="text"
+              id="description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              required
+              placeholder="e.g. Apple Inc."
+            />
           </div>
-          <div>
-            <label htmlFor="accountNumber" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Account Number (Optional)</label>
-            <input type="text" id="accountNumber" value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white" />
+
+          <div className="space-y-2">
+            <Label htmlFor="accountNumber">Account Number (Optional)</Label>
+            <Input
+              type="text"
+              id="accountNumber"
+              value={accountNumber}
+              onChange={(e) => setAccountNumber(e.target.value)}
+              placeholder="e.g. 123456789"
+            />
           </div>
+
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="quantity" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Quantity*</label>
-              <input type="number" step="any" id="quantity" value={quantity} onChange={(e) => setQuantity(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white" />
+            <div className="space-y-2">
+              <Label htmlFor="quantity">Quantity *</Label>
+              <Input
+                type="number"
+                step="any"
+                id="quantity"
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+                required
+                placeholder="100"
+              />
             </div>
-            <div>
-              <label htmlFor="price" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Price per Share*</label>
-              <input type="number" step="any" id="price" value={price} onChange={(e) => setPrice(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white" />
+            <div className="space-y-2">
+              <Label htmlFor="price">Price per Share *</Label>
+              <Input
+                type="number"
+                step="any"
+                id="price"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                required
+                placeholder="150.00"
+              />
             </div>
           </div>
-          <div>
-            <label htmlFor="costBasis" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Total Cost Basis (Optional)</label>
-            <input type="number" step="any" id="costBasis" value={costBasis} onChange={(e) => setCostBasis(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white" />
+
+          <div className="space-y-2">
+            <Label htmlFor="costBasis">Total Cost Basis (Optional)</Label>
+            <Input
+              type="number"
+              step="any"
+              id="costBasis"
+              value={costBasis}
+              onChange={(e) => setCostBasis(e.target.value)}
+              placeholder="15000.00"
+            />
           </div>
-          <div className="flex justify-end space-x-3 pt-2">
+
+          <DialogFooter className="gap-2 sm:gap-0">
             <Button type="button" variant="outline" onClick={handleClose} disabled={isSubmitting}>
               Cancel
             </Button>
-            <Button type="submit" variant="primary" disabled={isSubmitting}>
+            <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? <LoadingSpinner size="xs" className="mr-2"/> : null}
               Add Holding
             </Button>
-          </div>
+          </DialogFooter>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };
 
