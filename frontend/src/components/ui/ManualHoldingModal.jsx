@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import Button from './Button';
 import LoadingSpinner from './LoadingSpinner'; // Import LoadingSpinner component
-import { usePlaid } from '../../contexts/PlaidDataContext'; // Use PlaidDataContext for user authentication
+import { useFinanceData } from '../../contexts/ConsolidatedDataContext';
 
 const ManualHoldingModal = ({ isOpen, onClose, onHoldingAdded }) => {
-  const { user } = usePlaid(); // Get user from PlaidDataContext
+  const { user } = useFinanceData();
   const [ticker, setTicker] = useState('');
   const [description, setDescription] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
@@ -41,12 +41,12 @@ const ManualHoldingModal = ({ isOpen, onClose, onHoldingAdded }) => {
     };
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/manual-holdings`, {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/manual_holdings`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ user_id: user.uid, holdingData }),
+        body: JSON.stringify({ user_id: user.uid, holding: holdingData }),
       });
 
       const result = await response.json();

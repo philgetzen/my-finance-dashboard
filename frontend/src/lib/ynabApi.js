@@ -3,7 +3,8 @@
 class YNABService {
   constructor() {
     this.accessToken = null;
-    this.apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001';
+    // Use empty string for same-domain in production, localhost for development
+    this.apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5001';
   }
 
   init(accessToken) {

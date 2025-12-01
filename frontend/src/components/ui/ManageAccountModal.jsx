@@ -15,10 +15,10 @@ export default function ManageAccountModal({ account, show, onClose, onRemove, i
 
   const getAccountSource = () => {
     switch (account.sourceType) {
-      case 'plaid':
-        return 'Plaid Connected';
       case 'ynab':
         return 'YNAB Synced';
+      case 'manual':
+        return 'Manual Account';
       default:
         return 'Unknown';
     }
@@ -52,22 +52,6 @@ export default function ManageAccountModal({ account, show, onClose, onRemove, i
         </div>
 
         <div className="space-y-4">
-          {account.sourceType === 'plaid' && (
-            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-              <div className="flex items-start">
-                <ExclamationTriangleIcon className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mt-0.5 mr-2 flex-shrink-0" />
-                <div>
-                  <p className="text-sm text-yellow-800 dark:text-yellow-200 font-medium">
-                    Disconnect Plaid Account
-                  </p>
-                  <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
-                    This will remove the connection to your bank account. You can reconnect it later by adding a new bank account.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
           {account.sourceType === 'ynab' && (
             <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
               <div className="flex items-start">
@@ -84,6 +68,22 @@ export default function ManageAccountModal({ account, show, onClose, onRemove, i
             </div>
           )}
 
+          {account.sourceType === 'manual' && (
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+              <div className="flex items-start">
+                <ExclamationTriangleIcon className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mt-0.5 mr-2 flex-shrink-0" />
+                <div>
+                  <p className="text-sm text-yellow-800 dark:text-yellow-200 font-medium">
+                    Delete Manual Account
+                  </p>
+                  <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+                    This will permanently remove this manual account and all associated data.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="flex gap-3 pt-4">
             <Button
               variant="outline"
@@ -92,8 +92,8 @@ export default function ManageAccountModal({ account, show, onClose, onRemove, i
             >
               Cancel
             </Button>
-            
-            {account.sourceType === 'plaid' && (
+
+            {account.sourceType === 'manual' && (
               <Button
                 variant="destructive"
                 onClick={handleRemove}
@@ -101,7 +101,7 @@ export default function ManageAccountModal({ account, show, onClose, onRemove, i
                 className="flex-1 flex items-center justify-center gap-2"
               >
                 <TrashIcon className="h-4 w-4" />
-                {isLoading ? 'Disconnecting...' : 'Disconnect'}
+                {isLoading ? 'Deleting...' : 'Delete'}
               </Button>
             )}
           </div>

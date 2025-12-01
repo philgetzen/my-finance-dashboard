@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase'; // Assuming db is exported from your firebase setup
-import { usePlaid } from '../contexts/PlaidDataContext'; // Use PlaidDataContext for user authentication
+import { useFinanceData } from '../contexts/ConsolidatedDataContext';
 
 const useInvestmentHoldings = () => {
-  const { user } = usePlaid(); // Get user from PlaidDataContext
+  const { user } = useFinanceData();
   const [holdings, setHoldings] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
