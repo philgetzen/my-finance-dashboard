@@ -1,5 +1,5 @@
-const { handleCors } = require('../../../_lib/cors');
-const { YNAB_CONFIG } = require('../../../_lib/ynab');
+const { handleCors } = require('../../_lib/cors');
+const { YNAB_CONFIG } = require('../../_lib/ynab');
 const axios = require('axios');
 
 async function handler(req, res) {
@@ -7,7 +7,17 @@ async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { budgetId, resource, since_date } = req.query;
+  // Extract path segments from the catch-all route
+  const { path, since_date } = req.query;
+
+  // path can be a string or array depending on how many segments
+  const pathSegments = Array.isArray(path) ? path : [path];
+
+  if (pathSegments.length !== 2) {
+    return res.status(400).json({ error: 'Invalid path format. Expected: /budgets/{budgetId}/{resource}' });
+  }
+
+  const [budgetId, resource] = pathSegments;
   const authHeader = req.headers.authorization;
 
   if (!authHeader) {
