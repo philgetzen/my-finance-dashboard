@@ -24,6 +24,7 @@ app.use(cors({
     const allowedOrigins = [
       'http://localhost:3000',
       'http://localhost:5173',
+      'http://localhost:5174',
       'https://serene-kelpie-1319e6.netlify.app',
       'https://ynabwealthdashboard.netlify.app',
       'https://my-finance-dashboard.onrender.com'
@@ -49,6 +50,7 @@ app.use((req, res, next) => {
     const allowedOrigins = [
       'http://localhost:3000',
       'http://localhost:5173',
+      'http://localhost:5174',
       'https://serene-kelpie-1319e6.netlify.app',
       'https://ynabwealthdashboard.netlify.app',
       'https://my-finance-dashboard.onrender.com'

@@ -30,11 +30,12 @@ export default function YNABCallback() {
       
       if (window.opener) {
         console.log('Sending error message to parent window');
+        // Use '*' for localhost development where ports may differ
         window.opener.postMessage({
           type: 'ynab-auth-error',
           error: error,
           description: errorDescription
-        }, window.location.origin);
+        }, '*');
       }
       
       console.log('Closing callback window due to error');
@@ -48,10 +49,11 @@ export default function YNABCallback() {
       // Send the code back to the parent window
       if (window.opener) {
         console.log('Posting success message to parent');
+        // Use '*' for localhost development where ports may differ
         window.opener.postMessage({
           type: 'ynab-auth-success',
           code: code
-        }, window.location.origin);
+        }, '*');
         
         console.log('Closing callback window after successful auth');
         window.close();
@@ -71,11 +73,12 @@ export default function YNABCallback() {
       
       if (window.opener) {
         console.log('Sending no-code error to parent window');
+        // Use '*' for localhost development where ports may differ
         window.opener.postMessage({
           type: 'ynab-auth-error',
           error: 'no_code',
           description: 'No authorization code received from YNAB'
-        }, window.location.origin);
+        }, '*');
       }
       
       console.log('Closing callback window due to missing code');

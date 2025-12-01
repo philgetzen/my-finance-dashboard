@@ -27,12 +27,23 @@ export const getDisplayAccountType = (type) => {
   return displayMap[mapAccountType(type)] || (type ? type.charAt(0).toUpperCase() + type.slice(1) : 'Other');
 };
 
+// Check if a number is effectively zero (rounds to 0.00)
+export const isEffectivelyZero = (amount) => {
+  return Math.abs(amount || 0) < 0.005;
+};
+
+// Normalize amount - converts -0.00 cases to actual 0
+export const normalizeAmount = (amount) => {
+  if (isEffectivelyZero(amount)) return 0;
+  return amount;
+};
+
 // Currency formatting - privacy handled via CSS blur, not text conversion
 export const formatCurrency = (amount, isPrivacyMode = false) => {
   // Always format numbers normally - privacy is handled via CSS blur effects
-  return Math.abs(amount || 0).toLocaleString('en-US', { 
-    minimumFractionDigits: 2, 
-    maximumFractionDigits: 2 
+  return Math.abs(amount || 0).toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
   });
 };
 

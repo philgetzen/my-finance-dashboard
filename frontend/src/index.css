@@ -4,16 +4,32 @@
 @tailwind utilities;
 
 :root {
-  --color-primary: #3ecf8e;
-  --color-primary-dark: #2ea06b;
-  --color-primary-light: #b6f5d8;
-  --color-bg: #f7faf9;
+  --color-primary: #7C3AED;
+  --color-primary-dark: #6D28D9;
+  --color-primary-light: #A78BFA;
+  --color-bg: #F9FAFB;
   --color-surface: #ffffff;
-  --color-surface-alt: #eafaf3;
-  --color-border: #e0e7ef;
-  --color-text: #1a2e22;
-  --color-muted: #7b8a8e;
-  --color-danger: #ff5a5f;
+  --color-surface-alt: #F3F4F6;
+  --color-border: #E5E7EB;
+  --color-text: #1F2937;
+  --color-muted: #6B7280;
+  --color-danger: #EF4444;
+
+  /* Mixpanel-inspired accents */
+  --accent-purple: #7C3AED;
+  --accent-purple-light: #A78BFA;
+  --accent-purple-subtle: #EDE9FE;
+  --accent-orange: #F97316;
+  --accent-orange-light: #FB923C;
+
+  /* Sidebar dark theme */
+  --sidebar-bg: #1B1F23;
+  --sidebar-text: #E5E7EB;
+  --sidebar-text-muted: #9CA3AF;
+  --sidebar-hover: rgba(255, 255, 255, 0.08);
+  --sidebar-active: rgba(124, 58, 237, 0.2);
+  --sidebar-active-border: #7C3AED;
+  --sidebar-border: #2D3339;
   font-family: 'SF Pro', 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
@@ -89,23 +105,15 @@ h1 {
   line-height: 1.1;
 }
 
+/* Button base styles - background handled by Tailwind classes */
 button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
   font-family: inherit;
-  background-color: #1a1a1a;
   cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
 }
 button:focus,
 button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+  outline: 2px solid #8b5cf6;
+  outline-offset: 2px;
 }
 
 @media (prefers-color-scheme: light) {
@@ -115,9 +123,6 @@ button:focus-visible {
   }
   a:hover {
     color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
   }
 }
 
@@ -249,16 +254,19 @@ body.theme-transitioning * {
 }
 
 .dark {
-  --color-bg: #181a1b;
-  --color-surface: #23272b;
-  --color-surface-alt: #23272b;
-  --color-border: #2d3237;
-  --color-text: #f3f4f6;
-  --color-muted: #a1a1aa;
-  --color-primary: #3ecf8e;
-  --color-primary-dark: #2ea06b;
-  --color-primary-light: #1a4736;
-  --color-danger: #ff5a5f;
+  --color-bg: #0F1114;
+  --color-surface: #1A1D21;
+  --color-surface-alt: #1A1D21;
+  --color-border: #2D3339;
+  --color-text: #F9FAFB;
+  --color-muted: #9CA3AF;
+  --color-primary: #A78BFA;
+  --color-primary-dark: #8B5CF6;
+  --color-primary-light: #C4B5FD;
+  --color-danger: #F87171;
+
+  /* Sidebar stays same in dark mode */
+  --sidebar-bg: #0F1114;
 }
 
 /* Ensure focus rings are never clipped */

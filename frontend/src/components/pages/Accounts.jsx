@@ -8,6 +8,7 @@ import Button from '../ui/Button';
 import ManualAccountModal from '../ui/ManualAccountModal';
 import EditManualAccountModal from '../ui/EditManualAccountModal';
 import PrivacyCurrency from '../ui/PrivacyCurrency';
+import { isEffectivelyZero } from '../../utils/formatters';
 import {
   BanknotesIcon,
   PlusIcon,
@@ -23,9 +24,10 @@ const AccountRow = React.memo(({ account, onEdit, onDelete, privacyMode }) => {
   const isLiability = ['Credit Card', 'Loan', 'Mortgage'].includes(account.displayType);
   const balance = account.balance;
   const isClosed = !!account.closed_on;
+  const isZero = isEffectivelyZero(balance);
 
   return (
-    <tr className={`hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors ${
+    <tr className={`group hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors ${
       isClosed ? 'opacity-60' : ''
     }`}>
       <td className="px-4 py-3 text-sm">
@@ -38,37 +40,41 @@ const AccountRow = React.memo(({ account, onEdit, onDelete, privacyMode }) => {
               Closed
             </span>
           )}
+          {/* Actions - show on hover for manual accounts */}
+          {account.source === 'manual' && !isClosed && (
+            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button
+                onClick={() => onEdit(account)}
+                className="p-1 text-gray-400 hover:text-gray-700 dark:text-gray-500 dark:hover:text-gray-300 transition-colors rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-transparent border-0"
+              >
+                <PencilIcon className="h-3.5 w-3.5 stroke-current" />
+              </button>
+              <button
+                onClick={() => onDelete(account)}
+                className="p-1 text-gray-400 hover:text-red-600 dark:text-gray-500 dark:hover:text-red-400 transition-colors rounded focus:outline-none focus:ring-2 focus:ring-red-500 bg-transparent border-0"
+              >
+                <TrashIcon className="h-3.5 w-3.5 stroke-current" />
+              </button>
+            </div>
+          )}
         </div>
       </td>
       <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
-        {account.displayType}
+        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+          account.source === 'ynab'
+            ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400'
+            : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+        }`}>
+          {account.source === 'ynab' ? 'YNAB' : 'Manual'}
+        </span>
       </td>
-      <td className={`px-4 py-3 text-sm font-medium text-right ${
-        isLiability ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
-      }`}>
+      <td className="px-4 py-3 text-sm font-medium text-right">
         <PrivacyCurrency
           amount={balance}
           isPrivacyMode={privacyMode}
-          prefix={isLiability ? '-$' : '$'}
+          prefix={isZero ? '$' : (isLiability ? '-$' : '$')}
+          className={isZero ? '' : (isLiability ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400')}
         />
-      </td>
-      <td className="px-4 py-3 text-right">
-        {account.source === 'manual' && !isClosed && (
-          <div className="flex gap-1 justify-end pr-1">
-            <button
-              onClick={() => onEdit(account)}
-              className="p-1.5 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-colors rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-800 bg-transparent border-0"
-            >
-              <PencilIcon className="h-4 w-4 stroke-current" />
-            </button>
-            <button
-              onClick={() => onDelete(account)}
-              className="p-1.5 text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 transition-colors rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-800 bg-transparent border-0"
-            >
-              <TrashIcon className="h-4 w-4 stroke-current" />
-            </button>
-          </div>
-        )}
       </td>
     </tr>
   );
@@ -121,11 +127,35 @@ export default function Accounts() {
     return { active, closed };
   }, [allAccounts, filterAccounts, sortAccounts, filters, sortBy]);
 
-  // Split active accounts by source
-  const { ynabActive, manualActive } = useMemo(() => {
-    const ynab = displayAccounts.active.filter(acc => acc.source === 'ynab');
-    const manual = displayAccounts.active.filter(acc => acc.source === 'manual');
-    return { ynabActive: ynab, manualActive: manual };
+  // Group accounts by type (user mental model)
+  const accountsByType = useMemo(() => {
+    const groups = {};
+
+    displayAccounts.active.forEach(account => {
+      const type = account.displayType || 'Other';
+      if (!groups[type]) {
+        groups[type] = {
+          accounts: [],
+          total: 0,
+          isLiability: ['Credit Card', 'Loan', 'Mortgage'].includes(type)
+        };
+      }
+      groups[type].accounts.push(account);
+      groups[type].total += account.balance || 0;
+    });
+
+    // Sort groups: Assets first, then Liabilities, alphabetically within each
+    const sortedTypes = Object.keys(groups).sort((a, b) => {
+      const aIsLiab = groups[a].isLiability;
+      const bIsLiab = groups[b].isLiability;
+      if (aIsLiab !== bIsLiab) return aIsLiab ? 1 : -1;
+      return a.localeCompare(b);
+    });
+
+    return sortedTypes.map(type => ({
+      type,
+      ...groups[type]
+    }));
   }, [displayAccounts.active]);
 
   // Account actions
@@ -166,7 +196,7 @@ export default function Accounts() {
     <PageTransition>
       <div className="w-full max-w-none space-y-6 pb-4">
         {/* Header */}
-        <Card className="glass-hero p-6">
+        <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white text-left">Accounts</h1>
@@ -220,7 +250,7 @@ export default function Accounts() {
         </Card>
 
         {/* Filters */}
-        <Card className="glass-card p-4">
+        <Card className="p-4">
           <div className="flex flex-wrap gap-4 items-center">
             {/* Search */}
             <div className="flex-1 min-w-[200px]">
@@ -231,7 +261,7 @@ export default function Accounts() {
                   placeholder="Search accounts..."
                   value={filters.search}
                   onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
-                  className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                  className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white bg-white dark:bg-[#23272b] focus:ring-2 focus:ring-blue-500"
                 />
               </div>
             </div>
@@ -242,7 +272,7 @@ export default function Accounts() {
               <select
                 value={filters.type}
                 onChange={(e) => setFilters(prev => ({ ...prev, type: e.target.value }))}
-                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white bg-white dark:bg-[#23272b] focus:ring-2 focus:ring-blue-500"
               >
                 <option value="all">All Types</option>
                 {accountTypes.map(type => (
@@ -257,7 +287,7 @@ export default function Accounts() {
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
-                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white bg-white dark:bg-[#23272b] focus:ring-2 focus:ring-blue-500"
               >
                 <option value="institution">By Institution</option>
                 <option value="balance">By Balance</option>
@@ -289,37 +319,51 @@ export default function Accounts() {
           </div>
         </Card>
 
-        {/* Account tables */}
+        {/* Account tables - grouped by type */}
         <div className="space-y-6">
-          {/* YNAB Active Accounts */}
-          {ynabActive.length > 0 && (
-            <Card className="glass-card p-0">
-              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white text-left">
-                  YNAB Accounts
-                </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 text-left">
-                  Connected through YNAB
-                </p>
+          {/* Accounts by Type */}
+          {accountsByType.map(group => (
+            <Card key={group.type} className="p-0" padding={false}>
+              <div className="px-4 py-4 border-b border-gray-200 dark:border-gray-700">
+                <div className="flex items-center justify-between">
+                  <div className="pl-2">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white text-left">
+                      {group.type}
+                    </h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 text-left">
+                      {group.accounts.length} account{group.accounts.length !== 1 ? 's' : ''}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Total</p>
+                    <PrivacyCurrency
+                      amount={Math.abs(group.total)}
+                      isPrivacyMode={privacyMode}
+                      prefix={group.isLiability ? '-$' : '$'}
+                      className={`text-lg font-bold ${
+                        group.isLiability ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
+                      }`}
+                    />
+                  </div>
+                </div>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-gray-50 dark:bg-gray-800">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase w-[60%]">
                         Account Name
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                        Type
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase w-[20%]">
+                        Source
                       </th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase w-[20%]">
                         Balance
                       </th>
-                      <th className="px-4 py-3 w-28"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                    {ynabActive.map(account => (
+                    {group.accounts.map(account => (
                       <AccountRow
                         key={account.id || account.account_id}
                         account={account}
@@ -332,54 +376,11 @@ export default function Accounts() {
                 </table>
               </div>
             </Card>
-          )}
-
-          {/* Manual Active Accounts */}
-          {manualActive.length > 0 && (
-            <Card className="glass-card p-0">
-              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white text-left">
-                  Manual Accounts
-                </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 text-left">
-                  Manually tracked accounts
-                </p>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50 dark:bg-gray-800">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                        Account Name
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                        Type
-                      </th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                        Balance
-                      </th>
-                      <th className="px-4 py-3 w-28"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                    {manualActive.map(account => (
-                      <AccountRow
-                        key={account.id || account.account_id}
-                        account={account}
-                        onEdit={handleEditAccount}
-                        onDelete={handleDeleteAccount}
-                        privacyMode={privacyMode}
-                      />
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
-          )}
+          ))}
 
           {/* Closed Accounts */}
           {displayAccounts.closed.length > 0 && (
-            <Card className="glass-card p-0">
+            <Card className="p-0" padding={false}>
               <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white text-left">
                   Closed Accounts
@@ -392,16 +393,15 @@ export default function Accounts() {
                 <table className="w-full">
                   <thead className="bg-gray-50 dark:bg-gray-800">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase w-[60%]">
                         Account Name
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase w-[20%]">
                         Type
                       </th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase w-[20%]">
                         Balance
                       </th>
-                      <th className="px-4 py-3 w-28"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -420,8 +420,8 @@ export default function Accounts() {
             </Card>
           )}
           
-          {(ynabActive.length === 0 && manualActive.length === 0 && displayAccounts.closed.length === 0) && (
-            <Card className="glass-card p-8 text-center">
+          {(accountsByType.length === 0 && displayAccounts.closed.length === 0) && (
+            <Card className="p-8 text-center">
               <BanknotesIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
               <h3 className="text-lg font-medium text-gray-800 dark:text-gray-200">
                 No accounts found

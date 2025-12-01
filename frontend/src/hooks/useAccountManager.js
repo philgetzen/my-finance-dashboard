@@ -1,6 +1,6 @@
 import { useMemo, useCallback } from 'react';
 import { getAccountBalance, normalizeYNABAccountType } from '../utils/ynabHelpers';
-import { getDisplayAccountType } from '../utils/formatters';
+import { getDisplayAccountType, isEffectivelyZero } from '../utils/formatters';
 
 /**
  * Custom hook for managing account data with filtering and sorting
@@ -11,46 +11,52 @@ export function useAccountManager(ynabAccounts = [], manualAccounts = []) {
     const normalizedYnab = ynabAccounts.map(account => {
       const balance = getAccountBalance(account);
       const displayType = getDisplayAccountType(account.type);
-      
-      // Auto-detect closed credit cards and loans with zero balance
-      const isLikelyClosedDebt = ['Credit Card', 'Loan'].includes(displayType) && 
-        Math.abs(balance) < 0.01 && 
-        !account.closed_on;
-      
+
+      // Check if account is explicitly closed (YNAB uses 'closed' boolean)
+      const isExplicitlyClosed = account.closed === true || !!account.closed_on;
+
+      // Auto-detect closed liability accounts with zero balance
+      const isLiabilityType = ['Credit Card', 'Loan', 'Mortgage'].includes(displayType);
+      const isZeroBalance = isEffectivelyZero(balance);
+      const isLikelyClosedDebt = isLiabilityType && isZeroBalance && !isExplicitlyClosed;
+
       return {
         ...account,
         source: 'ynab',
         displayType,
         normalizedType: normalizeYNABAccountType(account.type),
-        balance,
-        institutionName: account.note?.match(/Institution: (.+?)(?:\n|$)/)?.[1] || 
-                         account.name.split(' ')[0] || 
+        balance: isZeroBalance ? 0 : balance, // Normalize zero balances
+        institutionName: account.note?.match(/Institution: (.+?)(?:\n|$)/)?.[1] ||
+                         account.name.split(' ')[0] ||
                          'Unknown Institution',
         // Mark as closed if explicitly closed or likely closed debt
-        closed_on: account.closed_on || (isLikelyClosedDebt ? 'auto-detected' : null)
+        closed_on: isExplicitlyClosed ? (account.closed_on || 'closed') : (isLikelyClosedDebt ? 'auto-detected' : null)
       };
     });
 
     const normalizedManual = manualAccounts.map(account => {
       const balance = getAccountBalance(account);
       const displayType = getDisplayAccountType(account.type);
-      
-      // Auto-detect closed credit cards and loans with zero balance
-      const isLikelyClosedDebt = ['Credit Card', 'Loan'].includes(displayType) && 
-        Math.abs(balance) < 0.01 && 
-        !account.closed_on;
-      
+
+      // Check if account is explicitly closed
+      const isExplicitlyClosed = account.closed === true || !!account.closed_on;
+
+      // Auto-detect closed liability accounts with zero balance
+      const isLiabilityType = ['Credit Card', 'Loan', 'Mortgage'].includes(displayType);
+      const isZeroBalance = isEffectivelyZero(balance);
+      const isLikelyClosedDebt = isLiabilityType && isZeroBalance && !isExplicitlyClosed;
+
       return {
         ...account,
         source: 'manual',
         displayType,
         normalizedType: normalizeYNABAccountType(account.type),
-        balance,
-        institutionName: account.institution || 
-                         account.name.split(' ')[0] || 
+        balance: isZeroBalance ? 0 : balance, // Normalize zero balances
+        institutionName: account.institution ||
+                         account.name.split(' ')[0] ||
                          'Manual Account',
         // Mark as closed if explicitly closed or likely closed debt
-        closed_on: account.closed_on || (isLikelyClosedDebt ? 'auto-detected' : null)
+        closed_on: isExplicitlyClosed ? (account.closed_on || 'closed') : (isLikelyClosedDebt ? 'auto-detected' : null)
       };
     });
 
@@ -103,7 +109,7 @@ export function useAccountManager(ynabAccounts = [], manualAccounts = []) {
       if (filters.showActiveOnly && account.closed_on) return false;
 
       // Balance filter
-      if (filters.hideZeroBalance && Math.abs(account.balance) < 0.01) return false;
+      if (filters.hideZeroBalance && isEffectivelyZero(account.balance)) return false;
 
       return true;
     });

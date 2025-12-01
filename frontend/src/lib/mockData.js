@@ -5,6 +5,7 @@ export const mockUser = {
   uid: 'demo-user-123',
   email: 'demo@healthywealth.app',
   displayName: 'Demo User',
+  photoURL: 'https://ui-avatars.com/api/?name=Demo+User&background=6366f1&color=fff&size=128',
   isDemoMode: true
 };
 

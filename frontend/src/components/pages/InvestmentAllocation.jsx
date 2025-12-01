@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { useFinanceData, usePrivacy } from '../../contexts/ConsolidatedDataContext';
 import { formatCurrency, formatPercent } from '../../utils/formatters';
 import { getAccountBalance, normalizeYNABAccountType } from '../../utils/ynabHelpers';
@@ -11,58 +11,27 @@ import PrivacyCurrency from '../ui/PrivacyCurrency';
 import {
   BanknotesIcon,
   ChartPieIcon,
-  ArrowTrendingUpIcon,
-  CalendarIcon,
   CurrencyDollarIcon,
   PlusIcon,
   FunnelIcon,
-  ArrowPathIcon,
   TableCellsIcon,
-  Squares2X2Icon,
   PencilSquareIcon,
   Cog6ToothIcon,
 } from '@heroicons/react/24/outline';
 
 const COLORS = ['#3B82F6', '#8B5CF6', '#EF4444', '#10B981', '#F59E0B', '#06B6D4', '#EC4899', '#8B5CF6'];
 
-const mockPerformanceData = [
-  { month: 'Jun', portfolio: 38500, benchmark: 37800 },
-  { month: 'Jul', portfolio: 39200, benchmark: 38400 },
-  { month: 'Aug', portfolio: 38800, benchmark: 38100 },
-  { month: 'Sep', portfolio: 40100, benchmark: 39200 },
-  { month: 'Oct', portfolio: 41200, benchmark: 40100 },
-  { month: 'Nov', portfolio: 41800, benchmark: 40600 },
-  { month: 'Dec', portfolio: 40900, benchmark: 39800 },
-  { month: 'Jan', portfolio: 42100, benchmark: 41000 },
-  { month: 'Feb', portfolio: 41700, benchmark: 40700 },
-  { month: 'Mar', portfolio: 43200, benchmark: 41800 },
-  { month: 'Apr', portfolio: 42800, benchmark: 41500 },
-  { month: 'May', portfolio: 43586, benchmark: 42100 },
-];
-
-// Risk analysis data
-const riskMetrics = [
-  { metric: 'Volatility', value: 65, fullMark: 100 },
-  { metric: 'Diversification', value: 85, fullMark: 100 },
-  { metric: 'Growth Potential', value: 78, fullMark: 100 },
-  { metric: 'Stability', value: 72, fullMark: 100 },
-  { metric: 'Liquidity', value: 90, fullMark: 100 },
-  { metric: 'Tax Efficiency', value: 68, fullMark: 100 },
-];
-
 export default function InvestmentAllocation() {
   const { privacyMode } = usePrivacy();
   const { accounts: ynabAccounts, manualAccounts, user } = useFinanceData();
   const [additionalHoldings, setAdditionalHoldings] = useState([]);
-  const [selectedPeriod, setSelectedPeriod] = useState('1Y');
   const [selectedAccount, setSelectedAccount] = useState('all');
-  const [groupBy, setGroupBy] = useState('type');
+  const [groupBy, setGroupBy] = useState('account');
   const [showAddHoldingModal, setShowAddHoldingModal] = useState(false);
   const [showManageHoldingsModal, setShowManageHoldingsModal] = useState(false);
   const [selectedAccountForManage, setSelectedAccountForManage] = useState(null);
-  const [viewMode, setViewMode] = useState('cards'); // 'cards' or 'table'
   const [accountHoldings, setAccountHoldings] = useState({});
-  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+  const [sortConfig, setSortConfig] = useState({ key: 'value', direction: 'desc' });
 
   // Load saved holdings data on component mount
   useEffect(() => {
@@ -258,10 +227,25 @@ export default function InvestmentAllocation() {
     return holdings.filter(holding => holding.account === selectedAccount);
   }, [selectedAccount, holdings]);
 
+  // Calculate filtered total for accurate percentages
+  const filteredTotalValue = useMemo(() => {
+    return filteredHoldings.reduce((sum, holding) => sum + holding.value, 0);
+  }, [filteredHoldings]);
+
   // Group holdings by selected criteria
   const groupedData = useMemo(() => {
-    const groups = filteredHoldings.reduce((acc, holding) => {
-      const key = holding[groupBy];
+    // Only include holdings that are properly configured (not Unknown for type/sector grouping)
+    const relevantHoldings = filteredHoldings.filter(holding => {
+      if (groupBy === 'type' || groupBy === 'sector') {
+        return !holding.needsConfiguration && holding[groupBy] !== 'Unknown';
+      }
+      return true;
+    });
+
+    const relevantTotal = relevantHoldings.reduce((sum, h) => sum + h.value, 0);
+
+    const groups = relevantHoldings.reduce((acc, holding) => {
+      const key = holding[groupBy] || 'Unknown';
       if (!acc[key]) {
         acc[key] = { name: key, value: 0, holdings: [] };
       }
@@ -270,20 +254,17 @@ export default function InvestmentAllocation() {
       return acc;
     }, {});
 
-    return Object.values(groups).map(group => ({
-      ...group,
-      percentage: (group.value / totalValue) * 100
-    }));
-  }, [filteredHoldings, groupBy, totalValue]);
+    return Object.values(groups)
+      .map(group => ({
+        ...group,
+        percentage: relevantTotal > 0 ? (group.value / relevantTotal) * 100 : 0
+      }))
+      .sort((a, b) => b.value - a.value); // Sort by value descending
+  }, [filteredHoldings, groupBy]);
 
   // Get unique accounts for filter
   const accounts = [...new Set(holdings.map(h => h.account))];
 
-  // Calculate performance metrics
-  const currentValue = mockPerformanceData[mockPerformanceData.length - 1].portfolio;
-  const previousValue = mockPerformanceData[0].portfolio;
-  const totalReturn = ((currentValue - previousValue) / previousValue) * 100;
-  const benchmarkReturn = ((mockPerformanceData[mockPerformanceData.length - 1].benchmark - mockPerformanceData[0].benchmark) / mockPerformanceData[0].benchmark) * 100;
 
   // Handle sorting
   const handleSort = (key) => {
@@ -326,366 +307,146 @@ export default function InvestmentAllocation() {
     return sorted;
   }, [filteredHoldings, sortConfig]);
 
-  const HoldingCard = ({ holding }) => (
-    <div className="glass-chart p-4 rounded-lg hover:scale-[1.02] transition-all duration-200">
-      <div className="flex justify-between items-start mb-2">
-        <div className="flex-1">
-          <div className="flex items-start gap-2">
-            <h4 className="font-semibold text-gray-900 dark:text-white text-sm">{holding.symbol}</h4>
-            <span className="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full">
-              {holding.account}
-            </span>
-          </div>
-          <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">{holding.name}</p>
-        </div>
-        <div className="text-right ml-2">
-          <p className="font-semibold text-sm text-green-600 dark:text-green-400">
-            <PrivacyCurrency
-              amount={holding.value}
-              isPrivacyMode={privacyMode}
-            />
-          </p>
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            {holding.shares} shares
-          </p>
-        </div>
-      </div>
-      <div className="flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
-        <span>{holding.type} • {holding.sector}</span>
-        <PrivacyCurrency
-          amount={holding.price}
-          isPrivacyMode={privacyMode}
-        />
-      </div>
-    </div>
-  );
-
   return (
     <PageTransition>
       <div className="w-full max-w-none space-y-6 pb-4">
         {/* Header */}
-        <div className="glass-hero p-6 rounded-2xl">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="w-12 h-12 glass-card-purple rounded-xl flex items-center justify-center glow-purple">
-              <BanknotesIcon className="h-6 w-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white">
-                Investment Portfolio
-              </h1>
-              <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300 mt-1">
-                Track and analyze your investment allocation
-              </p>
-            </div>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
+              Investments
+            </h1>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              Track your investment accounts and holdings
+            </p>
           </div>
-
-          {/* Quick Actions */}
-          <div className="flex gap-3 flex-wrap">
-            <Button
-              onClick={() => setShowAddHoldingModal(true)}
-              variant="primary"
-              className="flex items-center gap-2"
-            >
-              <PlusIcon className="h-4 w-4" />
-              Add Holding
-            </Button>
-            <Button variant="outline" className="flex items-center gap-2">
-              <ArrowPathIcon className="h-4 w-4" />
-              Refresh Prices
-            </Button>
-          </div>
+          <Button
+            onClick={() => setShowAddHoldingModal(true)}
+            variant="primary"
+            className="flex items-center gap-2 self-start sm:self-auto"
+          >
+            <PlusIcon className="h-4 w-4" />
+            Add Holding
+          </Button>
         </div>
 
         {/* Summary Cards */}
-        <div className="grid gap-4 grid-cols-[repeat(auto-fit,_minmax(260px,_1fr))]">
-          <div className="flex flex-wrap md:flex-nowrap gap-4">
-            <div className="glass-card p-6 flex-[2] min-w-[260px]">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Total Value</p>
-                  <p className={`text-2xl font-bold tabular-nums text-green-600 dark:text-green-400 ${privacyMode ? 'privacy-blur' : ''}`}>
-                    ${formatCurrency(totalValue)}
-                  </p>
-                </div>
-                <div className="w-12 h-12 glass-card-green rounded-xl flex items-center justify-center glow-emerald flex-shrink-0">
-                  <CurrencyDollarIcon className="h-6 w-6 text-white" />
-                </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="glass-card p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Total Value</p>
+                <p className={`text-2xl font-bold tabular-nums text-green-600 dark:text-green-400 ${privacyMode ? 'privacy-blur' : ''}`}>
+                  ${formatCurrency(totalValue)}
+                </p>
               </div>
-            </div>
-
-            <div className="glass-card p-6 flex-1 min-w-[200px]">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Total Return</p>
-                  <p className={`text-2xl font-bold tabular-nums ${totalReturn >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'} ${privacyMode ? 'privacy-blur' : ''}`}>
-                    {totalReturn >= 0 ? '+' : ''}{formatPercent(totalReturn)}
-                  </p>
-                </div>
-                <div className={`w-12 h-12 ${totalReturn >= 0 ? 'glass-card-green' : 'glass-card-red'} rounded-xl flex items-center justify-center ${totalReturn >= 0 ? 'glow-emerald' : ''}`}>
-                  <ArrowTrendingUpIcon className="h-6 w-6 text-white" />
-                </div>
-              </div>
-            </div>
-
-            <div className="glass-card p-6 flex-1 min-w-[200px]">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">vs Benchmark</p>
-                  <p className={`text-2xl font-bold tabular-nums ${(totalReturn - benchmarkReturn) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'} ${privacyMode ? 'privacy-blur' : ''}`}>
-                    {(totalReturn - benchmarkReturn) >= 0 ? '+' : ''}{formatPercent(totalReturn - benchmarkReturn)}
-                  </p>
-                </div>
-                <div className="w-12 h-12 glass-card-blue rounded-xl flex items-center justify-center glow-blue">
-                  <ChartPieIcon className="h-6 w-6 text-white" />
-                </div>
-              </div>
-            </div>
-
-            <div className="glass-card p-6 flex-1 min-w-[200px]">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Holdings</p>
-                  <p className="text-2xl font-bold tabular-nums text-blue-600 dark:text-blue-400">
-                    {filteredHoldings.length}
-                  </p>
-                </div>
-                <div className="w-12 h-12 glass-card-gold rounded-xl flex items-center justify-center glow-gold">
-                  <BanknotesIcon className="h-6 w-6 text-white" />
-                </div>
+              <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+                <CurrencyDollarIcon className="h-5 w-5 text-green-600 dark:text-green-400" />
               </div>
             </div>
           </div>
 
+          <div className="glass-card p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Holdings</p>
+                <p className="text-2xl font-bold tabular-nums text-blue-600 dark:text-blue-400">
+                  {filteredHoldings.filter(h => !h.needsConfiguration).length}
+                </p>
+              </div>
+              <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+                <BanknotesIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              </div>
+            </div>
+          </div>
 
+          <div className="glass-card p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Accounts</p>
+                <p className="text-2xl font-bold tabular-nums text-purple-600 dark:text-purple-400">
+                  {accounts.length}
+                </p>
+              </div>
+              <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+                <ChartPieIcon className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Controls */}
-        <div className="glass-card p-4">
-          <div className="flex flex-wrap gap-4 items-center">
-            <div className="flex items-center gap-2">
-              <CalendarIcon className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-              <select
-                value={selectedPeriod}
-                onChange={(e) => setSelectedPeriod(e.target.value)}
-                className="px-3 py-1 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="1D">1 Day</option>
-                <option value="1W">1 Week</option>
-                <option value="1M">1 Month</option>
-                <option value="3M">3 Months</option>
-                <option value="6M">6 Months</option>
-                <option value="1Y">1 Year</option>
-                <option value="ALL">All Time</option>
-              </select>
-            </div>
+        <div className="flex flex-wrap gap-4 items-center">
+          <div className="flex items-center gap-2">
+            <FunnelIcon className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+            <select
+              value={selectedAccount}
+              onChange={(e) => setSelectedAccount(e.target.value)}
+              className="px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All Accounts</option>
+              {accounts.map(account => (
+                <option key={account} value={account}>{account}</option>
+              ))}
+            </select>
+          </div>
 
-            <div className="flex items-center gap-2">
-              <FunnelIcon className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-              <select
-                value={selectedAccount}
-                onChange={(e) => setSelectedAccount(e.target.value)}
-                className="px-3 py-1 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="all">All Accounts</option>
-                {accounts.map(account => (
-                  <option key={account} value={account}>{account}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Group by:</span>
-              <select
-                value={groupBy}
-                onChange={(e) => setGroupBy(e.target.value)}
-                className="px-3 py-1 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="type">Asset Type</option>
-                <option value="sector">Sector</option>
-                <option value="account">Account</option>
-              </select>
-            </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600 dark:text-gray-400">Group by:</span>
+            <select
+              value={groupBy}
+              onChange={(e) => setGroupBy(e.target.value)}
+              className="px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="account">Account</option>
+              <option value="type">Asset Type</option>
+              <option value="sector">Sector</option>
+            </select>
           </div>
         </div>
 
-        {/* Charts Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Allocation Chart */}
-          <div className="glass-card p-6">
-            <div className="flex items-center mb-6">
-              <div className="w-10 h-10 glass-card-purple rounded-lg flex items-center justify-center glow-purple mr-3">
-                <ChartPieIcon className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  Allocation by {groupBy.charAt(0).toUpperCase() + groupBy.slice(1)}
-                </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Portfolio breakdown</p>
-              </div>
-            </div>
-
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={groupedData}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius="75%"
-                    label={({ name, percentage }) => `${name}: ${formatPercent(percentage)}`}
-                    stroke="rgba(255,255,255,0.2)"
-                    strokeWidth={2}
-                  >
-                    {groupedData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    content={({ active, payload }) => {
-                      if (!active || !payload || payload.length === 0) return null;
-                      return (
-                        <div className="chart-tooltip glass-tooltip bg-white dark:bg-gray-800 p-3 rounded-xl border border-gray-200 dark:border-gray-700 shadow-lg">
-                          {payload.map((entry, index) => (
-                            <div key={index} className="flex items-center gap-2">
-                              <div
-                                className="w-3 h-3 rounded-full"
-                                style={{ backgroundColor: entry.fill }}
-                              />
-                              <span className="text-sm text-gray-600 dark:text-gray-400">
-                                {entry.name}:
-                              </span>
-                              <span className={`text-sm font-medium text-gray-900 dark:text-white ${privacyMode ? 'privacy-blur' : ''}`}>
-                                {formatCurrency(entry.value)}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      );
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          {/* Performance Chart */}
-          <div className="glass-card p-6">
-            <div className="flex items-center mb-6">
-              <div className="w-10 h-10 glass-card-emerald rounded-lg flex items-center justify-center glow-emerald mr-3">
-                <ArrowTrendingUpIcon className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Performance</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Portfolio vs benchmark</p>
-              </div>
-            </div>
-
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={mockPerformanceData} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                  <XAxis
-                    dataKey="month"
-                    tick={{ fontSize: 11 }}
-                  />
-                  <YAxis
-                    tick={{ fontSize: 11 }}
-                    tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
-                  />
-                  <Tooltip
-                    content={({ active, payload, label }) => {
-                      if (!active || !payload || payload.length === 0) return null;
-                      return (
-                        <div className="chart-tooltip glass-tooltip bg-white dark:bg-gray-800 p-3 rounded-xl border border-gray-200 dark:border-gray-700 shadow-lg">
-                          <p className="text-sm font-medium text-gray-900 dark:text-white mb-2">{label}</p>
-                          {payload.map((entry, index) => (
-                            <div key={index} className="flex items-center gap-2">
-                              <div
-                                className="w-3 h-3 rounded-full"
-                                style={{ backgroundColor: entry.stroke }}
-                              />
-                              <span className="text-sm text-gray-600 dark:text-gray-400">
-                                {entry.name}:
-                              </span>
-                              <span className={`text-sm font-medium text-gray-900 dark:text-white ${privacyMode ? 'privacy-blur' : ''}`}>
-                                {formatCurrency(entry.value)}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      );
-                    }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="portfolio"
-                    stroke="#10B981"
-                    strokeWidth={3}
-                    name="Portfolio"
-                    dot={{ fill: '#10B981', strokeWidth: 2, r: 4 }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="benchmark"
-                    stroke="#6B7280"
-                    strokeWidth={2}
-                    strokeDasharray="5 5"
-                    name="Benchmark"
-                    dot={false}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        </div>
-
-        {/* Risk Analysis */}
+        {/* Allocation Chart */}
         <div className="glass-card p-6">
-          <div className="flex items-center mb-6">
-            <div className="w-10 h-10 glass-card-gold rounded-lg flex items-center justify-center glow-gold mr-3">
-              <ChartPieIcon className="h-5 w-5 text-white" />
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Risk Analysis</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Portfolio risk metrics</p>
-            </div>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Allocation by {groupBy.charAt(0).toUpperCase() + groupBy.slice(1)}
+            </h3>
           </div>
 
-          <div className="h-80">
+          <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <RadarChart data={riskMetrics}>
-                <PolarGrid className="opacity-30" />
-                <PolarAngleAxis
-                  dataKey="metric"
-                  tick={{ fontSize: 11, fill: 'currentColor' }}
-                />
-                <PolarRadiusAxis
-                  angle={90}
-                  domain={[0, 100]}
-                  tick={{ fontSize: 10, fill: 'currentColor' }}
-                />
-                <Radar
-                  name="Portfolio"
+              <PieChart>
+                <Pie
+                  data={groupedData}
                   dataKey="value"
-                  stroke="#3B82F6"
-                  fill="#3B82F6"
-                  fillOpacity={0.3}
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius="75%"
+                  label={({ name, percentage }) => `${name}: ${formatPercent(percentage)}`}
+                  stroke="rgba(255,255,255,0.2)"
                   strokeWidth={2}
-                />
+                >
+                  {groupedData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
                 <Tooltip
                   content={({ active, payload }) => {
                     if (!active || !payload || payload.length === 0) return null;
                     return (
-                      <div className="chart-tooltip glass-tooltip bg-white dark:bg-gray-800 p-3 rounded-xl border border-gray-200 dark:border-gray-700 shadow-lg">
+                      <div className="bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700 shadow-lg">
                         {payload.map((entry, index) => (
                           <div key={index} className="flex items-center gap-2">
+                            <div
+                              className="w-3 h-3 rounded-full"
+                              style={{ backgroundColor: entry.fill }}
+                            />
                             <span className="text-sm text-gray-600 dark:text-gray-400">
-                              {entry.payload.metric}:
+                              {entry.name}:
                             </span>
-                            <span className="text-sm font-medium text-gray-900 dark:text-white">
-                              {entry.value}/100
+                            <span className={`text-sm font-medium text-gray-900 dark:text-white ${privacyMode ? 'privacy-blur' : ''}`}>
+                              ${formatCurrency(entry.value)}
                             </span>
                           </div>
                         ))}
@@ -693,7 +454,7 @@ export default function InvestmentAllocation() {
                     );
                   }}
                 />
-              </RadarChart>
+              </PieChart>
             </ResponsiveContainer>
           </div>
         </div>
@@ -745,15 +506,9 @@ export default function InvestmentAllocation() {
 
         {/* All Holdings Table */}
         <div className="glass-card p-6">
-          <div className="flex items-center mb-6">
-            <div className="w-10 h-10 glass-card-purple rounded-lg flex items-center justify-center glow-purple mr-3">
-              <TableCellsIcon className="h-5 w-5 text-white" />
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">All Holdings</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Complete portfolio breakdown by account</p>
-            </div>
-          </div>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            Holdings
+          </h3>
 
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -879,16 +634,16 @@ export default function InvestmentAllocation() {
                             {holding.type}
                           </span>
                         </td>
-                        <td className={`px-4 py-3 text-sm text-right text-gray-600 dark:text-gray-400`}>
-                          {holding.shares}
+                        <td className="px-4 py-3 text-sm text-right tabular-nums text-gray-600 dark:text-gray-400">
+                          {holding.shares.toLocaleString()}
                         </td>
-                        <td className={`px-4 py-3 text-sm text-right text-gray-600 dark:text-gray-400 ${privacyMode ? 'privacy-blur' : ''}`}>
+                        <td className={`px-4 py-3 text-sm text-right tabular-nums text-gray-600 dark:text-gray-400 ${privacyMode ? 'privacy-blur' : ''}`}>
                           ${holding.price.toFixed(2)}
                         </td>
-                        <td className={`px-4 py-3 text-sm text-right font-medium text-green-600 dark:text-green-400 ${privacyMode ? 'privacy-blur' : ''}`}>
+                        <td className={`px-4 py-3 text-sm text-right tabular-nums font-medium text-green-600 dark:text-green-400 ${privacyMode ? 'privacy-blur' : ''}`}>
                           ${formatCurrency(holding.value)}
                         </td>
-                        <td className={`px-4 py-3 text-sm text-right text-gray-600 dark:text-gray-400 ${privacyMode ? 'privacy-blur' : ''}`}>
+                        <td className={`px-4 py-3 text-sm text-right tabular-nums text-gray-600 dark:text-gray-400 ${privacyMode ? 'privacy-blur' : ''}`}>
                           {formatPercent(percentage)}
                         </td>
                         <td className="px-4 py-3 text-center">
@@ -914,10 +669,10 @@ export default function InvestmentAllocation() {
                   <td colSpan="6" className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white text-right">
                     Total Portfolio Value:
                   </td>
-                  <td className={`px-4 py-3 text-sm font-bold text-green-600 dark:text-green-400 text-right ${privacyMode ? 'privacy-blur' : ''}`}>
+                  <td className={`px-4 py-3 text-sm font-bold tabular-nums text-green-600 dark:text-green-400 text-right ${privacyMode ? 'privacy-blur' : ''}`}>
                     ${formatCurrency(totalValue)}
                   </td>
-                  <td className="px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400 text-right">
+                  <td className="px-4 py-3 text-sm font-medium tabular-nums text-gray-600 dark:text-gray-400 text-right">
                     100%
                   </td>
                   <td></td>

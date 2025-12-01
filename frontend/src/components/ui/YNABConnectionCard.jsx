@@ -81,7 +81,10 @@ export default function YNABConnectionCard({
       // Listen for OAuth callback
       const handleMessage = async (event) => {
         console.log('Received message:', event);
-        if (event.origin !== window.location.origin) {
+        // Allow localhost messages from different ports (for development)
+        const isLocalhost = event.origin.startsWith('http://localhost:');
+        const isSameOrigin = event.origin === window.location.origin;
+        if (!isLocalhost && !isSameOrigin) {
           console.log('Ignoring message from different origin:', event.origin);
           return;
         }

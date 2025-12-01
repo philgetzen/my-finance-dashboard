@@ -3,8 +3,8 @@ import React from 'react';
 export default function Card({ children, className = '', padding = true }) {
   return (
     <div
-      className={`bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-visible ${
-        padding ? 'glass-card p-6' : 'glass-hero p-6'
+      className={`bg-white dark:bg-[var(--color-surface)] rounded-xl border border-gray-200 dark:border-[var(--color-border)] shadow-sm ${
+        padding ? 'p-6' : ''
       } ${className}`}
     >
       {children}

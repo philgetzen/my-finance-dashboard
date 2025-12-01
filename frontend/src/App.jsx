@@ -14,7 +14,7 @@ const AuthenticationPage = lazy(() => import('./components/auth/AuthenticationPa
 const YNABCallback = lazy(() => import('./components/auth/YNABCallback'));
 const Dashboard = lazy(() => import('./components/pages/Dashboard'));
 const Accounts = lazy(() => import('./components/pages/Accounts'));
-const BalanceSheet = lazy(() => import('./components/pages/BalanceSheet'));
+const CashFlow = lazy(() => import('./components/pages/CashFlow'));
 const InvestmentAllocation = lazy(() => import('./components/pages/InvestmentAllocation'));
 
 // Loading component
@@ -104,8 +104,8 @@ function ProtectedRoutes() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/accounts" element={<Accounts />} />
-          <Route path="/balance-sheet" element={<BalanceSheet />} />
-          <Route path="/investment-allocation" element={<InvestmentAllocation />} />
+          <Route path="/spending" element={<CashFlow />} />
+          <Route path="/investments" element={<InvestmentAllocation />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </Suspense>

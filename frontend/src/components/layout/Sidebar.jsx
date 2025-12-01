@@ -14,13 +14,12 @@ import {
   SunIcon,
   EyeIcon,
   EyeSlashIcon,
-  Cog6ToothIcon,
 } from '@heroicons/react/24/outline';
 
 const NavItem = React.memo(({ to, icon: IconComponent, children, onClick }) => {
-  const baseClasses = "flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200";
-  const activeClasses = "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-medium";
-  const inactiveClasses = "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800";
+  const baseClasses = "flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all duration-150 text-sm font-medium";
+  const activeClasses = "bg-[var(--sidebar-active)] text-white border-l-2 border-[var(--accent-purple)] -ml-[2px] pl-[18px]";
+  const inactiveClasses = "text-[var(--sidebar-text-muted)] hover:bg-[var(--sidebar-hover)] hover:text-[var(--sidebar-text)]";
 
   if (onClick) {
     return (
@@ -28,7 +27,7 @@ const NavItem = React.memo(({ to, icon: IconComponent, children, onClick }) => {
         onClick={onClick}
         className={`${baseClasses} ${inactiveClasses} w-full text-left`}
       >
-        <IconComponent className="h-5 w-5" />
+        <IconComponent className="h-5 w-5 flex-shrink-0" />
         <span>{children}</span>
       </button>
     );
@@ -37,11 +36,11 @@ const NavItem = React.memo(({ to, icon: IconComponent, children, onClick }) => {
   return (
     <NavLink
       to={to}
-      className={({ isActive }) => 
+      className={({ isActive }) =>
         `${baseClasses} ${isActive ? activeClasses : inactiveClasses}`
       }
     >
-      <Icon className="h-5 w-5" />
+      <IconComponent className="h-5 w-5 flex-shrink-0" />
       <span>{children}</span>
     </NavLink>
   );
@@ -65,20 +64,33 @@ export default function Sidebar({ onClose }) {
   }, [navigate, onClose]);
 
   return (
-    <aside className="h-full flex flex-col bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700">
+    <aside className="h-full flex flex-col bg-[var(--sidebar-bg)]">
       {/* Logo/Header */}
-      <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-        <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+      <div className="p-5 border-b border-[var(--sidebar-border)]">
+        <h2 className="text-lg font-semibold text-white tracking-tight">
           Finance Dashboard
         </h2>
         {user && (
-          <div className="mt-3 flex items-center gap-3">
-            <UserCircleIcon className="h-8 w-8 text-gray-400" />
+          <div className="mt-4 flex items-center gap-3">
+            {user.photoURL ? (
+              <img
+                src={user.photoURL}
+                alt=""
+                className="h-8 w-8 rounded-full ring-2 ring-[var(--sidebar-border)] object-cover"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <div className="h-8 w-8 rounded-full ring-2 ring-[var(--sidebar-border)] bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                <span className="text-white text-sm font-medium">
+                  {(user.displayName || user.email || 'U').charAt(0).toUpperCase()}
+                </span>
+              </div>
+            )}
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+              <p className="text-sm font-medium text-[var(--sidebar-text)] truncate">
                 {user.displayName || 'User'}
               </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+              <p className="text-xs text-[var(--sidebar-text-muted)] truncate">
                 {user.email}
               </p>
             </div>
@@ -87,36 +99,47 @@ export default function Sidebar({ onClose }) {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+      <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+        <p className="px-4 py-2 text-xs font-medium text-[var(--sidebar-text-muted)] uppercase tracking-wider">
+          Overview
+        </p>
         <NavItem to="/" icon={HomeIcon}>
           Dashboard
         </NavItem>
         <NavItem to="/accounts" icon={BanknotesIcon}>
           Accounts
         </NavItem>
-        <NavItem to="/balance-sheet" icon={ChartBarIcon}>
-          Balance Sheet
+
+        <p className="px-4 py-2 mt-4 text-xs font-medium text-[var(--sidebar-text-muted)] uppercase tracking-wider">
+          Reports
+        </p>
+        <NavItem to="/spending" icon={ChartBarIcon}>
+          Spending
         </NavItem>
-        <NavItem to="/investment-allocation" icon={ChartPieIcon}>
+        <NavItem to="/investments" icon={ChartPieIcon}>
           Investments
         </NavItem>
       </nav>
 
       {/* Settings Section */}
-      <div className="p-4 border-t border-gray-200 dark:border-gray-700 space-y-1">
+      <div className="p-3 border-t border-[var(--sidebar-border)] space-y-1">
+        <p className="px-4 py-2 text-xs font-medium text-[var(--sidebar-text-muted)] uppercase tracking-wider">
+          Settings
+        </p>
+
         {/* Dark Mode Toggle */}
         <button
           onClick={toggleDarkMode}
-          className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200 w-full text-left"
+          className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-[var(--sidebar-text-muted)] hover:bg-[var(--sidebar-hover)] hover:text-[var(--sidebar-text)] transition-all duration-150 w-full text-left text-sm font-medium"
         >
           {darkMode ? (
             <>
-              <SunIcon className="h-5 w-5" />
+              <SunIcon className="h-5 w-5 flex-shrink-0" />
               <span>Light Mode</span>
             </>
           ) : (
             <>
-              <MoonIcon className="h-5 w-5" />
+              <MoonIcon className="h-5 w-5 flex-shrink-0" />
               <span>Dark Mode</span>
             </>
           )}
@@ -125,34 +148,29 @@ export default function Sidebar({ onClose }) {
         {/* Privacy Mode Toggle */}
         <button
           onClick={() => setPrivacyMode(!privacyMode)}
-          className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200 w-full text-left"
+          className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-[var(--sidebar-text-muted)] hover:bg-[var(--sidebar-hover)] hover:text-[var(--sidebar-text)] transition-all duration-150 w-full text-left text-sm font-medium"
         >
           {privacyMode ? (
             <>
-              <EyeIcon className="h-5 w-5" />
+              <EyeIcon className="h-5 w-5 flex-shrink-0" />
               <span>Show Numbers</span>
             </>
           ) : (
             <>
-              <EyeSlashIcon className="h-5 w-5" />
+              <EyeSlashIcon className="h-5 w-5 flex-shrink-0" />
               <span>Privacy Mode</span>
             </>
           )}
         </button>
 
-        {/* Settings (placeholder) */}
-        <button
-          className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200 w-full text-left opacity-50 cursor-not-allowed"
-          disabled
-        >
-          <Cog6ToothIcon className="h-5 w-5" />
-          <span>Settings</span>
-        </button>
-
         {/* Logout */}
-        <NavItem onClick={handleLogout} icon={ArrowRightOnRectangleIcon}>
-          Logout
-        </NavItem>
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-[var(--sidebar-text-muted)] hover:bg-red-500/10 hover:text-red-400 transition-all duration-150 w-full text-left text-sm font-medium"
+        >
+          <ArrowRightOnRectangleIcon className="h-5 w-5 flex-shrink-0" />
+          <span>Logout</span>
+        </button>
       </div>
     </aside>
   );
