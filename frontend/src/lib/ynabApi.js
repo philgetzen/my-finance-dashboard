@@ -64,26 +64,26 @@ class YNABService {
   }
 
   async getAccounts(budgetId = 'last-used') {
-    const result = await this.makeRequest(`/api/ynab/budgets/${budgetId}/accounts`);
+    const result = await this.makeRequest(`/api/ynab/budgets?budgetId=${budgetId}&resource=accounts`);
     return result.data?.accounts || [];
   }
 
   async getTransactions(budgetId = 'last-used', sinceDate = null) {
-    let endpoint = `/api/ynab/budgets/${budgetId}/transactions`;
+    let endpoint = `/api/ynab/budgets?budgetId=${budgetId}&resource=transactions`;
     if (sinceDate) {
-      endpoint += `?since_date=${sinceDate}`;
+      endpoint += `&since_date=${sinceDate}`;
     }
     const result = await this.makeRequest(endpoint);
     return result.data?.transactions || [];
   }
 
   async getCategories(budgetId = 'last-used') {
-    const result = await this.makeRequest(`/api/ynab/budgets/${budgetId}/categories`);
+    const result = await this.makeRequest(`/api/ynab/budgets?budgetId=${budgetId}&resource=categories`);
     return result.data || { category_groups: [] };
   }
 
   async getMonths(budgetId = 'last-used') {
-    const result = await this.makeRequest(`/api/ynab/budgets/${budgetId}/months`);
+    const result = await this.makeRequest(`/api/ynab/budgets?budgetId=${budgetId}&resource=months`);
     return result.data?.months || [];
   }
 
