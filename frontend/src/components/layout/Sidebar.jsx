@@ -16,7 +16,7 @@ import {
   EyeSlashIcon,
 } from '@heroicons/react/24/outline';
 
-const NavItem = React.memo(({ to, icon: IconComponent, children, onClick }) => {
+const NavItem = React.memo(({ to, icon: IconComponent, children, onClick, onNavigate }) => {
   const baseClasses = "flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all duration-150 text-sm font-medium";
   const activeClasses = "bg-[var(--sidebar-active)] text-white border-l-2 border-[var(--accent-purple)] -ml-[2px] pl-[18px]";
   const inactiveClasses = "text-[var(--sidebar-text-muted)] hover:bg-[var(--sidebar-hover)] hover:text-[var(--sidebar-text)]";
@@ -36,6 +36,7 @@ const NavItem = React.memo(({ to, icon: IconComponent, children, onClick }) => {
   return (
     <NavLink
       to={to}
+      onClick={onNavigate}
       className={({ isActive }) =>
         `${baseClasses} ${isActive ? activeClasses : inactiveClasses}`
       }
@@ -103,20 +104,20 @@ export default function Sidebar({ onClose }) {
         <p className="px-4 py-2 text-xs font-medium text-[var(--sidebar-text-muted)] uppercase tracking-wider">
           Overview
         </p>
-        <NavItem to="/" icon={HomeIcon}>
+        <NavItem to="/" icon={HomeIcon} onNavigate={onClose}>
           Dashboard
         </NavItem>
-        <NavItem to="/accounts" icon={BanknotesIcon}>
+        <NavItem to="/accounts" icon={BanknotesIcon} onNavigate={onClose}>
           Accounts
         </NavItem>
 
         <p className="px-4 py-2 mt-4 text-xs font-medium text-[var(--sidebar-text-muted)] uppercase tracking-wider">
           Reports
         </p>
-        <NavItem to="/spending" icon={ChartBarIcon}>
+        <NavItem to="/spending" icon={ChartBarIcon} onNavigate={onClose}>
           Spending
         </NavItem>
-        <NavItem to="/investments" icon={ChartPieIcon}>
+        <NavItem to="/investments" icon={ChartPieIcon} onNavigate={onClose}>
           Investments
         </NavItem>
       </nav>
@@ -129,7 +130,10 @@ export default function Sidebar({ onClose }) {
 
         {/* Dark Mode Toggle */}
         <button
-          onClick={toggleDarkMode}
+          onClick={() => {
+            toggleDarkMode();
+            if (onClose) onClose();
+          }}
           className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-[var(--sidebar-text-muted)] hover:bg-[var(--sidebar-hover)] hover:text-[var(--sidebar-text)] transition-all duration-150 w-full text-left text-sm font-medium"
         >
           {darkMode ? (
@@ -147,7 +151,10 @@ export default function Sidebar({ onClose }) {
 
         {/* Privacy Mode Toggle */}
         <button
-          onClick={() => setPrivacyMode(!privacyMode)}
+          onClick={() => {
+            setPrivacyMode(!privacyMode);
+            if (onClose) onClose();
+          }}
           className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-[var(--sidebar-text-muted)] hover:bg-[var(--sidebar-hover)] hover:text-[var(--sidebar-text)] transition-all duration-150 w-full text-left text-sm font-medium"
         >
           {privacyMode ? (

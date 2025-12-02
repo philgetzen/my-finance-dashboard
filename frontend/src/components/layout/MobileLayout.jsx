@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useLayoutEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { usePrivacy, useFinanceData } from '../../contexts/ConsolidatedDataContext';
 import DemoModeIndicator from '../ui/DemoModeIndicator';
@@ -46,6 +46,11 @@ export default function MobileLayout({ children }) {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // Scroll to top on route change
+  useLayoutEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location.pathname]);
 
   const handleLogout = async () => {
     await logout();
@@ -106,7 +111,7 @@ export default function MobileLayout({ children }) {
 
   // Mobile bottom navigation - clean tab bar
   const MobileBottomNav = () => (
-    <div className="fixed bottom-0 left-0 right-0 bg-[var(--sidebar-bg)] border-t border-[var(--sidebar-border)] lg:hidden z-40 pb-safe">
+    <div className="fixed bottom-0 left-0 right-0 bg-[var(--sidebar-bg)] border-t border-[var(--sidebar-border)] lg:hidden z-40 safe-area-bottom">
       <div className="grid grid-cols-5 h-16">
         {navItems.map((item) => {
           const isActive = location.pathname === item.path;
