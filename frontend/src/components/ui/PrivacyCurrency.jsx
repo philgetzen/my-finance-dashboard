@@ -26,7 +26,7 @@ const PrivacyCurrency = ({
   const finalPrefix = isZero ? '$' : prefix;
 
   return (
-    <span className={`tabular-nums ${finalClassName}`} {...props}>
+    <span className={`tabular-nums whitespace-nowrap ${finalClassName}`} {...props}>
       {finalPrefix}{formattedAmount}
     </span>
   );
