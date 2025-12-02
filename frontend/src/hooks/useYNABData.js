@@ -15,16 +15,16 @@ export const ynabQueryKeys = {
 };
 
 // Initialize YNAB Service
-export const useInitializeYNAB = (accessToken) => {
+export const useInitializeYNAB = (accessToken, refreshToken = null, userId = null) => {
   useEffect(() => {
     if (accessToken) {
       console.log('Initializing YNAB service with token:', accessToken.substring(0, 10) + '...');
-      ynabService.init(accessToken);
-      console.log('YNAB service initialized:', ynabService.isInitialized());
+      ynabService.init(accessToken, refreshToken, userId);
+      console.log('YNAB service initialized:', ynabService.isInitialized(), refreshToken ? '(with refresh token)' : '(no refresh token)');
     } else {
       console.log('No access token provided to initialize YNAB service');
     }
-  }, [accessToken]);
+  }, [accessToken, refreshToken, userId]);
 };
 
 const ynabQueryRetryFn = (failureCount, error) => {
@@ -103,9 +103,9 @@ export const useYNABSummary = (budgetId = 'last-used', enabled = false) => {
 };
 
 // Combined hook for all YNAB data
-export const useYNABData = (budgetId = 'last-used', enabled = false, accessToken = null) => {
+export const useYNABData = (budgetId = 'last-used', enabled = false, accessToken = null, refreshToken = null, userId = null) => {
   // Initialize YNAB service when access token is provided
-  useInitializeYNAB(accessToken);
+  useInitializeYNAB(accessToken, refreshToken, userId);
   
   // Use accessToken presence instead of ynabService.isInitialized() for enabling queries
   const shouldEnable = enabled && !!accessToken;

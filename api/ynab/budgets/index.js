@@ -37,13 +37,50 @@ async function handler(req, res) {
       headers: {
         'Authorization': authHeader,
         'Accept': 'application/json'
-      }
+      },
+      timeout: 15000 // 15 second timeout - accounts for Vercel cold start
     });
 
     res.json(response.data);
   } catch (error) {
-    console.error('Error fetching budgets:', error.response?.data || error.message);
-    res.status(error.response?.status || 500).json({ error: 'Unable to fetch budgets' });
+    console.error('Error fetching budgets:', {
+      message: error.message,
+      code: error.code,
+      status: error.response?.status,
+      data: error.response?.data,
+      isTimeout: error.code === 'ECONNABORTED' || error.message?.includes('timeout')
+    });
+
+    // Provide more specific error messages
+    if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+      return res.status(504).json({
+        error: 'YNAB API request timed out',
+        code: 'TIMEOUT',
+        retryable: true
+      });
+    }
+
+    if (error.response?.status === 401) {
+      return res.status(401).json({
+        error: 'YNAB token expired or invalid',
+        code: 'AUTH_EXPIRED',
+        retryable: false
+      });
+    }
+
+    if (error.response?.status === 429) {
+      return res.status(429).json({
+        error: 'YNAB rate limit exceeded',
+        code: 'RATE_LIMITED',
+        retryable: true,
+        retryAfter: error.response?.headers?.['retry-after'] || 60
+      });
+    }
+
+    res.status(error.response?.status || 500).json({
+      error: 'Unable to fetch budgets',
+      details: error.response?.data?.error?.detail || error.message
+    });
   }
 }
 

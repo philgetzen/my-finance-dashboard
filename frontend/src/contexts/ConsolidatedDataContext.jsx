@@ -53,6 +53,7 @@ export const FinanceDataProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [ynabToken, setYnabToken] = useState(null);
+  const [ynabRefreshToken, setYnabRefreshToken] = useState(null);
   const [manualAccounts, setManualAccounts] = useState([]);
   const [showYNABErrorModal, setShowYNABErrorModal] = useState(false);
   const [ynabError, setYnabError] = useState(null);
@@ -238,6 +239,7 @@ export const FinanceDataProvider = ({ children }) => {
                 setAutoConnectMessage('Found existing YNAB connection!');
                 console.log('Auto-connecting with existing YNAB token');
                 setYnabToken(tokenData.access_token);
+                setYnabRefreshToken(tokenData.refresh_token || null);
                 setIsAutoConnectingYNAB(false);
                 setHasAutoConnected(true);
                 // Keep the message visible - don't clear it
@@ -275,6 +277,7 @@ export const FinanceDataProvider = ({ children }) => {
         } else {
           // Clear data on logout
           setYnabToken(null);
+          setYnabRefreshToken(null);
           setManualAccounts([]);
           setAutoConnectMessage(null);
           setIsAutoConnectingYNAB(false);
@@ -290,8 +293,21 @@ export const FinanceDataProvider = ({ children }) => {
     return () => unsubscribe();
   }, []);
 
-  // Initialize YNAB data
-  const ynabData = useYNABData('last-used', !!ynabToken && !loading, ynabToken);
+  // Initialize YNAB data with refresh token support
+  const ynabData = useYNABData('last-used', !!ynabToken && !loading, ynabToken, ynabRefreshToken, user?.uid);
+
+  // Listen for token refresh events from the YNAB service
+  useEffect(() => {
+    const handleTokenRefreshed = (event) => {
+      const { accessToken, refreshToken } = event.detail;
+      console.log('YNAB tokens refreshed by service');
+      setYnabToken(accessToken);
+      setYnabRefreshToken(refreshToken);
+    };
+
+    window.addEventListener('ynab-token-refreshed', handleTokenRefreshed);
+    return () => window.removeEventListener('ynab-token-refreshed', handleTokenRefreshed);
+  }, []);
 
   // Handle YNAB errors
   useEffect(() => {
@@ -324,7 +340,7 @@ export const FinanceDataProvider = ({ children }) => {
   // YNAB token management
   const saveYNABToken = useCallback(async (accessToken, refreshToken) => {
     if (!user) return;
-    
+
     try {
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/ynab/save_token`, {
         method: 'POST',
@@ -335,10 +351,11 @@ export const FinanceDataProvider = ({ children }) => {
           refresh_token: refreshToken
         })
       });
-      
+
       if (response.ok) {
         setYnabToken(accessToken);
-        console.log('YNAB token saved successfully');
+        setYnabRefreshToken(refreshToken || null);
+        console.log('YNAB token saved successfully (with refresh token)');
       }
     } catch (error) {
       console.error('Error saving YNAB token:', error);
@@ -347,16 +364,17 @@ export const FinanceDataProvider = ({ children }) => {
 
   const disconnectYNAB = useCallback(async () => {
     if (!user) return;
-    
+
     try {
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/ynab/disconnect`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: user.uid })
       });
-      
+
       if (response.ok) {
         setYnabToken(null);
+        setYnabRefreshToken(null);
         console.log('YNAB disconnected successfully');
       }
     } catch (error) {
@@ -459,9 +477,10 @@ export const FinanceDataProvider = ({ children }) => {
       
       // Sign out from Google/Firebase auth
       await auth.signOut();
-      
+
       // Clear any remaining state
       setYnabToken(null);
+      setYnabRefreshToken(null);
       setManualAccounts([]);
       setYnabError(null);
       setShowYNABErrorModal(false);

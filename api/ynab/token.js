@@ -68,7 +68,7 @@ async function handler(req, res) {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        timeout: 10000
+        timeout: 20000 // 20 second timeout - accounts for Vercel cold start + YNAB API latency
       });
 
       console.log('YNAB token exchange successful');
