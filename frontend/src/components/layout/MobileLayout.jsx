@@ -66,7 +66,7 @@ export default function MobileLayout({ children }) {
 
   // Mobile header
   const MobileHeader = () => (
-    <div className="lg:hidden sticky top-0 z-50 bg-[var(--sidebar-bg)] border-b border-[var(--sidebar-border)]">
+    <div className="lg:hidden sticky top-0 z-50 bg-[var(--sidebar-bg)]">
       <div className="flex items-center justify-between h-14 px-4">
         <div className="flex items-center space-x-3">
           <span className="text-lg font-semibold text-white">Finance Dashboard</span>

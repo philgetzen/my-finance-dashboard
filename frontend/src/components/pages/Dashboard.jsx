@@ -38,22 +38,22 @@ const COLORS = ['#8B5CF6', '#F97316', '#3B82F6', '#10B981', '#EC4899', '#14B8A6'
 
 // Memoized components for better performance
 const MetricCard = React.memo(({ title, value, icon: Icon, trend, color, isPrivacyMode }) => (
-  <Card className="p-6">
-    <div className="flex items-center justify-between">
-      <div>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">{title}</p>
+  <Card className="p-3 sm:p-6">
+    <div className="flex items-center justify-between gap-2">
+      <div className="min-w-0 flex-1">
+        <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mb-1">{title}</p>
         <PrivacyCurrency
           amount={value}
           isPrivacyMode={isPrivacyMode}
-          className={`text-2xl font-bold ${color}`}
+          className={`text-sm sm:text-lg md:text-2xl font-bold ${color}`}
         />
       </div>
-      <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+      <div className={`w-8 h-8 sm:w-12 sm:h-12 rounded-xl flex-shrink-0 flex items-center justify-center ${
         trend === 'up' ? 'bg-emerald-50 dark:bg-emerald-900/30' :
         trend === 'down' ? 'bg-red-50 dark:bg-red-900/30' :
         'bg-violet-50 dark:bg-violet-900/30'
       }`}>
-        <Icon className={`h-6 w-6 ${
+        <Icon className={`h-4 w-4 sm:h-6 sm:w-6 ${
           trend === 'up' ? 'text-emerald-600 dark:text-emerald-400' :
           trend === 'down' ? 'text-red-500 dark:text-red-400' :
           'text-violet-600 dark:text-violet-400'

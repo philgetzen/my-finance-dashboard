@@ -117,7 +117,7 @@
     left: 0;
     right: 0;
     height: env(safe-area-inset-bottom, 0px);
-    background: inherit;
+    background: var(--sidebar-bg);
   }
 }
 
