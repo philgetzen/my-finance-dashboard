@@ -221,41 +221,41 @@ const PeriodSummary = React.memo(({ title, income, expenses, savings, isPrivacyM
   const savingsRate = income > 0 ? ((savings / income) * 100).toFixed(0) : 0;
 
   return (
-    <Card className="p-6">
+    <Card className="p-4 sm:p-6">
       <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
         {title}
       </h3>
-      <div className="grid grid-cols-3 gap-4">
-        <div className="text-center p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
-          <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium uppercase mb-1">
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
+        <div className="text-center p-2 sm:p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
+          <p className="text-[10px] sm:text-xs text-emerald-600 dark:text-emerald-400 font-medium uppercase mb-1">
             Income
           </p>
           <PrivacyCurrency
             amount={income}
             isPrivacyMode={isPrivacyMode}
-            className="text-lg font-bold text-emerald-700 dark:text-emerald-400"
+            className="text-sm sm:text-lg font-bold text-emerald-700 dark:text-emerald-400"
           />
         </div>
-        <div className="text-center p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
-          <p className="text-xs text-red-600 dark:text-red-400 font-medium uppercase mb-1">
+        <div className="text-center p-2 sm:p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+          <p className="text-[10px] sm:text-xs text-red-600 dark:text-red-400 font-medium uppercase mb-1">
             Spent
           </p>
           <PrivacyCurrency
             amount={expenses}
             isPrivacyMode={isPrivacyMode}
-            className="text-lg font-bold text-red-700 dark:text-red-400"
+            className="text-sm sm:text-lg font-bold text-red-700 dark:text-red-400"
           />
         </div>
-        <div className="text-center p-3 bg-violet-50 dark:bg-violet-900/20 rounded-lg">
-          <p className="text-xs text-violet-600 dark:text-violet-400 font-medium uppercase mb-1">
+        <div className="text-center p-2 sm:p-3 bg-violet-50 dark:bg-violet-900/20 rounded-lg">
+          <p className="text-[10px] sm:text-xs text-violet-600 dark:text-violet-400 font-medium uppercase mb-1">
             Saved
           </p>
           <PrivacyCurrency
             amount={savings}
             isPrivacyMode={isPrivacyMode}
-            className="text-lg font-bold text-violet-700 dark:text-violet-400"
+            className="text-sm sm:text-lg font-bold text-violet-700 dark:text-violet-400"
           />
-          <p className="text-xs text-violet-500 dark:text-violet-400 mt-0.5">
+          <p className="text-[10px] sm:text-xs text-violet-500 dark:text-violet-400 mt-0.5">
             {savingsRate}% rate
           </p>
         </div>

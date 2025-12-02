@@ -376,13 +376,13 @@ export default function InvestmentAllocation() {
         </div>
 
         {/* Controls */}
-        <div className="flex flex-wrap gap-4 items-center">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:gap-4 sm:items-center">
           <div className="flex items-center gap-2">
-            <FunnelIcon className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+            <FunnelIcon className="h-4 w-4 text-gray-500 dark:text-gray-400 flex-shrink-0" />
             <select
               value={selectedAccount}
               onChange={(e) => setSelectedAccount(e.target.value)}
-              className="px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+              className="flex-1 px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">All Accounts</option>
               {accounts.map(account => (
@@ -392,11 +392,11 @@ export default function InvestmentAllocation() {
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600 dark:text-gray-400">Group by:</span>
+            <span className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">Group by:</span>
             <select
               value={groupBy}
               onChange={(e) => setGroupBy(e.target.value)}
-              className="px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+              className="flex-1 px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
             >
               <option value="account">Account</option>
               <option value="type">Asset Type</option>
@@ -406,69 +406,102 @@ export default function InvestmentAllocation() {
         </div>
 
         {/* Allocation Chart */}
-        <div className="glass-card p-6">
+        <div className="glass-card p-4 sm:p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
               Allocation by {groupBy.charAt(0).toUpperCase() + groupBy.slice(1)}
             </h3>
           </div>
 
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={groupedData}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius="75%"
-                  label={({ name, percentage }) => `${name}: ${formatPercent(percentage)}`}
-                  stroke="rgba(255,255,255,0.2)"
-                  strokeWidth={2}
-                >
-                  {groupedData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  content={({ active, payload }) => {
-                    if (!active || !payload || payload.length === 0) return null;
-                    return (
-                      <div className="bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700 shadow-lg">
-                        {payload.map((entry, index) => (
-                          <div key={index} className="flex items-center gap-2">
-                            <div
-                              className="w-3 h-3 rounded-full"
-                              style={{ backgroundColor: entry.fill }}
-                            />
-                            <span className="text-sm text-gray-600 dark:text-gray-400">
-                              {entry.name}:
-                            </span>
-                            <span className={`text-sm font-medium text-gray-900 dark:text-white ${privacyMode ? 'privacy-blur' : ''}`}>
-                              ${formatCurrency(entry.value)}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    );
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
+          {groupedData.length > 0 ? (
+            <div className="h-64 sm:h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={groupedData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius="70%"
+                    label={false}
+                    stroke="rgba(255,255,255,0.2)"
+                    strokeWidth={2}
+                  >
+                    {groupedData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    content={({ active, payload }) => {
+                      if (!active || !payload || payload.length === 0) return null;
+                      return (
+                        <div className="bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700 shadow-lg">
+                          {payload.map((entry, index) => (
+                            <div key={index} className="flex items-center gap-2">
+                              <div
+                                className="w-3 h-3 rounded-full"
+                                style={{ backgroundColor: entry.fill }}
+                              />
+                              <span className="text-sm text-gray-600 dark:text-gray-400">
+                                {entry.name}:
+                              </span>
+                              <span className={`text-sm font-medium text-gray-900 dark:text-white ${privacyMode ? 'privacy-blur' : ''}`}>
+                                ${formatCurrency(entry.value)} ({formatPercent(entry.payload.percentage)})
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="h-64 sm:h-72 flex items-center justify-center">
+              <div className="text-center">
+                <ChartPieIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {groupBy === 'type' || groupBy === 'sector'
+                    ? 'Configure holdings to see allocation by ' + groupBy
+                    : 'No data available'}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Legend below chart for mobile readability */}
+          {groupedData.length > 0 && (
+            <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {groupedData.map((entry, index) => (
+                <div key={entry.name} className="flex items-center gap-2 text-sm">
+                  <div
+                    className="w-3 h-3 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                  />
+                  <span className="text-gray-700 dark:text-gray-300 truncate">
+                    {entry.name}
+                  </span>
+                  <span className={`text-gray-500 dark:text-gray-500 ${privacyMode ? 'privacy-blur' : ''}`}>
+                    {formatPercent(entry.percentage)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Investment Accounts Configuration */}
         {holdings.some(h => h.needsConfiguration) && (
-          <div className="glass-card p-6 mb-6 border-2 border-amber-500/20 bg-amber-50/50 dark:bg-amber-900/20">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 glass-card-gold rounded-lg flex items-center justify-center glow-gold">
+          <div className="glass-card p-4 sm:p-6 mb-6 border-2 border-amber-500/20 bg-amber-50/50 dark:bg-amber-900/20">
+            <div className="flex items-start sm:items-center gap-3 mb-4">
+              <div className="w-10 h-10 glass-card-gold rounded-lg flex items-center justify-center glow-gold flex-shrink-0">
                 <Cog6ToothIcon className="h-5 w-5 text-white" />
               </div>
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Configure Your Holdings</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
+              <div className="flex-1 min-w-0">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">Configure Your Holdings</h3>
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                   Some investment accounts need holdings configuration to display accurate data
                 </p>
               </div>
@@ -480,9 +513,9 @@ export default function InvestmentAllocation() {
                   const account = [...(ynabAccounts || []), ...(manualAccounts || [])]
                     .find(acc => acc.id === holding.accountId);
                   return (
-                    <div key={holding.id} className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-                      <div>
-                        <p className="font-medium text-gray-900 dark:text-white">{holding.account}</p>
+                    <div key={holding.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                      <div className="min-w-0">
+                        <p className="font-medium text-gray-900 dark:text-white truncate">{holding.account}</p>
                         <p className={`text-sm text-green-600 dark:text-green-400 ${privacyMode ? 'privacy-blur' : ''}`}>
                           Balance: ${formatCurrency(holding.value)}
                         </p>
@@ -494,6 +527,7 @@ export default function InvestmentAllocation() {
                         }}
                         variant="primary"
                         size="sm"
+                        className="w-full sm:w-auto flex-shrink-0"
                       >
                         Configure Holdings
                       </Button>

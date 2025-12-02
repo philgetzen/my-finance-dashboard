@@ -196,8 +196,8 @@ export default function Accounts() {
     <PageTransition>
       <div className="w-full max-w-none space-y-6 pb-4">
         {/* Header */}
-        <Card className="p-6">
-          <div className="flex items-center justify-between mb-4">
+        <Card className="p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
             <div>
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white text-left">Accounts</h1>
               <p className="mt-1 text-gray-600 dark:text-gray-400 text-left">
@@ -206,7 +206,7 @@ export default function Accounts() {
             </div>
             <Button
               onClick={() => setShowManualModal(true)}
-              className="flex items-center gap-2"
+              className="flex items-center justify-center gap-2 w-full sm:w-auto"
               disabled={!isFeatureEnabled('create_account')}
               title={!isFeatureEnabled('create_account') ? 'Account creation disabled in demo mode' : 'Add a new manual account'}
             >

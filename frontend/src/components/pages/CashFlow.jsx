@@ -44,7 +44,7 @@ const CategoryRow = React.memo(({ item, monthHeaders, privacyMode, isIncome, dep
 
   return (
     <tr className="group hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-      <td className="py-2.5 pl-4 pr-4 sticky left-0 bg-white dark:bg-gray-900 group-hover:bg-gray-50 dark:group-hover:bg-gray-800/50 transition-colors z-10 min-w-[180px]">
+      <td className="py-2.5 pl-4 pr-4 sm:sticky sm:left-0 bg-white dark:bg-gray-900 group-hover:bg-gray-50 dark:group-hover:bg-gray-800/50 transition-colors sm:z-10 min-w-[140px] sm:min-w-[180px]">
         <span
           className="text-sm text-gray-700 dark:text-gray-300"
           style={{ paddingLeft: `${depth * 16}px` }}
@@ -101,7 +101,7 @@ const GroupHeaderRow = React.memo(({ group, monthHeaders, privacyMode, isIncome,
       }`}
       onClick={onToggle}
     >
-      <td className={`py-3 pl-4 pr-4 sticky left-0 z-10 min-w-[180px] ${
+      <td className={`py-3 pl-4 pr-4 sm:sticky sm:left-0 sm:z-10 min-w-[140px] sm:min-w-[180px] ${
         isIncome
           ? 'bg-green-50 dark:bg-green-900/20'
           : 'bg-gray-100 dark:bg-gray-800'
@@ -173,7 +173,7 @@ const SectionHeader = ({ title, icon: Icon, colorClass }) => (
 // Summary row component
 const SummaryRow = ({ label, monthHeaders, monthlyData, avgValue, totalValue, colorClass, isBold, privacyMode }) => (
   <tr className={isBold ? 'border-t-2 border-gray-300 dark:border-gray-600' : ''}>
-    <td className={`py-3 pl-4 pr-4 sticky left-0 bg-white dark:bg-gray-900 z-10 min-w-[180px] ${
+    <td className={`py-3 pl-4 pr-4 sm:sticky sm:left-0 bg-white dark:bg-gray-900 sm:z-10 min-w-[140px] sm:min-w-[180px] ${
       isBold ? 'font-bold text-gray-900 dark:text-white' : 'font-medium text-gray-700 dark:text-gray-300'
     }`}>
       <span className="text-sm">{label}</span>
@@ -519,7 +519,7 @@ export default function CashFlow() {
             <table className="w-full border-collapse">
               <thead>
                 <tr className="bg-gray-50 dark:bg-gray-800/50">
-                  <th className="py-3 pl-4 pr-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider sticky left-0 bg-gray-50 dark:bg-gray-800/50 z-20 min-w-[180px]">
+                  <th className="py-3 pl-4 pr-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider sm:sticky sm:left-0 bg-gray-50 dark:bg-gray-800/50 sm:z-20 min-w-[140px] sm:min-w-[180px]">
                     Category
                   </th>
                   {monthHeaders.map(month => (
