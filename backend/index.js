@@ -162,6 +162,51 @@ console.log('Loaded ENV:', {
 // Track processed authorization codes
 const processedCodes = new Set();
 
+// In-memory cache for YNAB API responses (works within warm serverless instances)
+const ynabCache = new Map();
+const CACHE_TTL = 60 * 60 * 1000; // 1 hour
+
+function getCacheKey(token, endpoint) {
+  // Use first 10 chars of token + endpoint as cache key
+  const tokenPrefix = token ? token.substring(0, 10) : 'notoken';
+  return `${tokenPrefix}:${endpoint}`;
+}
+
+function getFromCache(key) {
+  const cached = ynabCache.get(key);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    console.log(`Cache HIT for ${key}`);
+    return cached.data;
+  }
+  if (cached) {
+    ynabCache.delete(key); // Clean up expired entry
+  }
+  return null;
+}
+
+function setCache(key, data) {
+  // Limit cache size to prevent memory issues
+  if (ynabCache.size > 1000) {
+    const entries = Array.from(ynabCache.entries());
+    entries.sort((a, b) => a[1].timestamp - b[1].timestamp);
+    entries.slice(0, 500).forEach(([k]) => ynabCache.delete(k));
+  }
+  ynabCache.set(key, { data, timestamp: Date.now() });
+}
+
+// Set cache headers for Vercel edge caching
+// This persists across serverless cold starts
+function setCacheHeaders(res, isPrivate = true) {
+  if (isPrivate) {
+    // Private cache - cached per user (uses Authorization header as key)
+    res.set('Cache-Control', 'private, max-age=3600, stale-while-revalidate=7200');
+  } else {
+    // Public cache - same for all users
+    res.set('Cache-Control', 'public, max-age=3600, s-maxage=3600, stale-while-revalidate=7200');
+  }
+  res.set('Vary', 'Authorization');
+}
+
 // Routes
 app.get('/', (req, res) => {
   res.json({ 
@@ -321,13 +366,50 @@ app.post('/api/ynab/token', async (req, res) => {
   }
 });
 
-// YNAB API proxy endpoints
+// YNAB API proxy endpoints (with caching for faster responses)
 app.get('/api/ynab/budgets', async (req, res) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Authorization header required' });
   }
-  
+
+  const { budgetId, resource } = req.query;
+  const token = authHeader.replace('Bearer ', '');
+
+  // Handle resource parameter for combined endpoint
+  if (budgetId && resource) {
+    const cacheKey = getCacheKey(token, `budgets/${budgetId}/${resource}`);
+    const cached = getFromCache(cacheKey);
+    if (cached) {
+      setCacheHeaders(res);
+      return res.json(cached);
+    }
+
+    try {
+      const response = await axios.get(`${YNAB_API_BASE_URL}/budgets/${budgetId}/${resource}`, {
+        headers: {
+          'Authorization': authHeader,
+          'Accept': 'application/json'
+        }
+      });
+      setCache(cacheKey, response.data);
+      setCacheHeaders(res);
+      res.json(response.data);
+    } catch (error) {
+      console.error(`Error fetching ${resource}:`, error.response?.data || error.message);
+      res.status(error.response?.status || 500).json({ error: `Unable to fetch ${resource}` });
+    }
+    return;
+  }
+
+  // Default: fetch all budgets
+  const cacheKey = getCacheKey(token, 'budgets');
+  const cached = getFromCache(cacheKey);
+  if (cached) {
+    setCacheHeaders(res);
+    return res.json(cached);
+  }
+
   try {
     const response = await axios.get(`${YNAB_API_BASE_URL}/budgets`, {
       headers: {
@@ -335,6 +417,8 @@ app.get('/api/ynab/budgets', async (req, res) => {
         'Accept': 'application/json'
       }
     });
+    setCache(cacheKey, response.data);
+    setCacheHeaders(res);
     res.json(response.data);
   } catch (error) {
     console.error('Error fetching budgets:', error.response?.data || error.message);
@@ -342,14 +426,22 @@ app.get('/api/ynab/budgets', async (req, res) => {
   }
 });
 
-// Fixed parameterized routes - these should work now
+// Fixed parameterized routes with caching
 app.get('/api/ynab/budgets/:budgetId/accounts', async (req, res) => {
   const { budgetId } = req.params;
   const authHeader = req.headers.authorization;
   if (!authHeader) {
     return res.status(401).json({ error: 'Authorization header required' });
   }
-  
+
+  const token = authHeader.replace('Bearer ', '');
+  const cacheKey = getCacheKey(token, `budgets/${budgetId}/accounts`);
+  const cached = getFromCache(cacheKey);
+  if (cached) {
+    setCacheHeaders(res);
+    return res.json(cached);
+  }
+
   try {
     const response = await axios.get(`${YNAB_API_BASE_URL}/budgets/${budgetId}/accounts`, {
       headers: {
@@ -357,6 +449,8 @@ app.get('/api/ynab/budgets/:budgetId/accounts', async (req, res) => {
         'Accept': 'application/json'
       }
     });
+    setCache(cacheKey, response.data);
+    setCacheHeaders(res);
     res.json(response.data);
   } catch (error) {
     console.error('Error fetching accounts:', error.response?.data || error.message);
@@ -371,19 +465,29 @@ app.get('/api/ynab/budgets/:budgetId/transactions', async (req, res) => {
   if (!authHeader) {
     return res.status(401).json({ error: 'Authorization header required' });
   }
-  
+
+  const token = authHeader.replace('Bearer ', '');
+  const cacheKey = getCacheKey(token, `budgets/${budgetId}/transactions${since_date ? `?since=${since_date}` : ''}`);
+  const cached = getFromCache(cacheKey);
+  if (cached) {
+    setCacheHeaders(res);
+    return res.json(cached);
+  }
+
   try {
     let url = `${YNAB_API_BASE_URL}/budgets/${budgetId}/transactions`;
     if (since_date) {
       url += `?since_date=${since_date}`;
     }
-    
+
     const response = await axios.get(url, {
       headers: {
         'Authorization': authHeader,
         'Accept': 'application/json'
       }
     });
+    setCache(cacheKey, response.data);
+    setCacheHeaders(res);
     res.json(response.data);
   } catch (error) {
     console.error('Error fetching transactions:', error.response?.data || error.message);
@@ -397,7 +501,15 @@ app.get('/api/ynab/budgets/:budgetId/categories', async (req, res) => {
   if (!authHeader) {
     return res.status(401).json({ error: 'Authorization header required' });
   }
-  
+
+  const token = authHeader.replace('Bearer ', '');
+  const cacheKey = getCacheKey(token, `budgets/${budgetId}/categories`);
+  const cached = getFromCache(cacheKey);
+  if (cached) {
+    setCacheHeaders(res);
+    return res.json(cached);
+  }
+
   try {
     const response = await axios.get(`${YNAB_API_BASE_URL}/budgets/${budgetId}/categories`, {
       headers: {
@@ -405,6 +517,8 @@ app.get('/api/ynab/budgets/:budgetId/categories', async (req, res) => {
         'Accept': 'application/json'
       }
     });
+    setCache(cacheKey, response.data);
+    setCacheHeaders(res);
     res.json(response.data);
   } catch (error) {
     console.error('Error fetching categories:', error.response?.data || error.message);
@@ -418,7 +532,15 @@ app.get('/api/ynab/budgets/:budgetId/months', async (req, res) => {
   if (!authHeader) {
     return res.status(401).json({ error: 'Authorization header required' });
   }
-  
+
+  const token = authHeader.replace('Bearer ', '');
+  const cacheKey = getCacheKey(token, `budgets/${budgetId}/months`);
+  const cached = getFromCache(cacheKey);
+  if (cached) {
+    setCacheHeaders(res);
+    return res.json(cached);
+  }
+
   try {
     const response = await axios.get(`${YNAB_API_BASE_URL}/budgets/${budgetId}/months`, {
       headers: {
@@ -426,6 +548,8 @@ app.get('/api/ynab/budgets/:budgetId/months', async (req, res) => {
         'Accept': 'application/json'
       }
     });
+    setCache(cacheKey, response.data);
+    setCacheHeaders(res);
     res.json(response.data);
   } catch (error) {
     console.error('Error fetching months:', error.response?.data || error.message);

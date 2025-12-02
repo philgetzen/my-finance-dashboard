@@ -225,54 +225,52 @@ export const FinanceDataProvider = ({ children }) => {
       try {
         setUser(currentUser);
         if (currentUser) {
-          // Fetch YNAB token with auto-connect detection
-          try {
-            setIsAutoConnectingYNAB(true);
-            
-            const tokenResponse = await fetch(
-              `${import.meta.env.VITE_API_BASE_URL}/api/ynab/token?user_id=${currentUser.uid}`
-            );
-            
-            if (tokenResponse.ok) {
-              const tokenData = await tokenResponse.json();
+          // Fetch YNAB token and manual accounts in parallel for faster load
+          setIsAutoConnectingYNAB(true);
+
+          const [tokenResult, accountsResult] = await Promise.allSettled([
+            fetch(`${import.meta.env.VITE_API_BASE_URL}/api/ynab/token?user_id=${currentUser.uid}`),
+            fetch(`${import.meta.env.VITE_API_BASE_URL}/api/manual_accounts?user_id=${currentUser.uid}`)
+          ]);
+
+          // Handle YNAB token response
+          if (tokenResult.status === 'fulfilled' && tokenResult.value.ok) {
+            try {
+              const tokenData = await tokenResult.value.json();
               if (tokenData.access_token) {
                 setAutoConnectMessage('Found existing YNAB connection!');
                 console.log('Auto-connecting with existing YNAB token');
                 setYnabToken(tokenData.access_token);
                 setYnabRefreshToken(tokenData.refresh_token || null);
-                setIsAutoConnectingYNAB(false);
                 setHasAutoConnected(true);
-                // Keep the message visible - don't clear it
               } else {
-                // No existing token found
                 setAutoConnectMessage(null);
-                setIsAutoConnectingYNAB(false);
                 setHasAutoConnected(false);
               }
-            } else {
-              // No existing token or error fetching
+            } catch (error) {
+              console.error('Error parsing YNAB token response:', error);
               setAutoConnectMessage(null);
-              setIsAutoConnectingYNAB(false);
               setHasAutoConnected(false);
             }
-          } catch (error) {
-            console.error('Error fetching YNAB token:', error);
+          } else {
+            if (tokenResult.status === 'rejected') {
+              console.error('Error fetching YNAB token:', tokenResult.reason);
+            }
             setAutoConnectMessage(null);
-            setIsAutoConnectingYNAB(false);
             setHasAutoConnected(false);
           }
-          
-          // Fetch manual accounts
-          try {
-            const accountsResponse = await fetch(
-              `${import.meta.env.VITE_API_BASE_URL}/api/manual_accounts?user_id=${currentUser.uid}`
-            );
-            if (accountsResponse.ok) {
-              const accountsData = await accountsResponse.json();
+          setIsAutoConnectingYNAB(false);
+
+          // Handle manual accounts response
+          if (accountsResult.status === 'fulfilled' && accountsResult.value.ok) {
+            try {
+              const accountsData = await accountsResult.value.json();
               setManualAccounts(accountsData.accounts || []);
+            } catch (error) {
+              console.error('Error parsing manual accounts response:', error);
             }
-          } catch (error) {
-            console.error('Error fetching manual accounts:', error);
+          } else if (accountsResult.status === 'rejected') {
+            console.error('Error fetching manual accounts:', accountsResult.reason);
           }
         } else {
           // Clear data on logout

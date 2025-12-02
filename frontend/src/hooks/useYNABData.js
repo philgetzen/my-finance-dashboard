@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ynabService } from '../lib/ynabApi';
-import { queryKeys } from '../lib/queryClient';
 import { useEffect } from 'react';
 
 // YNAB Query Keys
@@ -42,7 +41,7 @@ export const useYNABBudgets = (enabled = false) => {
     queryKey: ynabQueryKeys.budgets(),
     queryFn: () => ynabService.getBudgets(),
     enabled: enabled,
-    staleTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: 60 * 60 * 1000, // 1 hour
     retry: ynabQueryRetryFn,
   });
 };
@@ -53,7 +52,7 @@ export const useYNABAccounts = (budgetId = 'last-used', enabled = false) => {
     queryKey: ynabQueryKeys.accounts(budgetId),
     queryFn: () => ynabService.getAccounts(budgetId),
     enabled: enabled,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 60 * 60 * 1000, // 1 hour
     retry: ynabQueryRetryFn,
   });
 };
@@ -64,7 +63,7 @@ export const useYNABTransactions = (budgetId = 'last-used', enabled = false) => 
     queryKey: ynabQueryKeys.transactions(budgetId),
     queryFn: () => ynabService.getTransactions(budgetId),
     enabled: enabled,
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 60 * 60 * 1000, // 1 hour
     retry: ynabQueryRetryFn,
   });
 };
@@ -75,7 +74,7 @@ export const useYNABCategories = (budgetId = 'last-used', enabled = false) => {
     queryKey: ynabQueryKeys.categories(budgetId),
     queryFn: () => ynabService.getCategories(budgetId),
     enabled: enabled,
-    staleTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: 60 * 60 * 1000, // 1 hour
     retry: ynabQueryRetryFn,
   });
 };
@@ -86,7 +85,7 @@ export const useYNABMonths = (budgetId = 'last-used', enabled = false) => {
     queryKey: ynabQueryKeys.months(budgetId),
     queryFn: () => ynabService.getMonths(budgetId),
     enabled: enabled,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 60 * 60 * 1000, // 1 hour
     retry: ynabQueryRetryFn,
   });
 };
@@ -97,51 +96,38 @@ export const useYNABSummary = (budgetId = 'last-used', enabled = false) => {
     queryKey: ynabQueryKeys.summary(budgetId),
     queryFn: () => ynabService.getBudgetSummary(budgetId),
     enabled: enabled,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 60 * 60 * 1000, // 1 hour
     retry: ynabQueryRetryFn,
   });
 };
 
 // Combined hook for all YNAB data
+// Optimized: Only uses getBudgetSummary which fetches all data in parallel
+// This reduces API calls from 10+ to just 5
 export const useYNABData = (budgetId = 'last-used', enabled = false, accessToken = null, refreshToken = null, userId = null) => {
   // Initialize YNAB service when access token is provided
   useInitializeYNAB(accessToken, refreshToken, userId);
-  
+
   // Use accessToken presence instead of ynabService.isInitialized() for enabling queries
   const shouldEnable = enabled && !!accessToken;
-  
-  const budgets = useYNABBudgets(shouldEnable);
-  const accounts = useYNABAccounts(budgetId, shouldEnable);
-  const transactions = useYNABTransactions(budgetId, shouldEnable);
-  const categories = useYNABCategories(budgetId, shouldEnable);
-  const months = useYNABMonths(budgetId, shouldEnable);
+
+  // Only use the summary query - it fetches all data in parallel internally
   const summary = useYNABSummary(budgetId, shouldEnable);
 
-  const isLoading = budgets.isLoading || accounts.isLoading || transactions.isLoading || 
-                    categories.isLoading || months.isLoading || summary.isLoading;
-  
-  const isError = budgets.isError || accounts.isError || transactions.isError || 
-                  categories.isError || months.isError || summary.isError;
-  
-  const error = budgets.error || accounts.error || transactions.error || 
-                categories.error || months.error || summary.error;
+  // Extract data from summary response
+  const summaryData = summary.data || {};
 
   return {
-    budgets: budgets.data || [],
-    accounts: accounts.data || [],
-    transactions: transactions.data || [],
-    categories: categories.data || { category_groups: [] },
-    months: months.data || [],
-    summary: summary.data || null,
-    isLoading,
-    isError,
-    error,
+    budgets: summaryData.budgets || [],
+    accounts: summaryData.accounts || [],
+    transactions: summaryData.transactions || [],
+    categories: summaryData.categories || { category_groups: [] },
+    months: summaryData.months || [],
+    summary: summaryData,
+    isLoading: summary.isLoading,
+    isError: summary.isError,
+    error: summary.error,
     refetch: () => {
-      budgets.refetch();
-      accounts.refetch();
-      transactions.refetch();
-      categories.refetch();
-      months.refetch();
       summary.refetch();
     },
   };
