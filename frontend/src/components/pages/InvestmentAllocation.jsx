@@ -376,13 +376,13 @@ export default function InvestmentAllocation() {
         </div>
 
         {/* Controls */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:gap-4 sm:items-center">
-          <div className="flex items-center gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:gap-4 sm:items-center overflow-hidden">
+          <div className="flex items-center gap-2 min-w-0">
             <FunnelIcon className="h-4 w-4 text-gray-500 dark:text-gray-400 flex-shrink-0" />
             <select
               value={selectedAccount}
               onChange={(e) => setSelectedAccount(e.target.value)}
-              className="flex-1 px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+              className="flex-1 min-w-0 px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">All Accounts</option>
               {accounts.map(account => (
@@ -391,12 +391,12 @@ export default function InvestmentAllocation() {
             </select>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             <span className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">Group by:</span>
             <select
               value={groupBy}
               onChange={(e) => setGroupBy(e.target.value)}
-              className="flex-1 px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+              className="flex-1 min-w-0 px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
             >
               <option value="account">Account</option>
               <option value="type">Asset Type</option>
