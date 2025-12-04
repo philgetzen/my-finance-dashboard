@@ -17,6 +17,9 @@ import PrivacyCurrency from '../ui/PrivacyCurrency';
 import { getAccountBalance, normalizeYNABAccountType } from '../../utils/ynabHelpers';
 import { formatCurrency, isLiability, getDisplayAccountType, isEffectivelyZero } from '../../utils/formatters';
 import { useTransactionProcessor, getMonthlyRangeData } from '../../hooks/useTransactionProcessor';
+import { useAccountManager } from '../../hooks/useAccountManager';
+import { useRunwayCalculator } from '../../hooks/useRunwayCalculator';
+import { Link } from 'react-router-dom';
 import {
   BanknotesIcon,
   CreditCardIcon,
@@ -31,6 +34,8 @@ import {
   ChevronDownIcon,
   ChevronUpIcon,
   CalendarIcon,
+  ClockIcon,
+  ChevronRightIcon,
 } from '@heroicons/react/24/outline';
 
 // Mixpanel-inspired chart colors - purple first
@@ -315,6 +320,88 @@ const TopCategories = React.memo(({ categories, isPrivacyMode }) => {
 
 TopCategories.displayName = 'TopCategories';
 
+// Runway health colors
+const RUNWAY_HEALTH_COLORS = {
+  critical: { bg: 'bg-red-500', text: 'text-red-600 dark:text-red-400', ring: 'ring-red-500' },
+  caution: { bg: 'bg-amber-500', text: 'text-amber-600 dark:text-amber-400', ring: 'ring-amber-500' },
+  healthy: { bg: 'bg-emerald-500', text: 'text-emerald-600 dark:text-emerald-400', ring: 'ring-emerald-500' },
+  excellent: { bg: 'bg-violet-500', text: 'text-violet-600 dark:text-violet-400', ring: 'ring-violet-500' }
+};
+
+// Runway Summary Card for Dashboard
+const RunwaySummaryCard = React.memo(({ runway, isPrivacyMode }) => {
+  const colors = RUNWAY_HEALTH_COLORS[runway.runwayHealth];
+  const displayMonths = !isFinite(runway.pureRunwayMonths)
+    ? '∞'
+    : runway.pureRunwayMonths >= 24
+      ? '24+'
+      : Math.floor(runway.pureRunwayMonths);
+
+  // Progress bar shows runway (capped at 24 months = 100%)
+  const progressPercent = Math.min((runway.pureRunwayMonths / 24) * 100, 100);
+
+  return (
+    <Card className="p-4 sm:p-6">
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <div className={`p-2 rounded-lg ${colors.bg}/10`}>
+            <ClockIcon className={`h-4 w-4 sm:h-5 sm:w-5 ${colors.text}`} />
+          </div>
+          <div>
+            <h3 className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">
+              Cash Runway
+            </h3>
+          </div>
+        </div>
+        <Link
+          to="/runway"
+          className="text-xs text-violet-600 dark:text-violet-400 hover:underline flex items-center gap-0.5"
+        >
+          Details <ChevronRightIcon className="h-3 w-3" />
+        </Link>
+      </div>
+
+      {/* Primary metric */}
+      <div className="flex items-baseline gap-2 mb-3">
+        <span className={`text-2xl sm:text-3xl font-bold ${colors.text}`}>
+          {displayMonths}
+        </span>
+        <span className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+          {displayMonths === 1 ? 'month' : 'months'}
+        </span>
+      </div>
+
+      {/* Progress bar */}
+      <div className="h-1.5 sm:h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden mb-2">
+        <div
+          className={`h-full ${colors.bg} transition-all duration-500 rounded-full`}
+          style={{ width: `${progressPercent}%` }}
+        />
+      </div>
+
+      {/* Supporting metrics */}
+      <div className="flex justify-between text-[10px] sm:text-xs text-gray-500 dark:text-gray-400">
+        <div>
+          Cash: <PrivacyCurrency
+            amount={runway.cashReserves}
+            isPrivacyMode={isPrivacyMode}
+            className="font-medium text-gray-700 dark:text-gray-300"
+          />
+        </div>
+        <div>
+          Avg/mo: <PrivacyCurrency
+            amount={runway.avgMonthlyExpenses}
+            isPrivacyMode={isPrivacyMode}
+            className="font-medium text-gray-700 dark:text-gray-300"
+          />
+        </div>
+      </div>
+    </Card>
+  );
+});
+
+RunwaySummaryCard.displayName = 'RunwaySummaryCard';
+
 const TransactionRow = React.memo(({ transaction, account, isPrivacyMode }) => {
   const amount = transaction.processedAmount || 0;
   const isZero = isEffectivelyZero(amount);
@@ -396,6 +483,12 @@ export default function Dashboard() {
     allAccounts,
     investmentAccountIds
   );
+
+  // Use account manager to get normalized accounts for runway calculation
+  const { allAccounts: normalizedAccounts } = useAccountManager(ynabAccounts, manualAccounts);
+
+  // Calculate runway metrics (uses 6 month average by default)
+  const runway = useRunwayCalculator(normalizedAccounts, monthlyData, 6);
 
   // Calculate date range based on selected time period
   const dateRange = useMemo(() => {
@@ -715,8 +808,8 @@ export default function Dashboard() {
           />
         </div>
 
-        {/* Assets vs Liabilities Quick View */}
-        <div className="grid grid-cols-2 gap-4">
+        {/* Assets, Liabilities, and Runway Quick View */}
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
           <MetricCard
             title="Total Assets"
             value={totalAssets}
@@ -733,6 +826,12 @@ export default function Dashboard() {
             color="text-red-600 dark:text-red-400"
             isPrivacyMode={privacyMode}
           />
+          <div className="col-span-2 lg:col-span-1">
+            <RunwaySummaryCard
+              runway={runway}
+              isPrivacyMode={privacyMode}
+            />
+          </div>
         </div>
 
         {/* Collapsible: Net Worth Over Time */}

@@ -8,6 +8,7 @@ import {
   BanknotesIcon,
   ChartBarIcon,
   ChartPieIcon,
+  ClockIcon,
   ArrowRightOnRectangleIcon,
   UserCircleIcon,
   MoonIcon,
@@ -119,6 +120,9 @@ export default function Sidebar({ onClose }) {
         </NavItem>
         <NavItem to="/investments" icon={ChartPieIcon} onNavigate={onClose}>
           Investments
+        </NavItem>
+        <NavItem to="/runway" icon={ClockIcon} onNavigate={onClose}>
+          Runway
         </NavItem>
       </nav>
 
