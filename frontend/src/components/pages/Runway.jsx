@@ -83,20 +83,26 @@ const CustomTooltip = ({ active, payload, label, privacyMode }) => {
       <p className="text-sm font-medium text-gray-900 dark:text-white mb-2">
         {label}
       </p>
-      {payload.map((entry, index) => (
-        <div key={index} className="flex items-center gap-2">
-          <div
-            className="w-3 h-3 rounded-full"
-            style={{ backgroundColor: entry.color || entry.stroke || entry.fill }}
-          />
-          <span className="text-sm text-gray-600 dark:text-gray-400">
-            {entry.name}:
-          </span>
-          <span className={`text-sm font-medium ${privacyMode ? 'privacy-blur' : ''}`}>
-            ${formatCurrency(entry.value)}
-          </span>
-        </div>
-      ))}
+      {payload.map((entry, index) => {
+        const color = entry.color || entry.stroke || entry.fill;
+        return (
+          <div key={index} className="flex items-center gap-2">
+            <div
+              className="w-3 h-3 rounded-full"
+              style={{ backgroundColor: color }}
+            />
+            <span className="text-sm text-gray-600 dark:text-gray-400">
+              {entry.name}:
+            </span>
+            <span
+              className={`text-sm font-medium ${privacyMode ? 'privacy-blur' : ''}`}
+              style={{ color }}
+            >
+              ${formatCurrency(entry.value)}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 };
