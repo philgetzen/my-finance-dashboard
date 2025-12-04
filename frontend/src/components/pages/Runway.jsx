@@ -21,6 +21,7 @@ import {
   ExclamationTriangleIcon,
   CheckCircleIcon,
   ChevronDownIcon,
+  InformationCircleIcon,
 } from '@heroicons/react/24/outline';
 
 // Purple-first color palette (matches Dashboard)
@@ -170,6 +171,33 @@ export default function Runway() {
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
               <ClockIcon className="h-7 w-7 text-violet-500" />
               Cash Runway
+              {/* Info tooltip */}
+              <div className="relative group">
+                <InformationCircleIcon className="h-5 w-5 text-gray-400 hover:text-violet-500 cursor-help transition-colors" />
+                <div className="absolute left-0 top-full mt-2 w-80 sm:w-96 p-4 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                  <h4 className="font-semibold text-gray-900 dark:text-white text-sm mb-2">
+                    How Runway is Calculated
+                  </h4>
+                  <div className="space-y-3 text-xs text-gray-600 dark:text-gray-400">
+                    <div>
+                      <p className="font-medium text-gray-700 dark:text-gray-300 mb-1">Cash Reserves</p>
+                      <p>Sum of all Checking, Savings, and Cash accounts (excludes investments and closed accounts)</p>
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-700 dark:text-gray-300 mb-1">Worst Case (No Income)</p>
+                      <p>Cash Reserves ÷ Average Monthly Expenses = Months until depleted with no income</p>
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-700 dark:text-gray-300 mb-1">Realistic (With Income)</p>
+                      <p>Cash Reserves ÷ (Avg Expenses - Avg Income) = Months until depleted considering income</p>
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-700 dark:text-gray-300 mb-1">Averaging Period</p>
+                      <p>Income and expenses are averaged over the selected period ({selectedPeriod} months) for more stable projections</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </h1>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
               How long your cash reserves will last
