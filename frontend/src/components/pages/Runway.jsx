@@ -114,7 +114,7 @@ export default function Runway() {
     accounts: ynabAccounts,
     transactions: ynabTransactions,
     manualAccounts,
-    loading: isLoading,
+    isLoading,
   } = useFinanceData();
   const { privacyMode } = usePrivacy();
 
