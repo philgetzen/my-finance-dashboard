@@ -11,6 +11,7 @@ import { formatCurrency } from '../../utils/formatters';
 import PageTransition from '../ui/PageTransition';
 import Card from '../ui/Card';
 import PrivacyCurrency from '../ui/PrivacyCurrency';
+import { RunwaySkeleton } from '../ui/Skeleton';
 import {
   ClockIcon,
   BanknotesIcon,
@@ -155,17 +156,7 @@ export default function Runway() {
   if (isLoading) {
     return (
       <PageTransition>
-        <div className="w-full max-w-none space-y-6 pb-4">
-          <div className="animate-pulse space-y-4">
-            <div className="h-12 bg-gray-200 dark:bg-gray-700 rounded-xl w-1/3" />
-            <div className="h-24 bg-gray-200 dark:bg-gray-700 rounded-xl" />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="h-48 bg-gray-200 dark:bg-gray-700 rounded-xl" />
-              <div className="h-48 bg-gray-200 dark:bg-gray-700 rounded-xl" />
-            </div>
-            <div className="h-72 bg-gray-200 dark:bg-gray-700 rounded-xl" />
-          </div>
-        </div>
+        <RunwaySkeleton />
       </PageTransition>
     );
   }

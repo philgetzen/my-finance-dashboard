@@ -164,6 +164,98 @@ export function AccountsSkeleton() {
   );
 }
 
+export function RunwaySkeleton() {
+  return (
+    <div className="w-full max-w-none space-y-6 pb-4">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-7 w-7 rounded-lg" />
+          <div>
+            <Skeleton className="h-8 w-32 mb-1" />
+            <Skeleton className="h-4 w-48" />
+          </div>
+        </div>
+        <Skeleton className="h-10 w-40 rounded-lg" />
+      </div>
+
+      {/* Health Status Banner */}
+      <SkeletonCard>
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-6 w-6 rounded-full" />
+          <div>
+            <Skeleton className="h-5 w-48 mb-1" />
+            <Skeleton className="h-4 w-36" />
+          </div>
+        </div>
+      </SkeletonCard>
+
+      {/* Two Scenario Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {[...Array(2)].map((_, i) => (
+          <SkeletonCard key={i} className="border-l-4 border-l-gray-300 dark:border-l-gray-600">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <Skeleton className="h-4 w-24 mb-1" />
+                <Skeleton className="h-3 w-32" />
+              </div>
+              <Skeleton className="h-5 w-5" />
+            </div>
+            <div className="flex items-baseline gap-2 mb-4">
+              <Skeleton className="h-10 w-16" />
+              <Skeleton className="h-5 w-16" />
+            </div>
+            <div className="pt-4 border-t border-gray-100 dark:border-gray-700">
+              <div className="flex justify-between">
+                <Skeleton className="h-4 w-28" />
+                <Skeleton className="h-4 w-20" />
+              </div>
+            </div>
+          </SkeletonCard>
+        ))}
+      </div>
+
+      {/* Cash Reserves Breakdown */}
+      <SkeletonCard>
+        <div className="flex items-center gap-2 mb-4">
+          <Skeleton className="h-5 w-5" />
+          <Skeleton className="h-6 w-48" />
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg text-center">
+              <Skeleton className="h-3 w-16 mx-auto mb-2" />
+              <Skeleton className="h-7 w-24 mx-auto" />
+            </div>
+          ))}
+        </div>
+      </SkeletonCard>
+
+      {/* Cash Projection Chart */}
+      <SkeletonCard>
+        <Skeleton className="h-6 w-48 mb-4" />
+        <Skeleton className="h-72 w-full rounded-lg" />
+      </SkeletonCard>
+
+      {/* Historical Spending Chart */}
+      <SkeletonCard>
+        <Skeleton className="h-6 w-48 mb-4" />
+        <Skeleton className="h-64 w-full rounded-lg" />
+      </SkeletonCard>
+
+      {/* Summary Metrics */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {[...Array(3)].map((_, i) => (
+          <SkeletonCard key={i} className="text-center">
+            <Skeleton className="h-3 w-28 mx-auto mb-2" />
+            <Skeleton className="h-7 w-24 mx-auto" />
+          </SkeletonCard>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function HoldingsSkeleton() {
   return (
     <div className="w-full max-w-none space-y-4 sm:space-y-6 lg:space-y-8">
