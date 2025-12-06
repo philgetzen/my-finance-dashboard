@@ -1,7 +1,5 @@
 import React, { useCallback } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { signOut } from 'firebase/auth';
-import { auth } from '../../firebase';
 import { useFinanceData, usePrivacy } from '../../contexts/ConsolidatedDataContext';
 import {
   HomeIcon,
@@ -53,18 +51,18 @@ NavItem.displayName = 'NavItem';
 
 export default function Sidebar({ onClose }) {
   const navigate = useNavigate();
-  const { user, darkMode, toggleDarkMode } = useFinanceData();
+  const { user, darkMode, toggleDarkMode, logout } = useFinanceData();
   const { privacyMode, setPrivacyMode } = usePrivacy();
 
   const handleLogout = useCallback(async () => {
     try {
-      await signOut(auth);
+      await logout();
       navigate('/login');
       if (onClose) onClose();
     } catch (error) {
       console.error('Error signing out:', error);
     }
-  }, [navigate, onClose]);
+  }, [navigate, onClose, logout]);
 
   return (
     <aside className="h-full flex flex-col bg-[var(--sidebar-bg)]">
