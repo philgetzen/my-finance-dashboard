@@ -17,6 +17,7 @@ const Accounts = lazy(() => import('./components/pages/Accounts'));
 const CashFlow = lazy(() => import('./components/pages/CashFlow'));
 const InvestmentAllocation = lazy(() => import('./components/pages/InvestmentAllocation'));
 const Runway = lazy(() => import('./components/pages/Runway'));
+const ConsciousSpendingPlan = lazy(() => import('./components/pages/ConsciousSpendingPlan'));
 
 // Loading component
 const PageLoader = () => (
@@ -108,6 +109,7 @@ function ProtectedRoutes() {
           <Route path="/spending" element={<CashFlow />} />
           <Route path="/investments" element={<InvestmentAllocation />} />
           <Route path="/runway" element={<Runway />} />
+          <Route path="/conscious-spending" element={<ConsciousSpendingPlan />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </Suspense>

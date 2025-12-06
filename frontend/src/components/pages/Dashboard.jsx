@@ -231,34 +231,34 @@ const PeriodSummary = React.memo(({ title, income, expenses, savings, isPrivacyM
         {title}
       </h3>
       <div className="grid grid-cols-3 gap-2 sm:gap-4">
-        <div className="text-center p-2 sm:p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
+        <div className="text-center p-2 sm:p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg overflow-hidden">
           <p className="text-[10px] sm:text-xs text-emerald-600 dark:text-emerald-400 font-medium uppercase mb-1">
             Income
           </p>
           <PrivacyCurrency
             amount={income}
             isPrivacyMode={isPrivacyMode}
-            className="text-sm sm:text-lg font-bold text-emerald-700 dark:text-emerald-400"
+            className="text-xs sm:text-base font-bold text-emerald-700 dark:text-emerald-400 truncate block"
           />
         </div>
-        <div className="text-center p-2 sm:p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+        <div className="text-center p-2 sm:p-3 bg-red-50 dark:bg-red-900/20 rounded-lg overflow-hidden">
           <p className="text-[10px] sm:text-xs text-red-600 dark:text-red-400 font-medium uppercase mb-1">
             Spent
           </p>
           <PrivacyCurrency
             amount={expenses}
             isPrivacyMode={isPrivacyMode}
-            className="text-sm sm:text-lg font-bold text-red-700 dark:text-red-400"
+            className="text-xs sm:text-base font-bold text-red-700 dark:text-red-400 truncate block"
           />
         </div>
-        <div className="text-center p-2 sm:p-3 bg-violet-50 dark:bg-violet-900/20 rounded-lg">
+        <div className="text-center p-2 sm:p-3 bg-violet-50 dark:bg-violet-900/20 rounded-lg overflow-hidden">
           <p className="text-[10px] sm:text-xs text-violet-600 dark:text-violet-400 font-medium uppercase mb-1">
             Saved
           </p>
           <PrivacyCurrency
             amount={savings}
             isPrivacyMode={isPrivacyMode}
-            className="text-sm sm:text-lg font-bold text-violet-700 dark:text-violet-400"
+            className="text-xs sm:text-base font-bold text-violet-700 dark:text-violet-400 truncate block"
           />
           <p className="text-[10px] sm:text-xs text-violet-500 dark:text-violet-400 mt-0.5">
             {savingsRate}% rate

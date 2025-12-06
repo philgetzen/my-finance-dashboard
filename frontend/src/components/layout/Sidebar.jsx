@@ -9,6 +9,7 @@ import {
   ChartBarIcon,
   ChartPieIcon,
   ClockIcon,
+  SparklesIcon,
   ArrowRightOnRectangleIcon,
   UserCircleIcon,
   MoonIcon,
@@ -116,13 +117,16 @@ export default function Sidebar({ onClose }) {
           Reports
         </p>
         <NavItem to="/spending" icon={ChartBarIcon} onNavigate={onClose}>
-          Spending
+          Cash Flow
         </NavItem>
         <NavItem to="/investments" icon={ChartPieIcon} onNavigate={onClose}>
           Investments
         </NavItem>
         <NavItem to="/runway" icon={ClockIcon} onNavigate={onClose}>
           Runway
+        </NavItem>
+        <NavItem to="/conscious-spending" icon={SparklesIcon} onNavigate={onClose}>
+          Conscious Spending
         </NavItem>
       </nav>
 

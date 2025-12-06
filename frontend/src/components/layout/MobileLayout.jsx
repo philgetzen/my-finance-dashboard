@@ -9,6 +9,8 @@ import {
   CreditCardIcon,
   ChartBarIcon,
   ChartPieIcon,
+  ClockIcon,
+  SparklesIcon,
   Cog6ToothIcon,
   Bars3Icon,
   XMarkIcon
@@ -18,13 +20,16 @@ import {
   CreditCardIcon as CreditCardIconSolid,
   ChartBarIcon as ChartBarIconSolid,
   ChartPieIcon as ChartPieIconSolid,
+  ClockIcon as ClockIconSolid,
+  SparklesIcon as SparklesIconSolid,
 } from '@heroicons/react/24/solid';
 
 const navItems = [
   { name: 'Dashboard', path: '/', icon: HomeIcon, iconActive: HomeIconSolid },
   { name: 'Accounts', path: '/accounts', icon: CreditCardIcon, iconActive: CreditCardIconSolid },
-  { name: 'Spending', path: '/spending', icon: ChartBarIcon, iconActive: ChartBarIconSolid },
+  { name: 'Cash Flow', path: '/spending', icon: ChartBarIcon, iconActive: ChartBarIconSolid },
   { name: 'Invest', path: '/investments', icon: ChartPieIcon, iconActive: ChartPieIconSolid },
+  { name: 'CSP', path: '/conscious-spending', icon: SparklesIcon, iconActive: SparklesIconSolid },
 ];
 
 export default function MobileLayout({ children }) {
@@ -112,7 +117,7 @@ export default function MobileLayout({ children }) {
   // Mobile bottom navigation - clean tab bar
   const MobileBottomNav = () => (
     <div className="fixed bottom-0 left-0 right-0 bg-[var(--sidebar-bg)] border-t border-[var(--sidebar-border)] lg:hidden z-40 safe-area-bottom">
-      <div className="grid grid-cols-5 h-16">
+      <div className="grid grid-cols-6 h-16">
         {navItems.map((item) => {
           const isActive = location.pathname === item.path;
           const Icon = isActive ? item.iconActive : item.icon;

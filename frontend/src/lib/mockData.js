@@ -9,77 +9,126 @@ export const mockUser = {
   isDemoMode: true
 };
 
+// YNAB-formatted mock accounts (balances in milliunits for YNAB compatibility)
 export const mockAccounts = [
   {
     id: 'demo-checking-001',
+    account_id: 'demo-checking-001',
     name: 'Main Checking',
     type: 'checking',
-    balance: 2800, // $2,800
+    balance: 2800000, // $2,800 in milliunits
     institution: 'Chase Bank',
     mask: '1234',
     subtype: 'checking',
+    on_budget: true,
+    closed: false,
     isActive: true,
     createdAt: '2024-01-15T00:00:00Z',
     updatedAt: '2024-06-26T00:00:00Z'
   },
   {
     id: 'demo-savings-001',
+    account_id: 'demo-savings-001',
     name: 'Emergency Savings',
     type: 'savings',
-    balance: 8000, // $8,000
+    balance: 8000000, // $8,000 in milliunits
     institution: 'Chase Bank',
     mask: '5678',
     subtype: 'savings',
+    on_budget: true,
+    closed: false,
     isActive: true,
     createdAt: '2024-01-15T00:00:00Z',
     updatedAt: '2024-06-26T00:00:00Z'
   },
   {
     id: 'demo-credit-001',
+    account_id: 'demo-credit-001',
     name: 'Chase Freedom Credit Card',
-    type: 'credit',
-    balance: -7321, // -$7,321 debt
+    type: 'creditCard',
+    balance: -7321000, // -$7,321 in milliunits (debt shown as negative)
     institution: 'Chase Bank',
     mask: '9012',
     subtype: 'credit card',
+    on_budget: true,
+    closed: false,
     isActive: true,
     createdAt: '2024-01-15T00:00:00Z',
     updatedAt: '2024-06-26T00:00:00Z'
   },
   {
     id: 'demo-loan-001',
+    account_id: 'demo-loan-001',
     name: 'Honda Civic Auto Loan',
-    type: 'loan',
-    balance: -25000, // -$25,000 debt
+    type: 'otherLiability',
+    balance: -25000000, // -$25,000 in milliunits
     institution: 'Honda Financial',
     mask: '3456',
     subtype: 'auto',
+    on_budget: false,
+    closed: false,
     isActive: true,
     createdAt: '2022-08-15T00:00:00Z',
     updatedAt: '2024-06-26T00:00:00Z'
   },
   {
     id: 'demo-mortgage-001',
+    account_id: 'demo-mortgage-001',
     name: 'Home Mortgage',
-    type: 'loan',
-    balance: -252505, // -$252,505 debt
+    type: 'mortgage',
+    balance: -252505000, // -$252,505 in milliunits
     institution: 'Wells Fargo Mortgage',
     mask: '7890',
     subtype: 'mortgage',
+    on_budget: false,
+    closed: false,
     isActive: true,
     createdAt: '2021-03-15T00:00:00Z',
     updatedAt: '2024-06-26T00:00:00Z'
   },
   {
     id: 'demo-investment-001',
+    account_id: 'demo-investment-001',
     name: 'Vanguard 401(k)',
-    type: 'investment',
-    balance: 45000, // $45,000
+    type: 'otherAsset', // YNAB uses otherAsset for investments
+    balance: 45000000, // $45,000 in milliunits
     institution: 'Vanguard',
     mask: '2468',
     subtype: '401k',
+    on_budget: false,
+    closed: false,
     isActive: true,
     createdAt: '2020-01-15T00:00:00Z',
+    updatedAt: '2024-06-26T00:00:00Z'
+  },
+  {
+    id: 'demo-investment-002',
+    account_id: 'demo-investment-002',
+    name: 'Roth IRA',
+    type: 'otherAsset', // YNAB uses otherAsset for investments
+    balance: 18500000, // $18,500 in milliunits
+    institution: 'Fidelity',
+    mask: '1357',
+    subtype: 'roth',
+    on_budget: false,
+    closed: false,
+    isActive: true,
+    createdAt: '2020-01-15T00:00:00Z',
+    updatedAt: '2024-06-26T00:00:00Z'
+  },
+  {
+    id: 'demo-home-value-001',
+    account_id: 'demo-home-value-001',
+    name: 'Home Value (Redfin Estimate)',
+    type: 'otherAsset', // YNAB uses otherAsset for property values
+    balance: 425000000, // $425,000 in milliunits
+    institution: 'Redfin',
+    mask: '0000',
+    subtype: 'real estate',
+    on_budget: false,
+    closed: false,
+    isActive: true,
+    createdAt: '2021-03-15T00:00:00Z',
     updatedAt: '2024-06-26T00:00:00Z'
   }
 ];
@@ -242,22 +291,58 @@ const generateSingleTransaction = (date, id) => {
 // Generate the transactions
 export const mockTransactions = generateTransactions();
 
-// Calculate account summaries
+// Calculate account summaries (balances are in milliunits, convert to dollars)
 export const mockAccountSummary = {
   totalAssets: mockAccounts
-    .filter(acc => ['checking', 'savings', 'investment'].includes(acc.type))
-    .reduce((sum, acc) => sum + Math.max(0, acc.balance), 0) +
+    .filter(acc => ['checking', 'savings', 'otherAsset'].includes(acc.type))
+    .reduce((sum, acc) => sum + Math.max(0, acc.balance / 1000), 0) +
     mockManualAccounts.reduce((sum, acc) => sum + Math.max(0, acc.balance), 0),
-  
+
   totalLiabilities: mockAccounts
-    .filter(acc => ['credit', 'loan'].includes(acc.type))
-    .reduce((sum, acc) => sum + Math.abs(Math.min(0, acc.balance)), 0),
-  
+    .filter(acc => ['creditCard', 'otherLiability', 'mortgage'].includes(acc.type))
+    .reduce((sum, acc) => sum + Math.abs(Math.min(0, acc.balance / 1000)), 0),
+
   netWorth: 0 // Will be calculated
 };
 
 // Calculate net worth
 mockAccountSummary.netWorth = mockAccountSummary.totalAssets - mockAccountSummary.totalLiabilities;
+
+// Generate mock months data for the last 12 months
+const generateMockMonths = () => {
+  const months = [];
+  const now = new Date();
+
+  for (let i = 0; i < 12; i++) {
+    const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const monthStr = monthDate.toISOString().slice(0, 10);
+
+    // Vary income and expenses slightly each month
+    const baseIncome = 8500000; // $8,500 in milliunits
+    const baseExpenses = 6500000; // $6,500 in milliunits
+    const variance = 500000; // +/- $500
+
+    const income = baseIncome + Math.floor((Math.random() - 0.5) * variance * 2);
+    const budgeted = baseExpenses + Math.floor((Math.random() - 0.5) * variance * 2);
+    const activity = -budgeted + Math.floor((Math.random() - 0.5) * variance); // Slight over/under spending
+
+    months.push({
+      month: monthStr,
+      note: null,
+      income: income,
+      budgeted: budgeted,
+      activity: activity,
+      to_be_budgeted: income + activity - budgeted,
+      age_of_money: 45 + Math.floor(Math.random() * 20), // 45-65 days
+      deleted: false,
+      categories: [] // Simplified - categories handled separately
+    });
+  }
+
+  return months;
+};
+
+export const mockMonths = generateMockMonths();
 
 // YNAB-style mock data
 export const mockYNABData = {
@@ -291,81 +376,111 @@ export const mockYNABData = {
         id: 'group-income',
         name: 'Income Sources',
         categories: [
-          { id: 'cat-salary', name: 'Salary' },
-          { id: 'cat-freelance', name: 'Freelance' },
-          { id: 'cat-investment', name: 'Investment Income' },
-          { id: 'cat-other-income', name: 'Other Income' }
+          { id: 'cat-salary', name: 'Salary', budgeted: 0, balance: 0, activity: 0 },
+          { id: 'cat-freelance', name: 'Freelance', budgeted: 0, balance: 0, activity: 0 },
+          { id: 'cat-investment', name: 'Investment Income', budgeted: 0, balance: 0, activity: 0 },
+          { id: 'cat-other-income', name: 'Other Income', budgeted: 0, balance: 0, activity: 0 }
         ]
       },
       {
         id: 'group-food',
         name: 'Food & Dining',
         categories: [
-          { id: 'cat-groceries', name: 'Groceries' },
-          { id: 'cat-restaurants', name: 'Restaurants' }
+          { id: 'cat-groceries', name: 'Groceries', budgeted: 600000, balance: 150000, activity: -450000 }, // $600 budgeted, $150 left
+          { id: 'cat-restaurants', name: 'Restaurants', budgeted: 300000, balance: 75000, activity: -225000 } // $300 budgeted, $75 left
         ]
       },
       {
         id: 'group-transportation',
         name: 'Transportation',
         categories: [
-          { id: 'cat-gas', name: 'Gas & Fuel' },
-          { id: 'cat-parking', name: 'Parking' },
-          { id: 'cat-rideshare', name: 'Rideshare' },
-          { id: 'cat-transit', name: 'Public Transit' }
+          { id: 'cat-gas', name: 'Gas & Fuel', budgeted: 200000, balance: 50000, activity: -150000 },
+          { id: 'cat-parking', name: 'Parking', budgeted: 50000, balance: 20000, activity: -30000 },
+          { id: 'cat-rideshare', name: 'Rideshare', budgeted: 100000, balance: 40000, activity: -60000 },
+          { id: 'cat-transit', name: 'Public Transit', budgeted: 120000, balance: 60000, activity: -60000 }
         ]
       },
       {
         id: 'group-entertainment',
         name: 'Entertainment',
         categories: [
-          { id: 'cat-streaming', name: 'Streaming Services' },
-          { id: 'cat-movies', name: 'Movies & Theater' },
-          { id: 'cat-music', name: 'Music' }
+          { id: 'cat-streaming', name: 'Streaming Services', budgeted: 50000, balance: 10000, activity: -40000 },
+          { id: 'cat-movies', name: 'Movies & Theater', budgeted: 75000, balance: 25000, activity: -50000 },
+          { id: 'cat-music', name: 'Music', budgeted: 20000, balance: 5000, activity: -15000 }
         ]
       },
       {
         id: 'group-utilities',
         name: 'Bills & Utilities',
         categories: [
-          { id: 'cat-electric', name: 'Electricity' },
-          { id: 'cat-internet', name: 'Internet' },
-          { id: 'cat-phone', name: 'Phone' },
-          { id: 'cat-water', name: 'Water' },
-          { id: 'cat-waste', name: 'Waste Management' }
+          { id: 'cat-electric', name: 'Electricity', budgeted: 150000, balance: 0, activity: -150000 },
+          { id: 'cat-internet', name: 'Internet', budgeted: 80000, balance: 0, activity: -80000 },
+          { id: 'cat-phone', name: 'Phone', budgeted: 100000, balance: 0, activity: -100000 },
+          { id: 'cat-water', name: 'Water', budgeted: 60000, balance: 0, activity: -60000 },
+          { id: 'cat-waste', name: 'Waste Management', budgeted: 40000, balance: 0, activity: -40000 }
         ]
       },
       {
         id: 'group-shopping',
         name: 'Shopping',
         categories: [
-          { id: 'cat-general-shopping', name: 'General Shopping' },
-          { id: 'cat-electronics', name: 'Electronics' },
-          { id: 'cat-home-improvement', name: 'Home Improvement' },
-          { id: 'cat-clothing', name: 'Clothing' }
+          { id: 'cat-general-shopping', name: 'General Shopping', budgeted: 200000, balance: 80000, activity: -120000 },
+          { id: 'cat-electronics', name: 'Electronics', budgeted: 100000, balance: 50000, activity: -50000 },
+          { id: 'cat-home-improvement', name: 'Home Improvement', budgeted: 150000, balance: 100000, activity: -50000 },
+          { id: 'cat-clothing', name: 'Clothing', budgeted: 100000, balance: 40000, activity: -60000 }
         ]
       },
       {
         id: 'group-healthcare',
         name: 'Healthcare',
         categories: [
-          { id: 'cat-medical', name: 'Medical' },
-          { id: 'cat-pharmacy', name: 'Pharmacy' },
-          { id: 'cat-dental', name: 'Dental' }
+          { id: 'cat-medical', name: 'Medical', budgeted: 200000, balance: 150000, activity: -50000 },
+          { id: 'cat-pharmacy', name: 'Pharmacy', budgeted: 50000, balance: 20000, activity: -30000 },
+          { id: 'cat-dental', name: 'Dental', budgeted: 100000, balance: 80000, activity: -20000 }
         ]
       },
       {
         id: 'group-insurance',
         name: 'Insurance',
         categories: [
-          { id: 'cat-auto-insurance', name: 'Auto Insurance' },
-          { id: 'cat-health-insurance', name: 'Health Insurance' },
-          { id: 'cat-home-insurance', name: 'Home Insurance' }
+          { id: 'cat-auto-insurance', name: 'Auto Insurance', budgeted: 150000, balance: 0, activity: -150000 },
+          { id: 'cat-health-insurance', name: 'Health Insurance', budgeted: 400000, balance: 0, activity: -400000 },
+          { id: 'cat-home-insurance', name: 'Home Insurance', budgeted: 125000, balance: 0, activity: -125000 }
+        ]
+      },
+      {
+        id: 'group-savings',
+        name: 'Savings Goals',
+        categories: [
+          // Savings categories have Available balance (what's accumulated) - this is what CSP uses
+          { id: 'cat-emergency-fund', name: 'Emergency Fund', budgeted: 500000, balance: 12000000, activity: 0 }, // $500/mo, $12,000 saved
+          { id: 'cat-vacation', name: 'Vacation Fund', budgeted: 300000, balance: 2500000, activity: 0 }, // $300/mo, $2,500 saved
+          { id: 'cat-house-fund', name: 'House Down Payment', budgeted: 1000000, balance: 25000000, activity: 0 }, // $1,000/mo, $25,000 saved
+          { id: 'cat-car-fund', name: 'New Car Fund', budgeted: 200000, balance: 3500000, activity: 0 } // $200/mo, $3,500 saved
+        ]
+      },
+      {
+        id: 'group-investments',
+        name: 'Investments',
+        categories: [
+          { id: 'cat-401k', name: '401(k) Contribution', budgeted: 750000, balance: 0, activity: -750000 },
+          { id: 'cat-roth-ira', name: 'Roth IRA', budgeted: 500000, balance: 0, activity: -500000 },
+          { id: 'cat-brokerage', name: 'Brokerage Account', budgeted: 300000, balance: 0, activity: -300000 }
+        ]
+      },
+      {
+        id: 'group-true-expenses',
+        name: 'True Expenses',
+        categories: [
+          { id: 'cat-car-maintenance', name: 'Car Maintenance', budgeted: 100000, balance: 450000, activity: 0 }, // Saving up for repairs
+          { id: 'cat-home-maintenance', name: 'Home Maintenance', budgeted: 200000, balance: 800000, activity: 0 },
+          { id: 'cat-gifts', name: 'Gifts', budgeted: 100000, balance: 200000, activity: -50000 },
+          { id: 'cat-annual-fees', name: 'Annual Subscriptions', budgeted: 50000, balance: 150000, activity: 0 }
         ]
       }
     ]
   },
-  months: [],
+  months: mockMonths,
   summary: null,
   isLoading: false,
   isError: false,
@@ -380,5 +495,6 @@ export default {
   mockManualAccounts,
   mockTransactions,
   mockAccountSummary,
+  mockMonths,
   mockYNABData
 };
