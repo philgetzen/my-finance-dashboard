@@ -1194,7 +1194,7 @@ export default function ConsciousSpendingPlan() {
               }`}
             >
               <AdjustmentsHorizontalIcon className="h-4 w-4" />
-              <span className="hidden sm:inline">Income</span>
+              <span className="hidden sm:inline">Filters</span>
               {activeExclusionCount > 0 && (
                 <span className="absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center bg-amber-500 text-white text-xs font-bold rounded-full">
                   {activeExclusionCount}
