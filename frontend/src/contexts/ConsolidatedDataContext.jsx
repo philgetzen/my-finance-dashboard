@@ -208,8 +208,9 @@ export const FinanceDataProvider = ({ children }) => {
     // Don't clear real user's YNAB token and manual accounts
     // setYnabToken(null);
     // setManualAccounts([]);
-    setLoading(true);
-    
+    // Don't set loading to true - there's no Firebase auth state change to trigger
+    // setLoading will remain false, allowing immediate redirect to login
+
     // Clear any demo-related session storage
     try {
       sessionStorage.removeItem('demoModeActive');
