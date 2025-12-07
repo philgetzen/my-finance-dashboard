@@ -1,4 +1,7 @@
-import { useMemo, useState, useEffect, useCallback } from 'react';
+import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
+import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { db } from '../firebase';
+import { useFinanceData } from '../contexts/ConsolidatedDataContext';
 import { getTransactionAmount } from '../utils/ynabHelpers';
 
 // Ramit Sethi's Conscious Spending Plan recommended percentages
@@ -17,12 +20,13 @@ export const CSP_BUCKETS = {
   guiltFree: { key: 'guiltFree', label: 'Guilt-Free', color: '#F59E0B' }
 };
 
-// LocalStorage keys
+// LocalStorage keys (for migration)
 const CSP_EXCLUDED_PAYEES_KEY = 'csp_excluded_payees';
 const CSP_CATEGORY_MAPPINGS_KEY = 'csp_category_mappings';
 const CSP_EXCLUDED_CATEGORIES_KEY = 'csp_excluded_categories'; // For income categories
 const CSP_EXCLUDED_EXPENSE_CATEGORIES_KEY = 'csp_excluded_expense_categories'; // For expense categories
 const CSP_SETTINGS_KEY = 'csp_settings';
+const CSP_MIGRATED_KEY = 'csp_migrated_to_firestore';
 
 // Default keyword-based mappings (used when no custom mapping exists)
 const DEFAULT_FIXED_COST_KEYWORDS = [
@@ -43,168 +47,276 @@ const DEFAULT_SAVINGS_KEYWORDS = [
   'house', 'down payment', 'sinking'
 ];
 
+// Default settings
+const DEFAULT_SETTINGS = {
+  includeTrackingAccounts: true,
+  useKeywordFallback: true,
+};
+
+// Helper to read from localStorage with fallback
+function readLocalStorage(key, defaultValue) {
+  try {
+    const stored = localStorage.getItem(key);
+    return stored ? JSON.parse(stored) : defaultValue;
+  } catch {
+    return defaultValue;
+  }
+}
+
+// Helper to check if there's data in localStorage to migrate
+function hasLocalStorageData() {
+  return (
+    localStorage.getItem(CSP_CATEGORY_MAPPINGS_KEY) ||
+    localStorage.getItem(CSP_EXCLUDED_CATEGORIES_KEY) ||
+    localStorage.getItem(CSP_EXCLUDED_PAYEES_KEY) ||
+    localStorage.getItem(CSP_EXCLUDED_EXPENSE_CATEGORIES_KEY) ||
+    localStorage.getItem(CSP_SETTINGS_KEY)
+  );
+}
+
+// Helper to clear localStorage after migration
+function clearLocalStorageData() {
+  localStorage.removeItem(CSP_CATEGORY_MAPPINGS_KEY);
+  localStorage.removeItem(CSP_EXCLUDED_CATEGORIES_KEY);
+  localStorage.removeItem(CSP_EXCLUDED_PAYEES_KEY);
+  localStorage.removeItem(CSP_EXCLUDED_EXPENSE_CATEGORIES_KEY);
+  localStorage.removeItem(CSP_SETTINGS_KEY);
+  localStorage.setItem(CSP_MIGRATED_KEY, 'true');
+}
+
 /**
  * Hook to manage all CSP settings including category mappings, exclusions, and account settings
+ * Now persists to Firestore for cross-device sync
  */
 export function useCSPSettings() {
+  const { user, isDemoMode } = useFinanceData();
+  const userId = user?.uid;
+
+  // Track if we're currently saving to prevent loops
+  const isSaving = useRef(false);
+  const [isLoading, setIsLoading] = useState(true);
+
   // Category-to-bucket mappings (categoryId -> bucket)
-  const [categoryMappings, setCategoryMappings] = useState(() => {
-    try {
-      const stored = localStorage.getItem(CSP_CATEGORY_MAPPINGS_KEY);
-      return stored ? JSON.parse(stored) : {};
-    } catch {
-      return {};
-    }
-  });
+  const [categoryMappings, setCategoryMappings] = useState({});
 
   // Excluded income categories (for one-time income like house sales)
-  const [excludedCategories, setExcludedCategories] = useState(() => {
-    try {
-      const stored = localStorage.getItem(CSP_EXCLUDED_CATEGORIES_KEY);
-      return stored ? new Set(JSON.parse(stored)) : new Set();
-    } catch {
-      return new Set();
-    }
-  });
+  const [excludedCategories, setExcludedCategories] = useState(new Set());
 
   // Excluded payees
-  const [excludedPayees, setExcludedPayees] = useState(() => {
-    try {
-      const stored = localStorage.getItem(CSP_EXCLUDED_PAYEES_KEY);
-      return stored ? new Set(JSON.parse(stored)) : new Set();
-    } catch {
-      return new Set();
-    }
-  });
+  const [excludedPayees, setExcludedPayees] = useState(new Set());
 
   // Excluded expense categories (for reimbursable expenses, etc.)
-  const [excludedExpenseCategories, setExcludedExpenseCategories] = useState(() => {
-    try {
-      const stored = localStorage.getItem(CSP_EXCLUDED_EXPENSE_CATEGORIES_KEY);
-      return stored ? new Set(JSON.parse(stored)) : new Set();
-    } catch {
-      return new Set();
-    }
-  });
+  const [excludedExpenseCategories, setExcludedExpenseCategories] = useState(new Set());
 
   // General settings (include tracking accounts, etc.)
-  const [settings, setSettings] = useState(() => {
-    try {
-      const stored = localStorage.getItem(CSP_SETTINGS_KEY);
-      return stored ? JSON.parse(stored) : {
-        includeTrackingAccounts: true, // Include off-budget tracking accounts in investment calcs
-        useKeywordFallback: true, // Use keyword matching when no custom mapping exists
-      };
-    } catch {
-      return {
-        includeTrackingAccounts: true,
-        useKeywordFallback: true,
-      };
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+
+  // Load settings from Firestore and set up real-time sync
+  useEffect(() => {
+    // Skip for demo mode - use localStorage fallback
+    if (isDemoMode || !userId) {
+      // Load from localStorage for unauthenticated users or demo mode
+      setCategoryMappings(readLocalStorage(CSP_CATEGORY_MAPPINGS_KEY, {}));
+      setExcludedCategories(new Set(readLocalStorage(CSP_EXCLUDED_CATEGORIES_KEY, [])));
+      setExcludedPayees(new Set(readLocalStorage(CSP_EXCLUDED_PAYEES_KEY, [])));
+      setExcludedExpenseCategories(new Set(readLocalStorage(CSP_EXCLUDED_EXPENSE_CATEGORIES_KEY, [])));
+      setSettings(readLocalStorage(CSP_SETTINGS_KEY, DEFAULT_SETTINGS));
+      setIsLoading(false);
+      return;
     }
-  });
 
-  // Persist all settings
-  useEffect(() => {
-    try {
-      localStorage.setItem(CSP_CATEGORY_MAPPINGS_KEY, JSON.stringify(categoryMappings));
-    } catch { /* ignore */ }
-  }, [categoryMappings]);
+    const docRef = doc(db, 'csp_settings', userId);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(CSP_EXCLUDED_CATEGORIES_KEY, JSON.stringify([...excludedCategories]));
-    } catch { /* ignore */ }
-  }, [excludedCategories]);
+    // Set up real-time listener for cross-device sync
+    const unsubscribe = onSnapshot(docRef, async (docSnap) => {
+      // Skip if we're currently saving (to prevent loops)
+      if (isSaving.current) return;
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(CSP_EXCLUDED_PAYEES_KEY, JSON.stringify([...excludedPayees]));
-    } catch { /* ignore */ }
-  }, [excludedPayees]);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setCategoryMappings(data.categoryMappings || {});
+        setExcludedCategories(new Set(data.excludedCategories || []));
+        setExcludedPayees(new Set(data.excludedPayees || []));
+        setExcludedExpenseCategories(new Set(data.excludedExpenseCategories || []));
+        setSettings(data.settings || DEFAULT_SETTINGS);
+      } else {
+        // No Firestore data - check for localStorage migration
+        const alreadyMigrated = localStorage.getItem(CSP_MIGRATED_KEY) === 'true';
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(CSP_EXCLUDED_EXPENSE_CATEGORIES_KEY, JSON.stringify([...excludedExpenseCategories]));
-    } catch { /* ignore */ }
-  }, [excludedExpenseCategories]);
+        if (!alreadyMigrated && hasLocalStorageData()) {
+          // Migrate from localStorage
+          const localMappings = readLocalStorage(CSP_CATEGORY_MAPPINGS_KEY, {});
+          const localExcludedCats = readLocalStorage(CSP_EXCLUDED_CATEGORIES_KEY, []);
+          const localExcludedPayees = readLocalStorage(CSP_EXCLUDED_PAYEES_KEY, []);
+          const localExcludedExpenseCats = readLocalStorage(CSP_EXCLUDED_EXPENSE_CATEGORIES_KEY, []);
+          const localSettings = readLocalStorage(CSP_SETTINGS_KEY, DEFAULT_SETTINGS);
 
-  useEffect(() => {
+          // Save to Firestore
+          isSaving.current = true;
+          try {
+            await setDoc(docRef, {
+              categoryMappings: localMappings,
+              excludedCategories: localExcludedCats,
+              excludedPayees: localExcludedPayees,
+              excludedExpenseCategories: localExcludedExpenseCats,
+              settings: localSettings,
+              updatedAt: new Date().toISOString(),
+              migratedFromLocalStorage: true
+            });
+
+            // Update local state
+            setCategoryMappings(localMappings);
+            setExcludedCategories(new Set(localExcludedCats));
+            setExcludedPayees(new Set(localExcludedPayees));
+            setExcludedExpenseCategories(new Set(localExcludedExpenseCats));
+            setSettings(localSettings);
+
+            // Clear localStorage after successful migration
+            clearLocalStorageData();
+            console.log('CSP settings migrated from localStorage to Firestore');
+          } catch (error) {
+            console.error('Failed to migrate CSP settings to Firestore:', error);
+          } finally {
+            isSaving.current = false;
+          }
+        } else {
+          // Initialize with defaults
+          setCategoryMappings({});
+          setExcludedCategories(new Set());
+          setExcludedPayees(new Set());
+          setExcludedExpenseCategories(new Set());
+          setSettings(DEFAULT_SETTINGS);
+        }
+      }
+      setIsLoading(false);
+    }, (error) => {
+      console.error('Error listening to CSP settings:', error);
+      // Fall back to localStorage on error
+      setCategoryMappings(readLocalStorage(CSP_CATEGORY_MAPPINGS_KEY, {}));
+      setExcludedCategories(new Set(readLocalStorage(CSP_EXCLUDED_CATEGORIES_KEY, [])));
+      setExcludedPayees(new Set(readLocalStorage(CSP_EXCLUDED_PAYEES_KEY, [])));
+      setExcludedExpenseCategories(new Set(readLocalStorage(CSP_EXCLUDED_EXPENSE_CATEGORIES_KEY, [])));
+      setSettings(readLocalStorage(CSP_SETTINGS_KEY, DEFAULT_SETTINGS));
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [userId, isDemoMode]);
+
+  // Helper to save all settings to Firestore
+  const saveToFirestore = useCallback(async (updates) => {
+    if (!userId || isDemoMode) {
+      // For unauthenticated users or demo mode, save to localStorage
+      if (updates.categoryMappings !== undefined) {
+        localStorage.setItem(CSP_CATEGORY_MAPPINGS_KEY, JSON.stringify(updates.categoryMappings));
+      }
+      if (updates.excludedCategories !== undefined) {
+        localStorage.setItem(CSP_EXCLUDED_CATEGORIES_KEY, JSON.stringify(updates.excludedCategories));
+      }
+      if (updates.excludedPayees !== undefined) {
+        localStorage.setItem(CSP_EXCLUDED_PAYEES_KEY, JSON.stringify(updates.excludedPayees));
+      }
+      if (updates.excludedExpenseCategories !== undefined) {
+        localStorage.setItem(CSP_EXCLUDED_EXPENSE_CATEGORIES_KEY, JSON.stringify(updates.excludedExpenseCategories));
+      }
+      if (updates.settings !== undefined) {
+        localStorage.setItem(CSP_SETTINGS_KEY, JSON.stringify(updates.settings));
+      }
+      return;
+    }
+
+    isSaving.current = true;
     try {
-      localStorage.setItem(CSP_SETTINGS_KEY, JSON.stringify(settings));
-    } catch { /* ignore */ }
-  }, [settings]);
+      const docRef = doc(db, 'csp_settings', userId);
+      await setDoc(docRef, {
+        categoryMappings: updates.categoryMappings ?? categoryMappings,
+        excludedCategories: updates.excludedCategories ?? [...excludedCategories],
+        excludedPayees: updates.excludedPayees ?? [...excludedPayees],
+        excludedExpenseCategories: updates.excludedExpenseCategories ?? [...excludedExpenseCategories],
+        settings: updates.settings ?? settings,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+    } catch (error) {
+      console.error('Failed to save CSP settings to Firestore:', error);
+    } finally {
+      // Small delay to prevent the onSnapshot from immediately overwriting
+      setTimeout(() => {
+        isSaving.current = false;
+      }, 100);
+    }
+  }, [userId, isDemoMode, categoryMappings, excludedCategories, excludedPayees, excludedExpenseCategories, settings]);
 
   // Category mapping functions
   const setCategoryBucket = useCallback((categoryId, bucket) => {
-    setCategoryMappings(prev => ({
-      ...prev,
-      [categoryId]: bucket
-    }));
-  }, []);
+    const newMappings = { ...categoryMappings, [categoryId]: bucket };
+    setCategoryMappings(newMappings);
+    saveToFirestore({ categoryMappings: newMappings });
+  }, [categoryMappings, saveToFirestore]);
 
   const clearCategoryMapping = useCallback((categoryId) => {
-    setCategoryMappings(prev => {
-      const next = { ...prev };
-      delete next[categoryId];
-      return next;
-    });
-  }, []);
+    const newMappings = { ...categoryMappings };
+    delete newMappings[categoryId];
+    setCategoryMappings(newMappings);
+    saveToFirestore({ categoryMappings: newMappings });
+  }, [categoryMappings, saveToFirestore]);
 
   const clearAllCategoryMappings = useCallback(() => {
     setCategoryMappings({});
-  }, []);
+    saveToFirestore({ categoryMappings: {} });
+  }, [saveToFirestore]);
 
   // Income category exclusion functions
   const toggleCategoryExclusion = useCallback((categoryId) => {
-    setExcludedCategories(prev => {
-      const next = new Set(prev);
-      if (next.has(categoryId)) {
-        next.delete(categoryId);
-      } else {
-        next.add(categoryId);
-      }
-      return next;
-    });
-  }, []);
+    const newExcluded = new Set(excludedCategories);
+    if (newExcluded.has(categoryId)) {
+      newExcluded.delete(categoryId);
+    } else {
+      newExcluded.add(categoryId);
+    }
+    setExcludedCategories(newExcluded);
+    saveToFirestore({ excludedCategories: [...newExcluded] });
+  }, [excludedCategories, saveToFirestore]);
 
   // Expense category exclusion functions
   const toggleExpenseCategoryExclusion = useCallback((categoryId) => {
-    setExcludedExpenseCategories(prev => {
-      const next = new Set(prev);
-      if (next.has(categoryId)) {
-        next.delete(categoryId);
-      } else {
-        next.add(categoryId);
-      }
-      return next;
-    });
-  }, []);
+    const newExcluded = new Set(excludedExpenseCategories);
+    if (newExcluded.has(categoryId)) {
+      newExcluded.delete(categoryId);
+    } else {
+      newExcluded.add(categoryId);
+    }
+    setExcludedExpenseCategories(newExcluded);
+    saveToFirestore({ excludedExpenseCategories: [...newExcluded] });
+  }, [excludedExpenseCategories, saveToFirestore]);
 
   const clearExpenseCategoryExclusions = useCallback(() => {
     setExcludedExpenseCategories(new Set());
-  }, []);
+    saveToFirestore({ excludedExpenseCategories: [] });
+  }, [saveToFirestore]);
 
   // Payee exclusion functions
   const togglePayeeExclusion = useCallback((payee) => {
-    setExcludedPayees(prev => {
-      const next = new Set(prev);
-      if (next.has(payee)) {
-        next.delete(payee);
-      } else {
-        next.add(payee);
-      }
-      return next;
-    });
-  }, []);
+    const newExcluded = new Set(excludedPayees);
+    if (newExcluded.has(payee)) {
+      newExcluded.delete(payee);
+    } else {
+      newExcluded.add(payee);
+    }
+    setExcludedPayees(newExcluded);
+    saveToFirestore({ excludedPayees: [...newExcluded] });
+  }, [excludedPayees, saveToFirestore]);
 
   const clearPayeeExclusions = useCallback(() => {
     setExcludedPayees(new Set());
-  }, []);
+    saveToFirestore({ excludedPayees: [] });
+  }, [saveToFirestore]);
 
   // Settings functions
   const updateSettings = useCallback((newSettings) => {
-    setSettings(prev => ({ ...prev, ...newSettings }));
-  }, []);
+    const mergedSettings = { ...settings, ...newSettings };
+    setSettings(mergedSettings);
+    saveToFirestore({ settings: mergedSettings });
+  }, [settings, saveToFirestore]);
 
   return {
     categoryMappings,
@@ -212,6 +324,7 @@ export function useCSPSettings() {
     excludedPayees,
     excludedExpenseCategories,
     settings,
+    isLoading,
     setCategoryBucket,
     clearCategoryMapping,
     clearAllCategoryMappings,
