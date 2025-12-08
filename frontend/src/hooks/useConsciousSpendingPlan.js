@@ -933,27 +933,29 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
       let monthlyAmountsToUse = catData.monthlyAmounts || {};
 
       if (currentBucket === 'savings' || currentBucket === 'investments') {
-        // For savings and investments, use monthly BUDGETED amount instead of transaction spending
-        // This captures regular planned contributions, not one-time large transfers
-        // (e.g., investing house sale proceeds shouldn't count as monthly investment rate)
-        const budgetedData = categoryBudgetedAmounts.get(catData.id);
-        if (budgetedData && budgetedData.monthlyBudgeted > 0) {
-          const monthlyContribution = budgetedData.monthlyBudgeted;
-          amountToUse = monthlyContribution * periodMonths;
-          // Create monthly breakdown with consistent contribution
-          monthlyAmountsToUse = {};
-          const now = new Date();
-          for (let i = 0; i < periodMonths; i++) {
-            const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
-            const monthKey = monthDate.toISOString().slice(0, 7);
-            monthlyAmountsToUse[monthKey] = monthlyContribution;
+        // For multi-month views (3+), use monthly BUDGETED amount to smooth out one-time transfers
+        // For 30-day snapshot view, use actual transactions to match income timing
+        if (periodMonths > 1) {
+          const budgetedData = categoryBudgetedAmounts.get(catData.id);
+          if (budgetedData && budgetedData.monthlyBudgeted > 0) {
+            const monthlyContribution = budgetedData.monthlyBudgeted;
+            amountToUse = monthlyContribution * periodMonths;
+            // Create monthly breakdown with consistent contribution
+            monthlyAmountsToUse = {};
+            const now = new Date();
+            for (let i = 0; i < periodMonths; i++) {
+              const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
+              const monthKey = monthDate.toISOString().slice(0, 7);
+              monthlyAmountsToUse[monthKey] = monthlyContribution;
+            }
+          } else {
+            // No monthly budgeted amount - don't count transaction spending
+            amountToUse = 0;
+            monthlyAmountsToUse = {};
           }
-        } else {
-          // No monthly budgeted amount - don't count transaction spending
-          // One-time transfers or spending shouldn't inflate the rate
-          amountToUse = 0;
-          monthlyAmountsToUse = {};
         }
+        // For 30-day view (periodMonths === 1), use actual transaction amounts
+        // This ensures savings/investments match the same time window as income
       }
 
       // Add to bucket totals
