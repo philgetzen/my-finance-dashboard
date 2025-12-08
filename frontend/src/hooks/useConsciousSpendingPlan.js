@@ -923,11 +923,12 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
       let amountToUse = catData.amount;
       let monthlyAmountsToUse = catData.monthlyAmounts || {};
 
-      if (currentBucket === 'savings') {
+      if (currentBucket === 'savings' || currentBucket === 'investments') {
+        // For savings and investments, use monthly BUDGETED amount instead of transaction spending
+        // This captures regular planned contributions, not one-time large transfers
+        // (e.g., investing house sale proceeds shouldn't count as monthly investment rate)
         const budgetedData = categoryBudgetedAmounts.get(catData.id);
         if (budgetedData && budgetedData.monthlyBudgeted > 0) {
-          // Use monthly budgeted amount × period for savings contribution
-          // This represents actual monthly cash flow to savings
           const monthlyContribution = budgetedData.monthlyBudgeted;
           amountToUse = monthlyContribution * periodMonths;
           // Create monthly breakdown with consistent contribution
@@ -939,8 +940,8 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
             monthlyAmountsToUse[monthKey] = monthlyContribution;
           }
         } else {
-          // No monthly budgeted amount - don't count transaction spending as "savings"
-          // Spending FROM savings categories doesn't represent saving money
+          // No monthly budgeted amount - don't count transaction spending
+          // One-time transfers or spending shouldn't inflate the rate
           amountToUse = 0;
           monthlyAmountsToUse = {};
         }
