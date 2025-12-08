@@ -938,6 +938,11 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
             const monthKey = monthDate.toISOString().slice(0, 7);
             monthlyAmountsToUse[monthKey] = monthlyContribution;
           }
+        } else {
+          // No monthly budgeted amount - don't count transaction spending as "savings"
+          // Spending FROM savings categories doesn't represent saving money
+          amountToUse = 0;
+          monthlyAmountsToUse = {};
         }
       }
 
