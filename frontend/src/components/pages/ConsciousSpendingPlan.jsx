@@ -1129,43 +1129,14 @@ export default function ConsciousSpendingPlan() {
     });
   };
 
-  // Calculate total allocated and unallocated
-  const allocationSummary = useMemo(() => {
-    const totalAllocated = Object.values(cspData.buckets).reduce((sum, b) => sum + b.amount, 0);
-    const monthlyIncome = cspData.monthlyIncome || 0;
-    const unallocated = monthlyIncome - totalAllocated;
-    const totalPercentage = monthlyIncome > 0 ? (totalAllocated / monthlyIncome) * 100 : 0;
-    const unallocatedPercentage = monthlyIncome > 0 ? (unallocated / monthlyIncome) * 100 : 0;
-
-    return {
-      totalAllocated,
-      unallocated,
-      totalPercentage,
-      unallocatedPercentage,
-      isOver: unallocated < 0,
-      isExact: Math.abs(unallocated) < 1
-    };
-  }, [cspData.buckets, cspData.monthlyIncome]);
-
-  // Pie chart data - include unallocated if positive
+  // Pie chart data - always exactly 4 buckets totaling 100% (Ramit's CSP formula)
   const pieData = useMemo(() => {
-    const data = Object.entries(cspData.buckets).map(([key, bucket]) => ({
+    return Object.entries(cspData.buckets).map(([key, bucket]) => ({
       name: bucket.target.label,
       value: bucket.amount,
       color: BUCKET_COLORS[key]
     }));
-
-    // Add unallocated slice if there's unallocated income
-    if (allocationSummary.unallocated > 0) {
-      data.push({
-        name: 'Unallocated',
-        value: allocationSummary.unallocated,
-        color: '#94a3b8' // slate-400
-      });
-    }
-
-    return data;
-  }, [cspData.buckets, allocationSummary.unallocated]);
+  }, [cspData.buckets]);
 
   // Bar chart data for monthly breakdown
   const barData = useMemo(() => {
@@ -1506,55 +1477,13 @@ export default function ConsciousSpendingPlan() {
             />
           ))}
 
-          {/* Allocation Summary - shows if not exactly 100% */}
-          {!allocationSummary.isExact && (
-            <div className={`p-4 rounded-xl border-2 border-dashed ${
-              allocationSummary.isOver
-                ? 'border-rose-300 dark:border-rose-700 bg-rose-50 dark:bg-rose-950/20'
-                : 'border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800/50'
-            }`}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className={`w-3 h-3 rounded-full ${
-                    allocationSummary.isOver ? 'bg-rose-500' : 'bg-slate-400'
-                  }`} />
-                  <span className="font-medium text-zinc-900 dark:text-zinc-100">
-                    {allocationSummary.isOver ? 'Over Budget' : 'Unallocated'}
-                  </span>
-                </div>
-                <div className="text-right">
-                  <span className={`text-lg font-semibold tabular-nums ${privacyMode ? 'privacy-blur' : ''} ${
-                    allocationSummary.isOver ? 'text-rose-600 dark:text-rose-400' : 'text-zinc-600 dark:text-zinc-400'
-                  }`}>
-                    {allocationSummary.isOver ? '+' : ''}${formatCurrency(Math.abs(allocationSummary.unallocated))}
-                  </span>
-                  <span className={`ml-2 text-sm ${
-                    allocationSummary.isOver ? 'text-rose-500' : 'text-zinc-400'
-                  }`}>
-                    {Math.abs(allocationSummary.unallocatedPercentage).toFixed(0)}%
-                  </span>
-                </div>
-              </div>
-              <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-                {allocationSummary.isOver
-                  ? 'Your spending exceeds your income. Consider reducing expenses or increasing income.'
-                  : 'This income isn\'t assigned to a spending category. Consider allocating to savings or investments.'}
-              </p>
-            </div>
-          )}
-
-          {/* Total allocation indicator */}
+          {/* Total allocation indicator - always 100% with Ramit's formula */}
           <div className="flex items-center justify-between py-3 px-4 bg-zinc-100 dark:bg-zinc-800 rounded-xl">
             <span className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
               Total Allocated
             </span>
-            <span className={`text-sm font-semibold tabular-nums ${
-              allocationSummary.isExact ? 'text-emerald-500' :
-              allocationSummary.isOver ? 'text-rose-500' :
-              'text-zinc-600 dark:text-zinc-400'
-            }`}>
-              {allocationSummary.totalPercentage.toFixed(0)}%
-              {allocationSummary.isExact && ' ✓'}
+            <span className="text-sm font-semibold tabular-nums text-emerald-500">
+              100% ✓
             </span>
           </div>
         </div>

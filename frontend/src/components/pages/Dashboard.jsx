@@ -1009,40 +1009,25 @@ export default function Dashboard() {
             <div>
               <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">Account Summary</h4>
               <div className="space-y-3 max-h-80 overflow-y-auto">
-              {Object.entries(
-                allAccounts.reduce((groups, account) => {
-                  const type = getDisplayAccountType(account.type);
-                  const balance = getAccountBalance(account);
-                  const isLiab = isLiability(account) || 
-                    ['credit', 'loan', 'mortgage'].includes(normalizeYNABAccountType(account.type));
-                  
-                  if (!groups[type]) {
-                    groups[type] = { total: 0, isLiability: isLiab };
-                  }
-                  groups[type].total += Math.abs(balance);
-                  return groups;
-                }, {})
-              ).map(([type, data], typeIndex) => (
+              {/* Use allocationData to ensure colors match the pie chart */}
+              {allocationData.map((item, index) => (
                 <div
-                  key={type}
+                  key={item.name}
                   className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-lg"
                 >
                   <div className="flex items-center">
                     <div
                       className="w-4 h-4 rounded-full mr-3"
-                      style={{ backgroundColor: COLORS[typeIndex % COLORS.length] }}
+                      style={{ backgroundColor: COLORS[index % COLORS.length] }}
                     />
                     <span className="text-base font-medium text-gray-900 dark:text-white">
-                      {type}
+                      {item.name}
                     </span>
                   </div>
                   <PrivacyCurrency
-                    amount={data.total}
+                    amount={item.value}
                     isPrivacyMode={privacyMode}
-                    prefix={data.isLiability ? '-$' : '$'}
-                    className={`text-base font-semibold ${
-                      data.isLiability ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
-                    }`}
+                    className="text-base font-semibold text-green-600 dark:text-green-400"
                   />
                 </div>
               ))}

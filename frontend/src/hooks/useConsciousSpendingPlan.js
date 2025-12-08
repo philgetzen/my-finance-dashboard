@@ -1034,11 +1034,25 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
     }
 
     // Use the recalculated totals
-    const totalSpending = Object.values(recalculatedBucketTotals).reduce((sum, val) => sum + val, 0);
+    // Calculate Guilt-Free as REMAINDER per Ramit's CSP formula:
+    // Guilt-Free = Income - Fixed Costs - Investments - Savings
+    // This ensures all 4 buckets always add to exactly 100%
+    const fixedCostsMonthly = recalculatedBucketTotals.fixedCosts / numMonths;
+    const investmentsMonthly = recalculatedBucketTotals.investments / numMonths;
+    const savingsMonthly = recalculatedBucketTotals.savings / numMonths;
+    const guiltFreeMonthly = monthlyIncome - fixedCostsMonthly - investmentsMonthly - savingsMonthly;
+
+    // Override the guilt-free total with the remainder calculation
+    const adjustedBucketTotals = {
+      ...recalculatedBucketTotals,
+      guiltFree: guiltFreeMonthly * numMonths
+    };
+
+    const totalSpending = Object.values(adjustedBucketTotals).reduce((sum, val) => sum + val, 0);
     const monthlySpending = totalSpending / numMonths;
 
     const buckets = {};
-    Object.entries(recalculatedBucketTotals).forEach(([key, total]) => {
+    Object.entries(adjustedBucketTotals).forEach(([key, total]) => {
       const monthlyAmount = total / numMonths;
       const percentage = monthlyIncome > 0 ? (monthlyAmount / monthlyIncome) * 100 : 0;
 
@@ -1076,16 +1090,23 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
     });
 
     // Build monthly chart data (using recalculated buckets with current mappings)
+    // Apply the same remainder formula for guilt-free in each month
     const monthlyData = Object.entries(recalculatedMonthlyBuckets)
       .sort(([a], [b]) => a.localeCompare(b))
       .slice(-periodMonths)
       .map(([monthKey, data]) => {
         const date = new Date(monthKey + '-01');
+        // Calculate guilt-free as remainder for this month
+        const monthIncome = data.income;
+        const guiltFreeRemainder = monthIncome - data.fixedCosts - data.investments - data.savings;
         return {
           month: date.toLocaleDateString('en-US', { month: 'short' }),
           monthKey,
           income: data.income,
-          ...data
+          fixedCosts: data.fixedCosts,
+          investments: data.investments,
+          savings: data.savings,
+          guiltFree: guiltFreeRemainder
         };
       });
 
