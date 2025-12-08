@@ -65,7 +65,7 @@ const BUCKET_ICONS = {
 
 // Period options
 const PERIOD_OPTIONS = [
-  { value: 1, label: '1 Month' },
+  { value: 1, label: 'Last 30 Days' },
   { value: 3, label: '3 Months' },
   { value: 6, label: '6 Months' },
   { value: 12, label: '12 Months' },
@@ -1227,7 +1227,7 @@ export default function ConsciousSpendingPlan() {
               >
                 {PERIOD_OPTIONS.map(opt => (
                   <option key={opt.value} value={opt.value}>
-                    {opt.label} Average
+                    {opt.label}{opt.value > 1 ? ' Average' : ''}
                   </option>
                 ))}
               </select>
@@ -1284,7 +1284,9 @@ export default function ConsciousSpendingPlan() {
                 </div>
                 <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/60 dark:bg-gray-800/60 rounded-lg backdrop-blur-sm">
                   <span className="text-sm text-gray-500 dark:text-gray-400">Based on:</span>
-                  <span className="text-sm font-bold text-gray-900 dark:text-white">{selectedPeriod} month average</span>
+                  <span className="text-sm font-bold text-gray-900 dark:text-white">
+                    {selectedPeriod === 1 ? 'last 30 days' : `${selectedPeriod} month average`}
+                  </span>
                 </div>
               </div>
             </div>

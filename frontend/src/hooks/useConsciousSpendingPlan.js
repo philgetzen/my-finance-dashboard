@@ -496,7 +496,15 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
 
     // Calculate date range
     const now = new Date();
-    const startDate = new Date(now.getFullYear(), now.getMonth() - periodMonths + 1, 1);
+    let startDate;
+
+    if (periodMonths === 1) {
+      // For 1 month: use last 30 days from today (not current partial calendar month)
+      startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    } else {
+      // For longer periods: use full calendar months
+      startDate = new Date(now.getFullYear(), now.getMonth() - periodMonths + 1, 1);
+    }
 
     // Build account lookup for tracking account detection
     // Also categorize ALL accounts for Net Worth calculation
@@ -888,7 +896,8 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
     });
 
     // Calculate monthly averages
-    const numMonths = Math.max(1, Object.keys(monthlyBuckets).length);
+    // For 1-month (last 30 days), force numMonths=1 even if it spans 2 calendar months
+    const numMonths = periodMonths === 1 ? 1 : Math.max(1, Object.keys(monthlyBuckets).length);
     const monthlyIncome = totalIncome / numMonths;
 
     // NOW calculate bucket totals using current category mappings
