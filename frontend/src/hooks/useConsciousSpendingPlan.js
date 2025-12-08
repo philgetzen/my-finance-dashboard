@@ -913,30 +913,30 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
     });
 
     // Iterate through all categories and assign amounts to buckets based on current mappings
-    // For SAVINGS categories, use AVAILABLE amounts (accumulated balance) instead of spent amounts
+    // For SAVINGS categories, use MONTHLY BUDGETED amounts (what you're contributing), not accumulated balance
     categoryTotals.forEach((catData, catKey) => {
       // Determine the current bucket for this category (custom mapping takes priority)
       const currentBucket = categoryMappings[catData.id] || catData.bucket;
 
-      // For savings categories, use AVAILABLE amounts instead of spent amounts
-      // Savings is about what's accumulated in the category, not what was spent from it
+      // For savings categories, use monthly budgeted amount (contribution) not spent or accumulated
+      // CSP tracks monthly cash flow, not accumulated wealth
       let amountToUse = catData.amount;
       let monthlyAmountsToUse = catData.monthlyAmounts || {};
 
       if (currentBucket === 'savings') {
         const budgetedData = categoryBudgetedAmounts.get(catData.id);
-        if (budgetedData && budgetedData.available > 0) {
-          // Use the Available balance for savings - this is actual accumulated savings
-          amountToUse = budgetedData.available;
-          // For monthly breakdown, distribute the available amount evenly across months
-          // (since Available is a snapshot, not a flow)
+        if (budgetedData && budgetedData.monthlyBudgeted > 0) {
+          // Use monthly budgeted amount × period for savings contribution
+          // This represents actual monthly cash flow to savings
+          const monthlyContribution = budgetedData.monthlyBudgeted;
+          amountToUse = monthlyContribution * periodMonths;
+          // Create monthly breakdown with consistent contribution
           monthlyAmountsToUse = {};
-          const monthlyAverage = budgetedData.available / periodMonths;
           const now = new Date();
           for (let i = 0; i < periodMonths; i++) {
             const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
             const monthKey = monthDate.toISOString().slice(0, 7);
-            monthlyAmountsToUse[monthKey] = monthlyAverage;
+            monthlyAmountsToUse[monthKey] = monthlyContribution;
           }
         }
       }
