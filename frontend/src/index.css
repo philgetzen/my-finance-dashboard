@@ -328,3 +328,41 @@ button:focus {
   background: var(--color-primary-dark);
   opacity: 1;
 }
+
+/* ================================
+   CSP Goals Panel Animations
+   ================================ */
+
+/* Panel slide-in animation */
+.csp-goals-panel {
+  animation: csp-panel-slide-in 0.3s ease-out;
+}
+
+@keyframes csp-panel-slide-in {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Desktop: slide from right */
+@media (min-width: 1024px) {
+  .csp-goals-panel {
+    animation: csp-panel-slide-right 0.3s ease-out;
+  }
+
+  @keyframes csp-panel-slide-right {
+    from {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+}

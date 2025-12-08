@@ -5,11 +5,13 @@ import {
 } from 'recharts';
 import { useFinanceData, usePrivacy } from '../../contexts/ConsolidatedDataContext';
 import { useConsciousSpendingPlan, useCSPSettings, CSP_TARGETS, CSP_BUCKETS } from '../../hooks/useConsciousSpendingPlan';
+import { useCSPGoals } from '../../hooks/useCSPGoals';
 import { normalizeYNABAccountType } from '../../utils/ynabHelpers';
 import { formatCurrency } from '../../utils/formatters';
 import PageTransition from '../ui/PageTransition';
 import Card from '../ui/Card';
 import PrivacyCurrency from '../ui/PrivacyCurrency';
+import CSPGoalsPanel from '../ui/CSPGoalsPanel';
 import {
   CalendarIcon,
   ChevronDownIcon,
@@ -29,6 +31,7 @@ import {
   ArrowTrendingUpIcon,
   MinusCircleIcon,
   QuestionMarkCircleIcon,
+  RocketLaunchIcon,
 } from '@heroicons/react/24/outline';
 
 // CSP bucket colors - rich, vibrant palette with gradients
@@ -1105,6 +1108,9 @@ export default function ConsciousSpendingPlan() {
     months
   );
 
+  // Future Goals feature
+  const goalsState = useCSPGoals(cspData);
+
   // Count active exclusions
   const activePayeeExclusions = cspData.incomePayees?.filter(p => p.isExcluded).length || 0;
   const activeCategoryExclusions = cspData.incomeCategories?.filter(c => c.isExcluded).length || 0;
@@ -1123,14 +1129,43 @@ export default function ConsciousSpendingPlan() {
     });
   };
 
-  // Pie chart data
+  // Calculate total allocated and unallocated
+  const allocationSummary = useMemo(() => {
+    const totalAllocated = Object.values(cspData.buckets).reduce((sum, b) => sum + b.amount, 0);
+    const monthlyIncome = cspData.monthlyIncome || 0;
+    const unallocated = monthlyIncome - totalAllocated;
+    const totalPercentage = monthlyIncome > 0 ? (totalAllocated / monthlyIncome) * 100 : 0;
+    const unallocatedPercentage = monthlyIncome > 0 ? (unallocated / monthlyIncome) * 100 : 0;
+
+    return {
+      totalAllocated,
+      unallocated,
+      totalPercentage,
+      unallocatedPercentage,
+      isOver: unallocated < 0,
+      isExact: Math.abs(unallocated) < 1
+    };
+  }, [cspData.buckets, cspData.monthlyIncome]);
+
+  // Pie chart data - include unallocated if positive
   const pieData = useMemo(() => {
-    return Object.entries(cspData.buckets).map(([key, bucket]) => ({
+    const data = Object.entries(cspData.buckets).map(([key, bucket]) => ({
       name: bucket.target.label,
       value: bucket.amount,
       color: BUCKET_COLORS[key]
     }));
-  }, [cspData.buckets]);
+
+    // Add unallocated slice if there's unallocated income
+    if (allocationSummary.unallocated > 0) {
+      data.push({
+        name: 'Unallocated',
+        value: allocationSummary.unallocated,
+        color: '#94a3b8' // slate-400
+      });
+    }
+
+    return data;
+  }, [cspData.buckets, allocationSummary.unallocated]);
 
   // Bar chart data for monthly breakdown
   const barData = useMemo(() => {
@@ -1184,6 +1219,15 @@ export default function ConsciousSpendingPlan() {
 
           {/* Controls */}
           <div className="flex items-center gap-2">
+            {/* Future Goals Button */}
+            <button
+              onClick={goalsState.openPanel}
+              className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-violet-500 to-indigo-500 hover:from-violet-600 hover:to-indigo-600 text-white rounded-lg text-sm font-medium transition-all shadow-md hover:shadow-lg"
+            >
+              <RocketLaunchIcon className="h-4 w-4" />
+              <span className="hidden sm:inline">Future Goals</span>
+            </button>
+
             {/* Income Settings Button */}
             <button
               onClick={() => setShowIncomeSettings(true)}
@@ -1461,6 +1505,58 @@ export default function ConsciousSpendingPlan() {
               onToggle={() => toggleBucket(key)}
             />
           ))}
+
+          {/* Allocation Summary - shows if not exactly 100% */}
+          {!allocationSummary.isExact && (
+            <div className={`p-4 rounded-xl border-2 border-dashed ${
+              allocationSummary.isOver
+                ? 'border-rose-300 dark:border-rose-700 bg-rose-50 dark:bg-rose-950/20'
+                : 'border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800/50'
+            }`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`w-3 h-3 rounded-full ${
+                    allocationSummary.isOver ? 'bg-rose-500' : 'bg-slate-400'
+                  }`} />
+                  <span className="font-medium text-zinc-900 dark:text-zinc-100">
+                    {allocationSummary.isOver ? 'Over Budget' : 'Unallocated'}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className={`text-lg font-semibold tabular-nums ${privacyMode ? 'privacy-blur' : ''} ${
+                    allocationSummary.isOver ? 'text-rose-600 dark:text-rose-400' : 'text-zinc-600 dark:text-zinc-400'
+                  }`}>
+                    {allocationSummary.isOver ? '+' : ''}${formatCurrency(Math.abs(allocationSummary.unallocated))}
+                  </span>
+                  <span className={`ml-2 text-sm ${
+                    allocationSummary.isOver ? 'text-rose-500' : 'text-zinc-400'
+                  }`}>
+                    {Math.abs(allocationSummary.unallocatedPercentage).toFixed(0)}%
+                  </span>
+                </div>
+              </div>
+              <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+                {allocationSummary.isOver
+                  ? 'Your spending exceeds your income. Consider reducing expenses or increasing income.'
+                  : 'This income isn\'t assigned to a spending category. Consider allocating to savings or investments.'}
+              </p>
+            </div>
+          )}
+
+          {/* Total allocation indicator */}
+          <div className="flex items-center justify-between py-3 px-4 bg-zinc-100 dark:bg-zinc-800 rounded-xl">
+            <span className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
+              Total Allocated
+            </span>
+            <span className={`text-sm font-semibold tabular-nums ${
+              allocationSummary.isExact ? 'text-emerald-500' :
+              allocationSummary.isOver ? 'text-rose-500' :
+              'text-zinc-600 dark:text-zinc-400'
+            }`}>
+              {allocationSummary.totalPercentage.toFixed(0)}%
+              {allocationSummary.isExact && ' ✓'}
+            </span>
+          </div>
         </div>
 
         {/* Monthly Trend Chart */}
@@ -1534,6 +1630,30 @@ export default function ConsciousSpendingPlan() {
           privacyMode={privacyMode}
           isOpen={showIncomeSettings}
           onClose={() => setShowIncomeSettings(false)}
+        />
+
+        {/* Future Goals Panel */}
+        <CSPGoalsPanel
+          isOpen={goalsState.isPanelOpen}
+          onClose={goalsState.closePanel}
+          draftIncome={goalsState.draftIncome}
+          setDraftIncome={goalsState.setDraftIncome}
+          draftBucketAmounts={goalsState.draftBucketAmounts}
+          setDraftBucketAmount={goalsState.setDraftBucketAmount}
+          hasChanges={goalsState.hasChanges}
+          resetDraft={goalsState.resetDraft}
+          actualIncome={goalsState.actualIncome}
+          actualBuckets={goalsState.actualBuckets}
+          projectedData={goalsState.projectedData}
+          deltas={goalsState.deltas}
+          savedGoals={goalsState.savedGoals}
+          activeGoalId={goalsState.activeGoalId}
+          saveGoal={goalsState.saveGoal}
+          loadGoal={goalsState.loadGoal}
+          deleteGoal={goalsState.deleteGoal}
+          isLoading={goalsState.isLoading}
+          error={goalsState.error}
+          setError={goalsState.setError}
         />
       </div>
     </PageTransition>

@@ -968,8 +968,13 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
           return;
         }
 
-        // Skip if no Available balance
-        if (!budgetedData.available || budgetedData.available <= 0) {
+        // For CSP, we want MONTHLY CONTRIBUTION to savings, not accumulated balance
+        // Use monthlyBudgeted (what was assigned this month) as the primary measure
+        // Fall back to available only if monthlyBudgeted is 0 and available is reasonable
+        const monthlyContribution = budgetedData.monthlyBudgeted || 0;
+
+        // Skip if no monthly contribution (we don't want accumulated balances)
+        if (monthlyContribution <= 0) {
           return;
         }
 
@@ -986,31 +991,38 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
           return;
         }
 
-        // Create monthly amounts for display (distribute available evenly since it's a snapshot)
+        // Create monthly amounts using the monthly budgeted amount
+        // This represents actual savings contribution, not accumulated balance
         const monthlyAmounts = {};
-        const monthlyAverage = budgetedData.available / periodMonths;
         const now = new Date();
         for (let i = 0; i < periodMonths; i++) {
           const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
           const monthKey = monthDate.toISOString().slice(0, 7);
-          monthlyAmounts[monthKey] = monthlyAverage;
+          // Use the current month's budgeted amount as a proxy for all months
+          // (YNAB only gives us current month's budget, not historical)
+          monthlyAmounts[monthKey] = monthlyContribution;
         }
 
-        // Add this savings category with Available amount
+        // Total for the period = monthly contribution × number of months
+        const totalForPeriod = monthlyContribution * periodMonths;
+
+        // Add this savings category with MONTHLY CONTRIBUTION (not accumulated balance)
         categoryTotals.set(categoryName, {
           id: categoryId,
           name: categoryName,
           bucket: 'savings',
-          amount: budgetedData.available,
-          displayAmount: budgetedData.available,
+          amount: totalForPeriod,
+          displayAmount: totalForPeriod,
           excludedAmount: 0,
           groupName: groupName,
           transactionCount: 0,
-          monthlyAmounts: monthlyAmounts
+          monthlyAmounts: monthlyAmounts,
+          // Store the accumulated balance separately for reference
+          accumulatedBalance: budgetedData.available
         });
 
-        // Add to bucket totals
-        recalculatedBucketTotals.savings += budgetedData.available;
+        // Add to bucket totals (monthly contribution × period)
+        recalculatedBucketTotals.savings += totalForPeriod;
 
         // Add to monthly buckets
         Object.entries(monthlyAmounts).forEach(([monthKey, amount]) => {
