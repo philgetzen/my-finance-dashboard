@@ -497,12 +497,15 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
     // Calculate date range
     const now = new Date();
     let startDate;
+    let endDate = null; // Only used for "Previous Month" option
 
     if (periodMonths === 1) {
-      // For 1 month: use last 30 days from today (not current partial calendar month)
-      startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      // For 1 month: use the PREVIOUS FULL calendar month
+      // This avoids timing issues where 30 days might capture parts of 2 months
+      startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      endDate = new Date(now.getFullYear(), now.getMonth(), 0); // Last day of previous month
     } else {
-      // For longer periods: use full calendar months
+      // For longer periods: use full calendar months starting from beginning of month
       startDate = new Date(now.getFullYear(), now.getMonth() - periodMonths + 1, 1);
     }
 
@@ -667,6 +670,10 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
     transactions.forEach(txn => {
       const txnDate = new Date(txn.date);
       if (txnDate < startDate) {
+        return;
+      }
+      // For "Previous Month" option, also filter out transactions after the end date
+      if (endDate && txnDate > endDate) {
         return;
       }
 
@@ -900,6 +907,18 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
     const numMonths = periodMonths === 1 ? 1 : Math.max(1, Object.keys(monthlyBuckets).length);
     const monthlyIncome = totalIncome / numMonths;
 
+    // DEBUG: Log income and expense totals
+    console.log('[CSP DEBUG] Period:', periodMonths, 'months, numMonths used:', numMonths);
+    console.log('[CSP DEBUG] Date Range:', startDate.toISOString().split('T')[0], 'to', endDate ? endDate.toISOString().split('T')[0] : 'now');
+    console.log('[CSP DEBUG] Total Income:', totalIncome, 'Monthly Income:', monthlyIncome);
+    console.log('[CSP DEBUG] Income Payees:', Array.from(incomeByPayee.values()).map(p => ({ name: p.name, amount: p.amount })));
+    console.log('[CSP DEBUG] Category totals:', Array.from(categoryTotals.entries()).map(([name, data]) => ({
+      name,
+      amount: data.amount,
+      bucket: data.bucket,
+      txnCount: data.transactionCount
+    })).filter(c => c.amount > 1000).sort((a, b) => b.amount - a.amount));
+
     // NOW calculate bucket totals using current category mappings
     // This ensures custom mappings are respected
     const recalculatedBucketTotals = {
@@ -932,9 +951,9 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
       let amountToUse = catData.amount;
       let monthlyAmountsToUse = catData.monthlyAmounts || {};
 
-      if (currentBucket === 'savings' || currentBucket === 'investments') {
-        // For multi-month views (3+), use monthly BUDGETED amount to smooth out one-time transfers
-        // For 30-day snapshot view, use actual transactions to match income timing
+      if (currentBucket === 'savings') {
+        // For SAVINGS: use monthly BUDGETED amount to smooth out one-time transfers
+        // (savings goals often have irregular transaction patterns)
         if (periodMonths > 1) {
           const budgetedData = categoryBudgetedAmounts.get(catData.id);
           if (budgetedData && budgetedData.monthlyBudgeted > 0) {
@@ -955,8 +974,10 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
           }
         }
         // For 30-day view (periodMonths === 1), use actual transaction amounts
-        // This ensures savings/investments match the same time window as income
       }
+      // For INVESTMENTS: always use actual transaction amounts
+      // Investment transfers (401k, IRA, brokerage) are concrete events we should track accurately
+      // This ensures weekly contributions like $250/week show as $1000/month
 
       // Add to bucket totals
       recalculatedBucketTotals[currentBucket] += amountToUse;
@@ -976,7 +997,9 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
     // Also check for savings categories that have Available balances but NO transactions
     // These won't be in categoryTotals yet, so we need to add them
     // This is critical for savings goals where you accumulate money but don't spend from them
-    if (categoryBudgetedAmounts.size > 0) {
+    // IMPORTANT: Only do this for multi-month views. For 30-day snapshot, we want actual transactions only
+    // to match the income timing (which also uses actual transactions)
+    if (categoryBudgetedAmounts.size > 0 && periodMonths > 1) {
       const processedCategoryIds = new Set(Array.from(categoryTotals.values()).map(c => c.id));
 
       categoryBudgetedAmounts.forEach((budgetedData, categoryId) => {
@@ -1059,11 +1082,29 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
     const savingsMonthly = recalculatedBucketTotals.savings / numMonths;
     const guiltFreeMonthly = monthlyIncome - fixedCostsMonthly - investmentsMonthly - savingsMonthly;
 
-    // Override the guilt-free total with the remainder calculation
-    const adjustedBucketTotals = {
-      ...recalculatedBucketTotals,
-      guiltFree: guiltFreeMonthly * numMonths
-    };
+    // DEBUG: Log bucket calculations (using actual spending, not remainder)
+    const guiltFreeActual = recalculatedBucketTotals.guiltFree / numMonths;
+    console.log('[CSP DEBUG] Bucket totals (actual spending):', recalculatedBucketTotals);
+    console.log('[CSP DEBUG] Monthly breakdown:', {
+      income: monthlyIncome,
+      fixedCosts: fixedCostsMonthly,
+      investments: investmentsMonthly,
+      savings: savingsMonthly,
+      guiltFree: guiltFreeActual,
+      totalSpending: fixedCostsMonthly + investmentsMonthly + savingsMonthly + guiltFreeActual
+    });
+    console.log('[CSP DEBUG] Percentages (actual):', {
+      fixedCosts: monthlyIncome > 0 ? (fixedCostsMonthly / monthlyIncome * 100).toFixed(1) + '%' : '0%',
+      investments: monthlyIncome > 0 ? (investmentsMonthly / monthlyIncome * 100).toFixed(1) + '%' : '0%',
+      savings: monthlyIncome > 0 ? (savingsMonthly / monthlyIncome * 100).toFixed(1) + '%' : '0%',
+      guiltFree: monthlyIncome > 0 ? (guiltFreeActual / monthlyIncome * 100).toFixed(1) + '%' : '0%',
+      total: monthlyIncome > 0 ? ((fixedCostsMonthly + investmentsMonthly + savingsMonthly + guiltFreeActual) / monthlyIncome * 100).toFixed(1) + '%' : '0%'
+    });
+
+    // Use actual spending for all buckets (don't override guilt-free with remainder)
+    // This shows what was ACTUALLY spent in each category
+    // Percentages may exceed 100% if spending exceeds income - that's informative!
+    const adjustedBucketTotals = recalculatedBucketTotals;
 
     const totalSpending = Object.values(adjustedBucketTotals).reduce((sum, val) => sum + val, 0);
     const monthlySpending = totalSpending / numMonths;
@@ -1107,15 +1148,12 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
     });
 
     // Build monthly chart data (using recalculated buckets with current mappings)
-    // Apply the same remainder formula for guilt-free in each month
+    // Use actual spending for each bucket (no remainder calculation)
     const monthlyData = Object.entries(recalculatedMonthlyBuckets)
       .sort(([a], [b]) => a.localeCompare(b))
       .slice(-periodMonths)
       .map(([monthKey, data]) => {
         const date = new Date(monthKey + '-01');
-        // Calculate guilt-free as remainder for this month
-        const monthIncome = data.income;
-        const guiltFreeRemainder = monthIncome - data.fixedCosts - data.investments - data.savings;
         return {
           month: date.toLocaleDateString('en-US', { month: 'short' }),
           monthKey,
@@ -1123,7 +1161,7 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
           fixedCosts: data.fixedCosts,
           investments: data.investments,
           savings: data.savings,
-          guiltFree: guiltFreeRemainder
+          guiltFree: data.guiltFree  // Use actual guilt-free spending
         };
       });
 

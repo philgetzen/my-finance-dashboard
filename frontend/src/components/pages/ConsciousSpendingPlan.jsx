@@ -65,7 +65,7 @@ const BUCKET_ICONS = {
 
 // Period options
 const PERIOD_OPTIONS = [
-  { value: 1, label: 'Last 30 Days' },
+  { value: 1, label: 'Previous Month' },
   { value: 3, label: '3 Months' },
   { value: 6, label: '6 Months' },
   { value: 12, label: '12 Months' },
@@ -574,49 +574,41 @@ const BucketCard = React.memo(({ bucketKey, bucket, privacyMode, isExpanded, onT
 
 BucketCard.displayName = 'BucketCard';
 
-// Suggestion Card - Enhanced with bucket-specific styling
-const SuggestionCard = ({ suggestion }) => {
-  const bucketColor = suggestion.bucket ? BUCKET_COLORS[suggestion.bucket] : null;
+// Compact Suggestions Panel - Collapsible to reduce visual noise
+const SuggestionsPanel = ({ suggestions }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
 
-  const config = {
-    warning: {
-      bg: 'bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/20',
-      border: 'border-amber-200/60 dark:border-amber-800/60',
-      icon: 'text-amber-600 dark:text-amber-400',
-      text: 'text-amber-800 dark:text-amber-200'
-    },
-    alert: {
-      bg: 'bg-gradient-to-r from-red-50 to-rose-50 dark:from-red-950/30 dark:to-rose-950/20',
-      border: 'border-red-200/60 dark:border-red-800/60',
-      icon: 'text-red-600 dark:text-red-400',
-      text: 'text-red-800 dark:text-red-200'
-    },
-    info: {
-      bg: 'bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-950/30 dark:to-cyan-950/20',
-      border: 'border-blue-200/60 dark:border-blue-800/60',
-      icon: 'text-blue-600 dark:text-blue-400',
-      text: 'text-blue-800 dark:text-blue-200'
-    }
-  };
-
-  const styles = config[suggestion.type] || config.info;
-  const Icon = suggestion.type === 'alert' ? ExclamationTriangleIcon : InformationCircleIcon;
+  if (!suggestions || suggestions.length === 0) return null;
 
   return (
-    <div className={`relative overflow-hidden p-4 rounded-xl border ${styles.bg} ${styles.border}`}>
-      {/* Bucket color accent */}
-      {bucketColor && (
-        <div
-          className="absolute left-0 top-0 bottom-0 w-1"
-          style={{ backgroundColor: bucketColor }}
+    <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 overflow-hidden">
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <InformationCircleIcon className="h-5 w-5 text-amber-500" />
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            {suggestions.length} area{suggestions.length !== 1 ? 's' : ''} need{suggestions.length === 1 ? 's' : ''} attention
+          </span>
+        </div>
+        <ChevronDownIcon
+          className={`h-5 w-5 text-gray-400 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
         />
+      </button>
+      {isExpanded && (
+        <div className="px-4 pb-3 space-y-2 border-t border-gray-200 dark:border-gray-700">
+          {suggestions.map((suggestion, idx) => (
+            <div
+              key={idx}
+              className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-400 pt-2"
+            >
+              <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0" />
+              <span>{suggestion.message}</span>
+            </div>
+          ))}
+        </div>
       )}
-      <div className="flex items-start gap-3 pl-2">
-        <Icon className={`h-5 w-5 mt-0.5 flex-shrink-0 ${styles.icon}`} />
-        <p className={`text-sm font-medium ${styles.text}`}>
-          {suggestion.message}
-        </p>
-      </div>
     </div>
   );
 };
@@ -1285,10 +1277,13 @@ export default function ConsciousSpendingPlan() {
                 <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/60 dark:bg-gray-800/60 rounded-lg backdrop-blur-sm">
                   <span className="text-sm text-gray-500 dark:text-gray-400">Based on:</span>
                   <span className="text-sm font-bold text-gray-900 dark:text-white">
-                    {selectedPeriod === 1 ? 'last 30 days' : `${selectedPeriod} month average`}
+                    {selectedPeriod === 1 ? 'previous month' : `${selectedPeriod} month average`}
                   </span>
                 </div>
               </div>
+              <p className="mt-3 text-xs text-gray-500 dark:text-gray-500">
+                Based on actual transactions for the selected period. Does not include existing savings balances or investment account values.
+              </p>
             </div>
           </div>
         </div>
@@ -1300,14 +1295,8 @@ export default function ConsciousSpendingPlan() {
           privacyMode={privacyMode}
         />
 
-        {/* Suggestions */}
-        {cspData.suggestions.length > 0 && (
-          <div className="space-y-3">
-            {cspData.suggestions.map((suggestion, idx) => (
-              <SuggestionCard key={idx} suggestion={suggestion} />
-            ))}
-          </div>
-        )}
+        {/* Suggestions - Compact collapsible panel */}
+        <SuggestionsPanel suggestions={cspData.suggestions} />
 
         {/* Quick Stats Row - Clean horizontal layout */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -1480,15 +1469,27 @@ export default function ConsciousSpendingPlan() {
             />
           ))}
 
-          {/* Total allocation indicator - always 100% with Ramit's formula */}
-          <div className="flex items-center justify-between py-3 px-4 bg-zinc-100 dark:bg-zinc-800 rounded-xl">
-            <span className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
-              Total Allocated
-            </span>
-            <span className="text-sm font-semibold tabular-nums text-emerald-500">
-              100% ✓
-            </span>
-          </div>
+          {/* Total allocation indicator - shows actual spending as % of income */}
+          {(() => {
+            const totalPercent = Object.values(cspData.buckets).reduce(
+              (sum, bucket) => sum + (bucket.percentage || 0), 0
+            );
+            const isOver = totalPercent > 100;
+            const isUnder = totalPercent < 95;
+            return (
+              <div className="flex items-center justify-between py-3 px-4 bg-zinc-100 dark:bg-zinc-800 rounded-xl">
+                <span className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
+                  Total Spending
+                </span>
+                <span className={`text-sm font-semibold tabular-nums ${
+                  isOver ? 'text-red-500' : isUnder ? 'text-blue-500' : 'text-emerald-500'
+                }`}>
+                  {Math.round(totalPercent)}% of income
+                  {isOver && ' (over budget)'}
+                </span>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Monthly Trend Chart */}
