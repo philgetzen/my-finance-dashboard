@@ -9,7 +9,7 @@ export const YNAB_INCOME_CATEGORIES = [
   "Deferred Income SubCategory"
 ];
 
-export const DEBT_PAYMENT_CATEGORIES = ["8331 Mortgage", "Kia Loan"];
+export const DEBT_PAYMENT_CATEGORIES = ["8331 Mortgage", "2563 Mortgage", "Kia Loan"];
 
 /**
  * Custom hook for processing transaction data
@@ -63,7 +63,9 @@ export function useTransactionProcessor(transactions, accounts, investmentAccoun
       if (isIncome) {
         monthlyData[monthKey].income += amount;
         totalIncome += amount;
-      } else if (amount < 0 || txn.category_name) {
+      } else if (amount < 0) {
+        // Only count actual expenses (negative amounts = outflows)
+        // Positive amounts in non-income categories (refunds) are ignored
         monthlyData[monthKey].expenses += Math.abs(amount);
         totalExpenses += Math.abs(amount);
       }

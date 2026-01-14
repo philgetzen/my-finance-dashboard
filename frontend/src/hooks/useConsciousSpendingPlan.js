@@ -574,9 +574,10 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
           (accName.includes('ira') && !accName.includes('roth'));
 
         // Investment accounts - be more specific to avoid false positives
+        // Note: YNAB uses 'otherasset' for investment/tracking accounts, not 'investmentaccount'
         const isInvestmentType =
           !isHomeValueAccount && !isDebtAccount && (
-            accType === 'investmentaccount' ||
+            accType === 'otherasset' ||
             accName.includes('401k') ||
             accName.includes('401(k)') ||
             accName.includes('ira') ||
@@ -907,17 +908,12 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
     const numMonths = periodMonths === 1 ? 1 : Math.max(1, Object.keys(monthlyBuckets).length);
     const monthlyIncome = totalIncome / numMonths;
 
-    // DEBUG: Log income and expense totals
-    console.log('[CSP DEBUG] Period:', periodMonths, 'months, numMonths used:', numMonths);
-    console.log('[CSP DEBUG] Date Range:', startDate.toISOString().split('T')[0], 'to', endDate ? endDate.toISOString().split('T')[0] : 'now');
-    console.log('[CSP DEBUG] Total Income:', totalIncome, 'Monthly Income:', monthlyIncome);
-    console.log('[CSP DEBUG] Income Payees:', Array.from(incomeByPayee.values()).map(p => ({ name: p.name, amount: p.amount })));
-    console.log('[CSP DEBUG] Category totals:', Array.from(categoryTotals.entries()).map(([name, data]) => ({
-      name,
-      amount: data.amount,
-      bucket: data.bucket,
-      txnCount: data.transactionCount
-    })).filter(c => c.amount > 1000).sort((a, b) => b.amount - a.amount));
+    // Debug logging (only in development)
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[CSP DEBUG] Period:', periodMonths, 'months, numMonths used:', numMonths);
+      console.log('[CSP DEBUG] Date Range:', startDate.toISOString().split('T')[0], 'to', endDate ? endDate.toISOString().split('T')[0] : 'now');
+      console.log('[CSP DEBUG] Total Income:', totalIncome, 'Monthly Income:', monthlyIncome);
+    }
 
     // NOW calculate bucket totals using current category mappings
     // This ensures custom mappings are respected
@@ -1082,24 +1078,19 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
     const savingsMonthly = recalculatedBucketTotals.savings / numMonths;
     const guiltFreeMonthly = monthlyIncome - fixedCostsMonthly - investmentsMonthly - savingsMonthly;
 
-    // DEBUG: Log bucket calculations (using actual spending, not remainder)
+    // Debug logging for bucket calculations (only in development)
     const guiltFreeActual = recalculatedBucketTotals.guiltFree / numMonths;
-    console.log('[CSP DEBUG] Bucket totals (actual spending):', recalculatedBucketTotals);
-    console.log('[CSP DEBUG] Monthly breakdown:', {
-      income: monthlyIncome,
-      fixedCosts: fixedCostsMonthly,
-      investments: investmentsMonthly,
-      savings: savingsMonthly,
-      guiltFree: guiltFreeActual,
-      totalSpending: fixedCostsMonthly + investmentsMonthly + savingsMonthly + guiltFreeActual
-    });
-    console.log('[CSP DEBUG] Percentages (actual):', {
-      fixedCosts: monthlyIncome > 0 ? (fixedCostsMonthly / monthlyIncome * 100).toFixed(1) + '%' : '0%',
-      investments: monthlyIncome > 0 ? (investmentsMonthly / monthlyIncome * 100).toFixed(1) + '%' : '0%',
-      savings: monthlyIncome > 0 ? (savingsMonthly / monthlyIncome * 100).toFixed(1) + '%' : '0%',
-      guiltFree: monthlyIncome > 0 ? (guiltFreeActual / monthlyIncome * 100).toFixed(1) + '%' : '0%',
-      total: monthlyIncome > 0 ? ((fixedCostsMonthly + investmentsMonthly + savingsMonthly + guiltFreeActual) / monthlyIncome * 100).toFixed(1) + '%' : '0%'
-    });
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[CSP DEBUG] Bucket totals (actual spending):', recalculatedBucketTotals);
+      console.log('[CSP DEBUG] Monthly breakdown:', {
+        income: monthlyIncome,
+        fixedCosts: fixedCostsMonthly,
+        investments: investmentsMonthly,
+        savings: savingsMonthly,
+        guiltFree: guiltFreeActual,
+        totalSpending: fixedCostsMonthly + investmentsMonthly + savingsMonthly + guiltFreeActual
+      });
+    }
 
     // Use actual spending for all buckets (don't override guilt-free with remainder)
     // This shows what was ACTUALLY spent in each category
