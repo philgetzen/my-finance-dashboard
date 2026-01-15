@@ -533,10 +533,11 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
       startDate = new Date(now.getFullYear(), now.getMonth(), 1);
       endDate = null; // Up to today
     } else {
-      // "Last X Months": X COMPLETE calendar months (excluding current partial month)
+      // "Last X Months": X calendar months INCLUDING current partial month
       // This matches YNAB's "Last X Months" behavior
-      startDate = new Date(now.getFullYear(), now.getMonth() - periodMonths, 1);
-      endDate = new Date(now.getFullYear(), now.getMonth(), 0); // Last day of previous month
+      // e.g., "Last 6 Months" in January = Aug, Sep, Oct, Nov, Dec, Jan
+      startDate = new Date(now.getFullYear(), now.getMonth() - (periodMonths - 1), 1);
+      endDate = null; // Up to today (include current partial month)
     }
 
     // Build account lookup for tracking account detection
@@ -769,20 +770,6 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
         const transferToAccount = accountMap.get(txn.transfer_account_id);
         const isTransferToInvestmentTracking = investmentTrackingAccountIds.has(txn.transfer_account_id);
 
-        // DEBUG: Log all transfer transactions to see what we're dealing with
-        const catInfo = categoryMap.get(txn.category_id);
-        if (catInfo?.name?.toLowerCase().includes('mortgage') || txn.payee_name?.toLowerCase().includes('mortgage')) {
-          console.log('[CSP TRANSFER DEBUG] Mortgage-related transfer:', {
-            payee: txn.payee_name,
-            category_id: txn.category_id,
-            category_name: catInfo?.name,
-            transfer_to: transferToAccount?.name,
-            amount: txn.amount,
-            isInvestmentTransfer: isTransferToInvestmentTracking,
-            hasCategory: !!txn.category_id
-          });
-        }
-
         if (isTransferToInvestmentTracking) {
           // This is a transfer TO an investment tracking account
           // Count it as an investment expense (the outflow from budget)
@@ -835,7 +822,6 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
           return;
         }
         // Fall through to normal expense processing for categorized transfers
-        console.log('[CSP DEBUG] Processing categorized transfer:', txn.payee_name, 'category:', categoryMap.get(txn.category_id)?.name);
       }
       if (txn.payee_name?.toLowerCase().startsWith('transfer :') && !txn.category_id) {
         return;
@@ -916,18 +902,6 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
         settings.useKeywordFallback
       );
 
-      // DEBUG: Log mortgage category processing
-      if (categoryInfo.name?.toLowerCase().includes('mortgage')) {
-        console.log('[CSP BUCKET DEBUG] Mortgage category bucket assignment:', {
-          categoryId: txn.category_id,
-          categoryName: categoryInfo.name,
-          mappedBucket: categoryMappings[txn.category_id],
-          assignedBucket: bucket,
-          amount: amount / 1000,
-          isExpense: amount < 0
-        });
-      }
-
       // Track by category (always, for UI purposes - both expenses and positive amounts)
       const catKey = categoryInfo.name || 'Uncategorized';
       if (!categoryTotals.has(catKey)) {
@@ -1007,8 +981,6 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
     });
 
     // Iterate through all categories and assign amounts to buckets based on current mappings
-    // For SAVINGS categories, use MONTHLY BUDGETED amounts (what you're contributing), not accumulated balance
-    const bucketDebug = { fixedCosts: [], investments: [], savings: [], guiltFree: [] };
     categoryTotals.forEach((catData, catKey) => {
       // Determine the current bucket for this category
       // Priority: 1) Custom mapping, 2) Inferred bucket (if keyword fallback enabled), 3) Original bucket
@@ -1029,16 +1001,6 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
         if (monthlyAmountsToUse[key] < 0) monthlyAmountsToUse[key] = 0;
       });
 
-      // Debug: track what goes into each bucket (include group name)
-      if (amountToUse !== 0) {
-        bucketDebug[currentBucket]?.push({
-          name: catKey,
-          group: catData.groupName || 'Unknown',
-          amount: amountToUse,
-          hasCustomMapping: !!categoryMappings[catData.id]
-        });
-      }
-
       // Add to bucket totals
       recalculatedBucketTotals[currentBucket] += amountToUse;
 
@@ -1053,17 +1015,6 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
         }
       });
     });
-
-    // Debug output: show what categories went into each bucket
-    console.log('[CSP DEBUG] Period:', periodMonths, 'months');
-    console.log('[CSP DEBUG] Date range:', startDate.toISOString().slice(0, 10), 'to', endDate ? endDate.toISOString().slice(0, 10) : 'now');
-    console.log('[CSP DEBUG] Months with data:', Object.keys(recalculatedMonthlyBuckets).sort());
-    console.log('[CSP DEBUG] numMonths used for averaging:', numMonths);
-    console.log('[CSP DEBUG] categoryMappings keys:', Object.keys(categoryMappings));
-    console.log('[CSP DEBUG] categoryMappings:', categoryMappings);
-    console.log('[CSP DEBUG] Fixed Costs categories:', bucketDebug.fixedCosts.sort((a, b) => b.amount - a.amount));
-    console.log('[CSP DEBUG] Fixed Costs total:', recalculatedBucketTotals.fixedCosts);
-    console.log('[CSP DEBUG] Guilt-Free total:', recalculatedBucketTotals.guiltFree);
 
     // Also check for savings categories that have Available balances but NO transactions
     // These won't be in categoryTotals yet, so we need to add them
@@ -1364,8 +1315,6 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
       const customBucket = categoryMappings[catData.id] || null;
       const inferredBucket = getInferredBucket(catData.name, catData.groupName || 'Hidden Categories');
       const bucket = customBucket || catData.bucket || 'guiltFree';
-
-      console.log('[CSP DEBUG] Adding hidden category with transactions:', catData.name, 'id:', catData.id, 'bucket:', bucket, 'customBucket:', customBucket);
 
       allExpenseCategories.push({
         id: catData.id,
