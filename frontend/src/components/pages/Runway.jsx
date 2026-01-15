@@ -34,11 +34,11 @@ const COLORS = {
   teal: '#14B8A6',
 };
 
-// Period options
+// Period options - matches YNAB
 const PERIOD_OPTIONS = [
-  { value: 3, label: '3 Months' },
-  { value: 6, label: '6 Months' },
-  { value: 12, label: '12 Months' },
+  { value: 3, label: 'Last 3 Months' },
+  { value: 6, label: 'Last 6 Months' },
+  { value: 12, label: 'Last 12 Months' },
 ];
 
 // Health status configuration

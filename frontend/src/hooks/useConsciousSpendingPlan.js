@@ -50,7 +50,7 @@ const DEFAULT_SAVINGS_KEYWORDS = [
 // Default settings
 const DEFAULT_SETTINGS = {
   includeTrackingAccounts: true,
-  useKeywordFallback: true,
+  useKeywordFallback: false,  // Changed to false - prefer custom category mappings over keyword inference
 };
 
 // Helper to read from localStorage with fallback
@@ -356,49 +356,78 @@ const INCOME_CATEGORIES = [
 ];
 
 /**
+ * Map YNAB group names to CSP buckets
+ * This allows direct matching of user's YNAB group structure
+ */
+const GROUP_NAME_TO_BUCKET = {
+  // Fixed Costs variations
+  'fixed costs': 'fixedCosts',
+  'fixed': 'fixedCosts',
+  'bills': 'fixedCosts',
+  'monthly bills': 'fixedCosts',
+  // Investments variations
+  'investments': 'investments',
+  'investing': 'investments',
+  'post tax investments': 'investments',
+  'post-tax investments': 'investments',
+  // Savings variations
+  'savings': 'savings',
+  'saving': 'savings',
+  'savings goals': 'savings',
+  'true expenses': 'guiltFree', // Common YNAB pattern - irregular but expected expenses
+  // Guilt-free variations
+  'guilt-free': 'guiltFree',
+  'guilt free': 'guiltFree',
+  'guilt-free spending': 'guiltFree',
+  'discretionary': 'guiltFree',
+  'fun money': 'guiltFree',
+  'spending': 'guiltFree',
+  'variable expenses': 'guiltFree',
+};
+
+/**
+ * Get bucket from YNAB group name (direct match)
+ */
+function getBucketFromGroupName(groupName) {
+  if (!groupName) return null;
+  const lowerGroup = groupName.toLowerCase().trim();
+  return GROUP_NAME_TO_BUCKET[lowerGroup] || null;
+}
+
+/**
  * Categorize a transaction into a CSP bucket
- * Uses custom mapping if available, otherwise falls back to keyword matching
+ * Priority: 1) Custom mapping, 2) Keyword inference (if enabled), 3) Default to guilt-free
  */
 function categorizeTransaction(categoryId, categoryName, categoryGroupName, categoryMappings, useKeywordFallback) {
-  // First check for custom mapping by category ID
+  // Use custom mapping if it exists
   if (categoryId && categoryMappings[categoryId]) {
     return categoryMappings[categoryId];
   }
 
-  // If no custom mapping and keyword fallback is disabled, default to guilt-free
-  if (!useKeywordFallback) {
-    return 'guiltFree';
+  // Use keyword inference as fallback when enabled (default is true)
+  if (useKeywordFallback !== false) {
+    const inferredBucket = getInferredBucket(categoryName, categoryGroupName);
+    if (inferredBucket && inferredBucket !== 'guiltFree') {
+      return inferredBucket;
+    }
   }
 
-  // Keyword-based fallback
-  if (!categoryName) return 'guiltFree';
-
-  const lowerCategory = categoryName.toLowerCase();
-  const lowerGroup = (categoryGroupName || '').toLowerCase();
-
-  // Check for investments first
-  if (DEFAULT_INVESTMENT_KEYWORDS.some(kw => lowerCategory.includes(kw) || lowerGroup.includes(kw))) {
-    return 'investments';
-  }
-
-  // Check for savings
-  if (DEFAULT_SAVINGS_KEYWORDS.some(kw => lowerCategory.includes(kw) || lowerGroup.includes(kw))) {
-    return 'savings';
-  }
-
-  // Check for fixed costs
-  if (DEFAULT_FIXED_COST_KEYWORDS.some(kw => lowerCategory.includes(kw) || lowerGroup.includes(kw))) {
-    return 'fixedCosts';
-  }
-
-  // Default to guilt-free spending
+  // No custom mapping and no keyword match - default to guilt-free
   return 'guiltFree';
 }
 
 /**
- * Get the inferred bucket for a category using keyword matching
+ * Get the inferred bucket for a category
+ * Priority: 1) YNAB group name match, 2) Keyword matching
  */
 export function getInferredBucket(categoryName, categoryGroupName) {
+  // First: Check if YNAB group name directly matches a bucket
+  const groupBucket = getBucketFromGroupName(categoryGroupName);
+  if (groupBucket) {
+    return groupBucket;
+  }
+
+  // Fallback to keyword matching
   if (!categoryName) return 'guiltFree';
 
   const lowerCategory = categoryName.toLowerCase();
@@ -499,14 +528,15 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
     let startDate;
     let endDate = null; // Only used for "Previous Month" option
 
-    if (periodMonths === 1) {
-      // For 1 month: use the PREVIOUS FULL calendar month
-      // This avoids timing issues where 30 days might capture parts of 2 months
-      startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      endDate = new Date(now.getFullYear(), now.getMonth(), 0); // Last day of previous month
+    if (periodMonths === 0) {
+      // "This Month": current partial month (1st of current month to today)
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      endDate = null; // Up to today
     } else {
-      // For longer periods: use full calendar months starting from beginning of month
-      startDate = new Date(now.getFullYear(), now.getMonth() - periodMonths + 1, 1);
+      // "Last X Months": X COMPLETE calendar months (excluding current partial month)
+      // This matches YNAB's "Last X Months" behavior
+      startDate = new Date(now.getFullYear(), now.getMonth() - periodMonths, 1);
+      endDate = new Date(now.getFullYear(), now.getMonth(), 0); // Last day of previous month
     }
 
     // Build account lookup for tracking account detection
@@ -739,6 +769,20 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
         const transferToAccount = accountMap.get(txn.transfer_account_id);
         const isTransferToInvestmentTracking = investmentTrackingAccountIds.has(txn.transfer_account_id);
 
+        // DEBUG: Log all transfer transactions to see what we're dealing with
+        const catInfo = categoryMap.get(txn.category_id);
+        if (catInfo?.name?.toLowerCase().includes('mortgage') || txn.payee_name?.toLowerCase().includes('mortgage')) {
+          console.log('[CSP TRANSFER DEBUG] Mortgage-related transfer:', {
+            payee: txn.payee_name,
+            category_id: txn.category_id,
+            category_name: catInfo?.name,
+            transfer_to: transferToAccount?.name,
+            amount: txn.amount,
+            isInvestmentTransfer: isTransferToInvestmentTracking,
+            hasCategory: !!txn.category_id
+          });
+        }
+
         if (isTransferToInvestmentTracking) {
           // This is a transfer TO an investment tracking account
           // Count it as an investment expense (the outflow from budget)
@@ -780,11 +824,20 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
             }
             catData.monthlyAmounts[monthKey] += expenseAmount;
           }
+          return; // Done processing investment transfer
         }
-        // Skip other transfers (between budget accounts)
-        return;
+
+        // For non-investment transfers: only process if they have a category
+        // This handles mortgage payments, loan payments, etc. that are categorized transfers
+        // (e.g., checking → mortgage loan account, but with category "8331 Mortgage")
+        if (!txn.category_id) {
+          // Uncategorized transfers between budget accounts - skip
+          return;
+        }
+        // Fall through to normal expense processing for categorized transfers
+        console.log('[CSP DEBUG] Processing categorized transfer:', txn.payee_name, 'category:', categoryMap.get(txn.category_id)?.name);
       }
-      if (txn.payee_name?.toLowerCase().startsWith('transfer :')) {
+      if (txn.payee_name?.toLowerCase().startsWith('transfer :') && !txn.category_id) {
         return;
       }
 
@@ -863,6 +916,18 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
         settings.useKeywordFallback
       );
 
+      // DEBUG: Log mortgage category processing
+      if (categoryInfo.name?.toLowerCase().includes('mortgage')) {
+        console.log('[CSP BUCKET DEBUG] Mortgage category bucket assignment:', {
+          categoryId: txn.category_id,
+          categoryName: categoryInfo.name,
+          mappedBucket: categoryMappings[txn.category_id],
+          assignedBucket: bucket,
+          amount: amount / 1000,
+          isExpense: amount < 0
+        });
+      }
+
       // Track by category (always, for UI purposes - both expenses and positive amounts)
       const catKey = categoryInfo.name || 'Uncategorized';
       if (!categoryTotals.has(catKey)) {
@@ -882,9 +947,9 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
       // Check if this expense category is excluded
       const isExpenseCategoryExcluded = excludedExpenseCategories.has(txn.category_id);
 
-      // Only count expenses (negative amounts) toward CSP buckets
-      // Positive amounts in non-income categories are tracked for display but don't add to buckets
+      // Handle expenses and refunds
       if (isExpense) {
+        // Normal expense - add to bucket
         if (isExpenseCategoryExcluded) {
           // Track excluded amount separately for UI
           catData.excludedAmount += expenseAmount;
@@ -900,20 +965,25 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
           }
           catData.monthlyAmounts[monthKey] += expenseAmount;
         }
+      } else if (amount > 0 && !INCOME_CATEGORIES.includes(txn.category_name)) {
+        // Refund/return - subtract from bucket (matching YNAB behavior)
+        if (!isExpenseCategoryExcluded) {
+          catData.amount -= amount;
+          if (!catData.monthlyAmounts) {
+            catData.monthlyAmounts = {};
+          }
+          if (!catData.monthlyAmounts[monthKey]) {
+            catData.monthlyAmounts[monthKey] = 0;
+          }
+          catData.monthlyAmounts[monthKey] -= amount;
+        }
       }
     });
 
     // Calculate monthly averages
-    // For 1-month (last 30 days), force numMonths=1 even if it spans 2 calendar months
-    const numMonths = periodMonths === 1 ? 1 : Math.max(1, Object.keys(monthlyBuckets).length);
+    // For "This Month" (periodMonths=0), force numMonths=1 since it's partial month data
+    const numMonths = periodMonths === 0 ? 1 : Math.max(1, Object.keys(monthlyBuckets).length);
     const monthlyIncome = totalIncome / numMonths;
-
-    // Debug logging (only in development)
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[CSP DEBUG] Period:', periodMonths, 'months, numMonths used:', numMonths);
-      console.log('[CSP DEBUG] Date Range:', startDate.toISOString().split('T')[0], 'to', endDate ? endDate.toISOString().split('T')[0] : 'now');
-      console.log('[CSP DEBUG] Total Income:', totalIncome, 'Monthly Income:', monthlyIncome);
-    }
 
     // NOW calculate bucket totals using current category mappings
     // This ensures custom mappings are respected
@@ -938,42 +1008,36 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
 
     // Iterate through all categories and assign amounts to buckets based on current mappings
     // For SAVINGS categories, use MONTHLY BUDGETED amounts (what you're contributing), not accumulated balance
+    const bucketDebug = { fixedCosts: [], investments: [], savings: [], guiltFree: [] };
     categoryTotals.forEach((catData, catKey) => {
-      // Determine the current bucket for this category (custom mapping takes priority)
-      const currentBucket = categoryMappings[catData.id] || catData.bucket;
+      // Determine the current bucket for this category
+      // Priority: 1) Custom mapping, 2) Inferred bucket (if keyword fallback enabled), 3) Original bucket
+      const inferredBucket = settings.useKeywordFallback !== false
+        ? getInferredBucket(catData.name, catData.groupName)
+        : null;
+      const currentBucket = categoryMappings[catData.id] || inferredBucket || catData.bucket || 'guiltFree';
 
-      // For savings categories, use monthly budgeted amount (contribution) not spent or accumulated
-      // CSP tracks monthly cash flow, not accumulated wealth
+      // Use actual transaction amounts for all buckets (savings, investments, fixed costs, guilt-free)
+      // This ensures CSP accurately reflects real money movement, not just budgeted intentions
+      // Previously savings used budgeted amounts which hid large one-time transfers (like house sale proceeds)
       let amountToUse = catData.amount;
       let monthlyAmountsToUse = catData.monthlyAmounts || {};
 
-      if (currentBucket === 'savings') {
-        // For SAVINGS: use monthly BUDGETED amount to smooth out one-time transfers
-        // (savings goals often have irregular transaction patterns)
-        if (periodMonths > 1) {
-          const budgetedData = categoryBudgetedAmounts.get(catData.id);
-          if (budgetedData && budgetedData.monthlyBudgeted > 0) {
-            const monthlyContribution = budgetedData.monthlyBudgeted;
-            amountToUse = monthlyContribution * periodMonths;
-            // Create monthly breakdown with consistent contribution
-            monthlyAmountsToUse = {};
-            const now = new Date();
-            for (let i = 0; i < periodMonths; i++) {
-              const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
-              const monthKey = monthDate.toISOString().slice(0, 7);
-              monthlyAmountsToUse[monthKey] = monthlyContribution;
-            }
-          } else {
-            // No monthly budgeted amount - don't count transaction spending
-            amountToUse = 0;
-            monthlyAmountsToUse = {};
-          }
-        }
-        // For 30-day view (periodMonths === 1), use actual transaction amounts
+      // Ensure amounts don't go negative from refunds exceeding purchases
+      if (amountToUse < 0) amountToUse = 0;
+      Object.keys(monthlyAmountsToUse).forEach(key => {
+        if (monthlyAmountsToUse[key] < 0) monthlyAmountsToUse[key] = 0;
+      });
+
+      // Debug: track what goes into each bucket (include group name)
+      if (amountToUse !== 0) {
+        bucketDebug[currentBucket]?.push({
+          name: catKey,
+          group: catData.groupName || 'Unknown',
+          amount: amountToUse,
+          hasCustomMapping: !!categoryMappings[catData.id]
+        });
       }
-      // For INVESTMENTS: always use actual transaction amounts
-      // Investment transfers (401k, IRA, brokerage) are concrete events we should track accurately
-      // This ensures weekly contributions like $250/week show as $1000/month
 
       // Add to bucket totals
       recalculatedBucketTotals[currentBucket] += amountToUse;
@@ -989,6 +1053,17 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
         }
       });
     });
+
+    // Debug output: show what categories went into each bucket
+    console.log('[CSP DEBUG] Period:', periodMonths, 'months');
+    console.log('[CSP DEBUG] Date range:', startDate.toISOString().slice(0, 10), 'to', endDate ? endDate.toISOString().slice(0, 10) : 'now');
+    console.log('[CSP DEBUG] Months with data:', Object.keys(recalculatedMonthlyBuckets).sort());
+    console.log('[CSP DEBUG] numMonths used for averaging:', numMonths);
+    console.log('[CSP DEBUG] categoryMappings keys:', Object.keys(categoryMappings));
+    console.log('[CSP DEBUG] categoryMappings:', categoryMappings);
+    console.log('[CSP DEBUG] Fixed Costs categories:', bucketDebug.fixedCosts.sort((a, b) => b.amount - a.amount));
+    console.log('[CSP DEBUG] Fixed Costs total:', recalculatedBucketTotals.fixedCosts);
+    console.log('[CSP DEBUG] Guilt-Free total:', recalculatedBucketTotals.guiltFree);
 
     // Also check for savings categories that have Available balances but NO transactions
     // These won't be in categoryTotals yet, so we need to add them
@@ -1017,13 +1092,11 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
         const categoryName = budgetedData.categoryName || 'Unknown Category';
         const groupName = budgetedData.groupName || '';
 
-        // Check if this category is mapped to savings OR would be inferred as savings
+        // Only use custom mappings - check if explicitly mapped to savings
         const mappedBucket = categoryMappings[categoryId];
-        const inferredBucket = getInferredBucket(categoryName, groupName);
-        const effectiveBucket = mappedBucket || inferredBucket;
 
-        // Only add if this is a savings category (explicitly mapped or inferred)
-        if (effectiveBucket !== 'savings') {
+        // Only add if this is explicitly mapped to savings
+        if (mappedBucket !== 'savings') {
           return;
         }
 
@@ -1077,20 +1150,6 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
     const investmentsMonthly = recalculatedBucketTotals.investments / numMonths;
     const savingsMonthly = recalculatedBucketTotals.savings / numMonths;
     const guiltFreeMonthly = monthlyIncome - fixedCostsMonthly - investmentsMonthly - savingsMonthly;
-
-    // Debug logging for bucket calculations (only in development)
-    const guiltFreeActual = recalculatedBucketTotals.guiltFree / numMonths;
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[CSP DEBUG] Bucket totals (actual spending):', recalculatedBucketTotals);
-      console.log('[CSP DEBUG] Monthly breakdown:', {
-        income: monthlyIncome,
-        fixedCosts: fixedCostsMonthly,
-        investments: investmentsMonthly,
-        savings: savingsMonthly,
-        guiltFree: guiltFreeActual,
-        totalSpending: fixedCostsMonthly + investmentsMonthly + savingsMonthly + guiltFreeActual
-      });
-    }
 
     // Use actual spending for all buckets (don't override guilt-free with remainder)
     // This shows what was ACTUALLY spent in each category
@@ -1253,10 +1312,14 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
             const excludedAmount = txnData?.excludedAmount || 0;
             const transactionCount = txnData?.transactionCount || 0;
 
-            // Determine the bucket (from custom mapping, txn data, or inferred)
+            // Determine the bucket
+            // Priority: 1) Custom mapping, 2) Inferred bucket (if keyword fallback enabled), 3) Original bucket
             const customBucket = categoryMappings[cat.id] || null;
-            const inferredBucket = getInferredBucket(cat.name, group.name);
-            const bucket = customBucket || (txnData?.bucket) || inferredBucket;
+            const inferredBucket = getInferredBucket(cat.name, group.name); // Keep for UI display
+            const bucket = customBucket ||
+              (settings.useKeywordFallback !== false ? inferredBucket : null) ||
+              (txnData?.bucket) ||
+              'guiltFree';
 
             allExpenseCategories.push({
               id: cat.id,
@@ -1279,6 +1342,50 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
         }
       });
     }
+
+    // Add categories that have transactions but are hidden in YNAB (e.g., mortgage/loan categories)
+    // These won't appear in the category_groups loop above because they're hidden
+    const addedCategoryIds = new Set(allExpenseCategories.map(c => c.id));
+    categoryTotals.forEach((catData, catKey) => {
+      // Skip if already added from visible categories
+      if (addedCategoryIds.has(catData.id)) {
+        return;
+      }
+      // Skip synthetic transfer categories (those we created for investment transfers)
+      if (catData.id?.startsWith('transfer-')) {
+        return;
+      }
+      // Skip if no category ID (uncategorized)
+      if (!catData.id) {
+        return;
+      }
+
+      // This is a hidden category with actual transactions - add it for mapping
+      const customBucket = categoryMappings[catData.id] || null;
+      const inferredBucket = getInferredBucket(catData.name, catData.groupName || 'Hidden Categories');
+      const bucket = customBucket || catData.bucket || 'guiltFree';
+
+      console.log('[CSP DEBUG] Adding hidden category with transactions:', catData.name, 'id:', catData.id, 'bucket:', bucket, 'customBucket:', customBucket);
+
+      allExpenseCategories.push({
+        id: catData.id,
+        name: catData.name,
+        bucket,
+        amount: catData.amount,
+        excludedAmount: catData.excludedAmount || 0,
+        groupName: catData.groupName || 'Hidden Categories',
+        groupIndex: 9999, // Put at end
+        catIndex: 0,
+        transactionCount: catData.transactionCount,
+        totalAmount: catData.amount + (catData.excludedAmount || 0),
+        monthlyAmount: catData.amount / numMonths,
+        monthlyExcludedAmount: (catData.excludedAmount || 0) / numMonths,
+        customBucket,
+        inferredBucket,
+        isExcluded: excludedExpenseCategories.has(catData.id),
+        isHidden: true // Mark as hidden for UI styling
+      });
+    });
 
     // Sort by group order then category order (matching YNAB)
     allExpenseCategories.sort((a, b) => {

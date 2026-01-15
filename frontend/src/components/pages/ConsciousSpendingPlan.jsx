@@ -63,12 +63,12 @@ const BUCKET_ICONS = {
   guiltFree: SparklesIcon
 };
 
-// Period options
+// Period options - matches YNAB Spending Report
 const PERIOD_OPTIONS = [
-  { value: 1, label: 'Previous Month' },
-  { value: 3, label: '3 Months' },
-  { value: 6, label: '6 Months' },
-  { value: 12, label: '12 Months' },
+  { value: 0, label: 'This Month' },        // Current partial month
+  { value: 3, label: 'Last 3 Months' },     // 3 complete months
+  { value: 6, label: 'Last 6 Months' },     // 6 complete months
+  { value: 12, label: 'Last 12 Months' },   // 12 complete months
 ];
 
 // Custom tooltip for charts
@@ -1065,7 +1065,7 @@ export default function ConsciousSpendingPlan() {
   const [expandedBuckets, setExpandedBuckets] = useState(new Set(['fixedCosts']));
   const [showIncomeSettings, setShowIncomeSettings] = useState(false);
 
-  // CSP settings (persisted to localStorage)
+  // CSP settings (persisted to Firestore)
   const cspSettings = useCSPSettings();
   const {
     excludedPayees,
@@ -1073,6 +1073,7 @@ export default function ConsciousSpendingPlan() {
     excludedExpenseCategories,
     categoryMappings,
     settings,
+    isLoading: cspSettingsLoading,
     togglePayeeExclusion,
     toggleCategoryExclusion,
     toggleExpenseCategoryExclusion,
@@ -1142,7 +1143,9 @@ export default function ConsciousSpendingPlan() {
     }));
   }, [cspData.monthlyData]);
 
-  if (isLoading) {
+  // Wait for both finance data AND CSP settings to load before rendering
+  // This prevents race condition where CSP calculates before Firestore mappings are loaded
+  if (isLoading || cspSettingsLoading) {
     return (
       <PageTransition>
         <div className="w-full max-w-none space-y-6 pb-4">
@@ -1219,7 +1222,7 @@ export default function ConsciousSpendingPlan() {
               >
                 {PERIOD_OPTIONS.map(opt => (
                   <option key={opt.value} value={opt.value}>
-                    {opt.label}{opt.value > 1 ? ' Average' : ''}
+                    {opt.label}
                   </option>
                 ))}
               </select>
@@ -1277,7 +1280,7 @@ export default function ConsciousSpendingPlan() {
                 <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/60 dark:bg-gray-800/60 rounded-lg backdrop-blur-sm">
                   <span className="text-sm text-gray-500 dark:text-gray-400">Based on:</span>
                   <span className="text-sm font-bold text-gray-900 dark:text-white">
-                    {selectedPeriod === 1 ? 'previous month' : `${selectedPeriod} month average`}
+                    {selectedPeriod === 0 ? 'this month' : `${selectedPeriod} month average`}
                   </span>
                 </div>
               </div>

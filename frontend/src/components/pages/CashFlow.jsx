@@ -424,11 +424,11 @@ export default function CashFlow() {
               onChange={(e) => setPeriodMonths(Number(e.target.value))}
               className="text-sm rounded-lg px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
             >
-              <option value={3}>Last 3 months</option>
-              <option value={6}>Last 6 months</option>
-              <option value={12}>Last 12 months</option>
-              <option value={24}>Last 24 months</option>
-              <option value={999}>All time</option>
+              <option value={3}>Last 3 Months</option>
+              <option value={6}>Last 6 Months</option>
+              <option value={12}>Last 12 Months</option>
+              <option value={24}>Last 24 Months</option>
+              <option value={999}>All Time</option>
             </select>
           </div>
         </div>
