@@ -16,7 +16,7 @@ import YNABConnectionErrorModal from '../ui/YNABConnectionErrorModal';
 import PrivacyCurrency from '../ui/PrivacyCurrency';
 import { getAccountBalance, normalizeYNABAccountType } from '../../utils/ynabHelpers';
 import { formatCurrency, isLiability, getDisplayAccountType, isEffectivelyZero } from '../../utils/formatters';
-import { useTransactionProcessor, getMonthlyRangeData } from '../../hooks/useTransactionProcessor';
+import { useTransactionProcessor, getMonthlyRangeData, SAVINGS_INVESTMENT_CATEGORIES } from '../../hooks/useTransactionProcessor';
 import { useAccountManager } from '../../hooks/useAccountManager';
 import { useRunwayCalculator } from '../../hooks/useRunwayCalculator';
 import { Link } from 'react-router-dom';
@@ -222,14 +222,86 @@ const HeroMetric = React.memo(({ value, label, trend, change, isPrivacyMode }) =
 HeroMetric.displayName = 'HeroMetric';
 
 // Period Summary component
-const PeriodSummary = React.memo(({ title, income, expenses, savings, isPrivacyMode }) => {
+const PeriodSummary = React.memo(({
+  title,
+  income,
+  expenses,
+  savings,
+  monthlyData,
+  dateRange,
+  isPrivacyMode
+}) => {
   const savingsRate = income > 0 ? ((savings / income) * 100).toFixed(0) : 0;
+
+  // Calculate number of months in the selected period
+  const numMonths = useMemo(() => {
+    if (!monthlyData || !dateRange) return 1;
+    const { startDate, endDate } = dateRange;
+    let count = 0;
+    Object.keys(monthlyData).forEach(monthKey => {
+      const [year, month] = monthKey.split('-').map(Number);
+      const monthDate = new Date(year, month - 1, 15);
+      if (monthDate >= startDate && monthDate <= endDate) {
+        count++;
+      }
+    });
+    return Math.max(count, 1);
+  }, [monthlyData, dateRange]);
+
+  // Calculate period-over-period trends (current period vs equivalent prior period)
+  const trends = useMemo(() => {
+    if (!monthlyData || !dateRange) return null;
+    const { startDate, endDate } = dateRange;
+
+    // Calculate period duration in milliseconds
+    const periodDuration = endDate.getTime() - startDate.getTime();
+
+    // Calculate prior period dates
+    const priorEndDate = new Date(startDate.getTime() - 1); // Day before current period starts
+    const priorStartDate = new Date(priorEndDate.getTime() - periodDuration);
+
+    // Sum current period
+    let currentIncome = 0;
+    let currentExpenses = 0;
+    let priorIncome = 0;
+    let priorExpenses = 0;
+
+    Object.entries(monthlyData).forEach(([monthKey, data]) => {
+      const [year, month] = monthKey.split('-').map(Number);
+      const monthDate = new Date(year, month - 1, 15);
+
+      if (monthDate >= startDate && monthDate <= endDate) {
+        currentIncome += data.income || 0;
+        currentExpenses += data.expenses || 0;
+      } else if (monthDate >= priorStartDate && monthDate <= priorEndDate) {
+        priorIncome += data.income || 0;
+        priorExpenses += data.expenses || 0;
+      }
+    });
+
+    // Need prior period data to calculate change
+    if (priorIncome === 0 && priorExpenses === 0) return null;
+
+    const incomeChange = priorIncome > 0
+      ? ((currentIncome - priorIncome) / priorIncome) * 100
+      : 0;
+    const expenseChange = priorExpenses > 0
+      ? ((currentExpenses - priorExpenses) / priorExpenses) * 100
+      : 0;
+
+    return { incomeChange, expenseChange };
+  }, [monthlyData, dateRange]);
+
+  const avgIncome = income / numMonths;
+  const avgExpenses = expenses / numMonths;
 
   return (
     <Card className="p-4 sm:p-6">
       <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
         {title}
       </h3>
+
+      {/* Main metrics row */}
       <div className="grid grid-cols-3 gap-2 sm:gap-4">
         <div className="text-center p-2 sm:p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg overflow-hidden">
           <p className="text-[10px] sm:text-xs text-emerald-600 dark:text-emerald-400 font-medium uppercase mb-1">
@@ -251,20 +323,91 @@ const PeriodSummary = React.memo(({ title, income, expenses, savings, isPrivacyM
             className="text-xs sm:text-base font-bold text-red-700 dark:text-red-400 truncate block"
           />
         </div>
-        <div className="text-center p-2 sm:p-3 bg-violet-50 dark:bg-violet-900/20 rounded-lg overflow-hidden">
-          <p className="text-[10px] sm:text-xs text-violet-600 dark:text-violet-400 font-medium uppercase mb-1">
-            Saved
+        <div className={`text-center p-2 sm:p-3 rounded-lg overflow-hidden ${
+          savings >= 0
+            ? 'bg-blue-50 dark:bg-blue-900/20'
+            : 'bg-orange-50 dark:bg-orange-900/20'
+        }`}>
+          <p className={`text-[10px] sm:text-xs font-medium uppercase mb-1 ${
+            savings >= 0
+              ? 'text-blue-600 dark:text-blue-400'
+              : 'text-orange-600 dark:text-orange-400'
+          }`}>
+            Net Cash Flow
           </p>
-          <PrivacyCurrency
-            amount={savings}
-            isPrivacyMode={isPrivacyMode}
-            className="text-xs sm:text-base font-bold text-violet-700 dark:text-violet-400 truncate block"
-          />
-          <p className="text-[10px] sm:text-xs text-violet-500 dark:text-violet-400 mt-0.5">
-            {savingsRate}% rate
-          </p>
+          <span className={`text-xs sm:text-base font-bold truncate block ${
+            savings >= 0
+              ? 'text-blue-700 dark:text-blue-400'
+              : 'text-orange-700 dark:text-orange-400'
+          }`}>
+            {savings >= 0 ? '+' : '-'}
+            <PrivacyCurrency
+              amount={Math.abs(savings)}
+              isPrivacyMode={isPrivacyMode}
+              className="inline"
+              prefix=""
+            />
+          </span>
         </div>
       </div>
+
+      {/* Monthly averages */}
+      <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+        <p className="text-xs text-gray-500 dark:text-gray-400 uppercase font-medium mb-2">
+          Monthly Average
+        </p>
+        <div className="flex justify-between text-sm">
+          <div className="flex items-center gap-2">
+            <span className="text-gray-600 dark:text-gray-400">Income:</span>
+            <PrivacyCurrency
+              amount={avgIncome}
+              isPrivacyMode={isPrivacyMode}
+              className="font-medium text-emerald-600 dark:text-emerald-400"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-gray-600 dark:text-gray-400">Spent:</span>
+            <PrivacyCurrency
+              amount={avgExpenses}
+              isPrivacyMode={isPrivacyMode}
+              className="font-medium text-red-600 dark:text-red-400"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Period-over-period trends */}
+      {trends && (
+        <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+          <p className="text-xs text-gray-500 dark:text-gray-400 uppercase font-medium mb-2">
+            vs Prior Period
+          </p>
+          <div className="flex justify-between text-sm">
+            <div className="flex items-center gap-1">
+              <span className="text-gray-600 dark:text-gray-400">Income:</span>
+              <span className={`font-medium flex items-center ${
+                trends.incomeChange >= 0
+                  ? 'text-emerald-600 dark:text-emerald-400'
+                  : 'text-red-600 dark:text-red-400'
+              }`}>
+                {trends.incomeChange >= 0 ? '↑' : '↓'}
+                {Math.abs(trends.incomeChange).toFixed(1)}%
+              </span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-gray-600 dark:text-gray-400">Spent:</span>
+              <span className={`font-medium flex items-center ${
+                trends.expenseChange <= 0
+                  ? 'text-emerald-600 dark:text-emerald-400'
+                  : 'text-red-600 dark:text-red-400'
+              }`}>
+                {trends.expenseChange >= 0 ? '↑' : '↓'}
+                {Math.abs(trends.expenseChange).toFixed(1)}%
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
     </Card>
   );
 });
@@ -661,6 +804,8 @@ export default function Dashboard() {
       })
       .forEach(txn => {
         const category = txn.category_name || txn.category || 'Uncategorized';
+        // Skip investment categories - these are asset transfers, not spending
+        if (SAVINGS_INVESTMENT_CATEGORIES.includes(category)) return;
         const amount = Math.abs(txn.processedAmount || 0);
         categoryTotals[category] = (categoryTotals[category] || 0) + amount;
       });
@@ -796,10 +941,13 @@ export default function Dashboard() {
         {/* Period Summary + Top Categories */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <PeriodSummary
+            key={selectedTimePeriod}
             title={TIME_PERIODS.find(p => p.key === selectedTimePeriod)?.label || 'Summary'}
             income={periodSummaryData.income}
             expenses={periodSummaryData.expenses}
             savings={periodSummaryData.savings}
+            monthlyData={monthlyData}
+            dateRange={dateRange}
             isPrivacyMode={privacyMode}
           />
           <TopCategories
