@@ -11,6 +11,10 @@ export const YNAB_INCOME_CATEGORIES = [
 
 export const DEBT_PAYMENT_CATEGORIES = ["8331 Mortgage", "2563 Mortgage", "Kia Loan"];
 
+export const SAVINGS_INVESTMENT_CATEGORIES = [
+  "Investments (Stocks, ETFs, MFs)",
+];
+
 /**
  * Custom hook for processing transaction data
  * Centralizes all transaction processing logic to avoid duplication
@@ -34,11 +38,13 @@ export function useTransactionProcessor(transactions, accounts, investmentAccoun
       // Skip investment account transactions
       if (investmentAccountIds?.has(accountId)) return null;
       
-      // Skip transfers unless they're categorized debt payments
-      const isPayeeTransfer = txn.payee_name?.toLowerCase().startsWith("transfer : ");
-      const isCategorizedDebtPayment = DEBT_PAYMENT_CATEGORIES.includes(txn.category_name);
-      
-      if (txn.transfer_account_id || (isPayeeTransfer && !isCategorizedDebtPayment)) {
+      // Skip internal transfers between budget accounts (but keep transfers to/from tracking/investment accounts)
+      // This matches YNAB's Income vs Expense report behavior
+      const isInternalTransfer = txn.transfer_account_id &&
+        txn.transfer_account_id !== 'null' &&
+        !investmentAccountIds?.has(txn.transfer_account_id);
+
+      if (isInternalTransfer) {
         return null;
       }
       
@@ -64,10 +70,13 @@ export function useTransactionProcessor(transactions, accounts, investmentAccoun
         monthlyData[monthKey].income += amount;
         totalIncome += amount;
       } else if (amount < 0) {
-        // Only count actual expenses (negative amounts = outflows)
-        // Positive amounts in non-income categories (refunds) are ignored
+        // Normal expense (outflow)
         monthlyData[monthKey].expenses += Math.abs(amount);
         totalExpenses += Math.abs(amount);
+      } else if (amount > 0) {
+        // Refund/return - reduces expenses (matches Cash Flow tab logic)
+        monthlyData[monthKey].expenses -= amount;
+        totalExpenses -= amount;
       }
       
       return {
