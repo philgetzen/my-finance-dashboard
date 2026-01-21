@@ -132,7 +132,7 @@ function generateNewsletterHtml(data) {
   } = data;
 
   const runway = metrics?.runway || {};
-  const topCategories = metrics?.topCategories || [];
+  const weeklyTopCategories = metrics?.weeklyTopCategories || [];
   const weekly = trends?.weekly || {};
 
   // Use 6-week average of true expenses (excludes investments/savings)
@@ -149,8 +149,8 @@ function generateNewsletterHtml(data) {
   // Runway health
   const runwayHealth = getHealthIndicator(runway.runwayHealth || 'caution');
 
-  // Categories with alerts (>20% over average)
-  const categoriesWithAlerts = topCategories.slice(0, 7).map(cat => ({
+  // Categories with alerts (>20% over weekly average)
+  const categoriesWithAlerts = weeklyTopCategories.slice(0, 7).map(cat => ({
     ...cat,
     isAlert: cat.vsAverage > 20
   }));

@@ -688,6 +688,92 @@ function getTopSpendingCategories(transactions, monthlyData, periodMonths = 6, i
     });
 }
 
+/**
+ * Get top spending categories for the CURRENT WEEK (matches newsletter hero)
+ * Compares this week's spending to 6-week weekly average by category
+ * @param {Array} transactions - All transactions
+ * @param {Set} investmentAccountIds - Account IDs to exclude
+ * @returns {Array} - Top categories with weekly comparison
+ */
+function getWeeklyTopCategories(transactions, investmentAccountIds = new Set()) {
+  if (!transactions?.length) return [];
+
+  const now = new Date();
+
+  // Calculate this week's date range (same as newsletter hero)
+  const dayOfWeek = now.getDay();
+  const daysToLastSaturday = dayOfWeek === 6 ? 0 : dayOfWeek + 1;
+  const lastSaturday = new Date(now);
+  lastSaturday.setDate(now.getDate() - daysToLastSaturday);
+  lastSaturday.setHours(0, 0, 0, 0);
+
+  const thisFriday = new Date(lastSaturday);
+  thisFriday.setDate(lastSaturday.getDate() + 6);
+  thisFriday.setHours(23, 59, 59, 999);
+
+  // Get this week's spending by category
+  const thisWeekSpending = {};
+  transactions.forEach(txn => {
+    const txnDate = new Date(txn.date);
+    if (txnDate < lastSaturday || txnDate > thisFriday) return;
+    if (investmentAccountIds.has(txn.account_id)) return;
+    if (shouldExcludeTransaction(txn)) return;
+    if (isIncomeCategory(txn.category_name)) return;
+    if (!isTrueExpense(txn.category_name, txn.category_group_name)) return;
+
+    const amount = Math.abs(getTransactionAmount(txn));
+    const category = txn.category_name || 'Uncategorized';
+
+    thisWeekSpending[category] = (thisWeekSpending[category] || 0) + amount;
+  });
+
+  // Calculate 6-week historical average by category (excluding current week)
+  const sixWeeksAgo = new Date(lastSaturday);
+  sixWeeksAgo.setDate(sixWeeksAgo.getDate() - (6 * 7));
+
+  const lastWeekEnd = new Date(lastSaturday);
+  lastWeekEnd.setDate(lastWeekEnd.getDate() - 1);
+  lastWeekEnd.setHours(23, 59, 59, 999);
+
+  const historicalCategoryTotals = {};
+  transactions.forEach(txn => {
+    const txnDate = new Date(txn.date);
+    if (txnDate < sixWeeksAgo || txnDate > lastWeekEnd) return;
+    if (investmentAccountIds.has(txn.account_id)) return;
+    if (shouldExcludeTransaction(txn)) return;
+    if (isIncomeCategory(txn.category_name)) return;
+    if (!isTrueExpense(txn.category_name, txn.category_group_name)) return;
+
+    const amount = Math.abs(getTransactionAmount(txn));
+    const category = txn.category_name || 'Uncategorized';
+
+    historicalCategoryTotals[category] = (historicalCategoryTotals[category] || 0) + amount;
+  });
+
+  // Calculate weekly averages (divide by 6 weeks)
+  const categoryWeeklyAverages = {};
+  Object.entries(historicalCategoryTotals).forEach(([cat, total]) => {
+    categoryWeeklyAverages[cat] = total / 6;
+  });
+
+  // Build top categories with weekly comparison
+  return Object.entries(thisWeekSpending)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([name, amount]) => {
+      const weeklyAverage = categoryWeeklyAverages[name] || 0;
+      const vsAverage = weeklyAverage > 0 ? ((amount - weeklyAverage) / weeklyAverage) * 100 : 0;
+
+      return {
+        name,
+        amount,
+        average: weeklyAverage,
+        vsAverage: Math.round(vsAverage),
+        vsAverageLabel: vsAverage > 0 ? `+${Math.round(vsAverage)}%` : `${Math.round(vsAverage)}%`
+      };
+    });
+}
+
 // ============================================
 // All Metrics Combined
 // ============================================
@@ -760,6 +846,7 @@ function calculateAllMetrics(data, options = {}) {
   const csp = calculateCSPBuckets(transactions, categories, periodMonths, cspSettings, investmentAccountIds);
   const burnRate = calculateBurnRate(monthlyData, periodMonths);
   const topCategories = getTopSpendingCategories(transactions, monthlyData, periodMonths, investmentAccountIds);
+  const weeklyTopCategories = getWeeklyTopCategories(transactions, investmentAccountIds);
 
   return {
     netWorth,
@@ -767,6 +854,7 @@ function calculateAllMetrics(data, options = {}) {
     csp,
     burnRate,
     topCategories,
+    weeklyTopCategories,
     monthlyData,
     totals,
     investmentAccountIds, // Expose for use in trends calculations
@@ -781,6 +869,7 @@ module.exports = {
   calculateCSPBuckets,
   calculateBurnRate,
   getTopSpendingCategories,
+  getWeeklyTopCategories,
   calculateAllMetrics,
   categorizeTransaction,
   isTrueExpense

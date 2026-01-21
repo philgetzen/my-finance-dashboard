@@ -27,7 +27,7 @@ function buildAnalysisPrompt(data) {
   const runway = metrics?.runway || {};
   const csp = metrics?.csp || {};
   const burnRate = metrics?.burnRate || {};
-  const topCategories = metrics?.topCategories || [];
+  const weeklyTopCategories = metrics?.weeklyTopCategories || [];
 
   const mom = trends?.monthOverMonth || {};
   const yoy = trends?.yearOverYear || {};
@@ -64,9 +64,9 @@ function buildAnalysisPrompt(data) {
     <six_week_average>${formatCurrency(weekly.sixWeekAverage || 0)}</six_week_average>
     <vs_last_week>${weekly.change?.percent || 0}%</vs_last_week>
     <vs_average>${weekly.sixWeekAverage > 0 ? Math.round(((weekly.currentWeek?.spending || 0) - weekly.sixWeekAverage) / weekly.sixWeekAverage * 100) : 0}%</vs_average>
-    <top_categories>
-      ${topCategories.slice(0, 7).map(cat => `
-      <category name="${cat.name}" amount="${formatCurrency(cat.amount)}" vs_average="${cat.vsAverageLabel || 'N/A'}"/>
+    <top_categories note="This week's spending by category vs 6-week weekly average">
+      ${weeklyTopCategories.slice(0, 7).map(cat => `
+      <category name="${cat.name}" amount="${formatCurrency(cat.amount)}" vs_weekly_average="${cat.vsAverageLabel || 'N/A'}"/>
       `).join('')}
     </top_categories>
   </weekly_spending>
