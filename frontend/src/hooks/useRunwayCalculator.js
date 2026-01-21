@@ -6,9 +6,14 @@ import { getMonthlyRangeData } from './useTransactionProcessor';
  * @param {Array} allAccounts - Normalized accounts from useAccountManager
  * @param {Object} monthlyData - Monthly income/expense data from useTransactionProcessor
  * @param {number} periodMonths - Number of months to average (3, 6, or 12)
+ * @param {Object} options - Optional configuration
+ * @param {number} options.scenarioIncome - Optional monthly income override for scenario planning
+ * @param {number} options.scenarioExpenses - Optional monthly expenses override for scenario planning
  * @returns {Object} Runway metrics and projection data
  */
-export function useRunwayCalculator(allAccounts, monthlyData, periodMonths = 6) {
+export function useRunwayCalculator(allAccounts, monthlyData, periodMonths = 6, options = {}) {
+  const { scenarioIncome, scenarioExpenses } = options;
+
   return useMemo(() => {
     // Default return for empty data
     const emptyResult = {
@@ -64,8 +69,18 @@ export function useRunwayCalculator(allAccounts, monthlyData, periodMonths = 6) 
     const totalExpenses = validMonths.reduce((sum, m) => sum + m.expenses, 0);
     const totalIncome = validMonths.reduce((sum, m) => sum + m.income, 0);
 
-    const avgMonthlyExpenses = totalExpenses / numMonths;
-    const avgMonthlyIncome = totalIncome / numMonths;
+    const historicalAvgMonthlyExpenses = totalExpenses / numMonths;
+    const historicalAvgMonthlyIncome = totalIncome / numMonths;
+
+    // Use scenario values if provided, otherwise use historical averages
+    const avgMonthlyExpenses = scenarioExpenses !== undefined && scenarioExpenses !== null
+      ? scenarioExpenses
+      : historicalAvgMonthlyExpenses;
+
+    const avgMonthlyIncome = scenarioIncome !== undefined && scenarioIncome !== null
+      ? scenarioIncome
+      : historicalAvgMonthlyIncome;
+
     const avgMonthlyNet = avgMonthlyIncome - avgMonthlyExpenses;
 
     // 4. Calculate runway months
@@ -136,12 +151,17 @@ export function useRunwayCalculator(allAccounts, monthlyData, periodMonths = 6) 
       cashBreakdown: { checking, savings, manualCash },
       avgMonthlyExpenses,
       avgMonthlyIncome,
+      historicalAvgMonthlyIncome,
+      historicalAvgMonthlyExpenses,
       avgMonthlyNet,
       pureRunwayMonths,
       netRunwayMonths,
       projection,
       historicalSpending,
-      runwayHealth
+      runwayHealth,
+      // Flags to indicate if scenario values are being used
+      isUsingScenarioIncome: scenarioIncome !== undefined && scenarioIncome !== null,
+      isUsingScenarioExpenses: scenarioExpenses !== undefined && scenarioExpenses !== null
     };
-  }, [allAccounts, monthlyData, periodMonths]);
+  }, [allAccounts, monthlyData, periodMonths, scenarioIncome, scenarioExpenses]);
 }

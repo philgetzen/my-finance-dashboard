@@ -7,10 +7,13 @@ import { useFinanceData, usePrivacy } from '../../contexts/ConsolidatedDataConte
 import { useAccountManager } from '../../hooks/useAccountManager';
 import { useTransactionProcessor } from '../../hooks/useTransactionProcessor';
 import { useRunwayCalculator } from '../../hooks/useRunwayCalculator';
+import { useIncomeScenario } from '../../hooks/useIncomeScenario';
+import { useCSPSettings, useConsciousSpendingPlan } from '../../hooks/useConsciousSpendingPlan';
 import { formatCurrency } from '../../utils/formatters';
 import PageTransition from '../ui/PageTransition';
 import Card from '../ui/Card';
 import PrivacyCurrency from '../ui/PrivacyCurrency';
+import IncomeScenarioPanel from '../ui/IncomeScenarioPanel';
 import { RunwaySkeleton } from '../ui/Skeleton';
 import {
   ClockIcon,
@@ -113,6 +116,7 @@ export default function Runway() {
   const {
     accounts: ynabAccounts,
     transactions: ynabTransactions,
+    categories: ynabCategories,
     manualAccounts,
     isLoading,
   } = useFinanceData();
@@ -138,8 +142,71 @@ export default function Runway() {
     investmentAccountIds
   );
 
-  // Calculate runway metrics
-  const runway = useRunwayCalculator(allAccounts, monthlyData, selectedPeriod);
+  // Load CSP settings for category mappings
+  const cspSettings = useCSPSettings();
+
+  // Calculate CSP data to get expense breakdown by bucket
+  const cspData = useConsciousSpendingPlan(
+    ynabTransactions,
+    ynabCategories,
+    ynabAccounts,
+    selectedPeriod,
+    cspSettings
+  );
+
+  // First calculate baseline runway (without scenario) to get historical values
+  const baselineRunway = useRunwayCalculator(allAccounts, monthlyData, selectedPeriod);
+
+  // Initialize income scenario hook with historical average income
+  const incomeScenario = useIncomeScenario(baselineRunway.historicalAvgMonthlyIncome);
+
+  // Calculate monthly expense amounts by bucket
+  const bucketExpenses = useMemo(() => {
+    if (!cspData?.buckets) return {};
+    return {
+      fixedCosts: cspData.buckets.fixedCosts?.amount || 0,
+      investments: cspData.buckets.investments?.amount || 0,
+      savings: cspData.buckets.savings?.amount || 0,
+      guiltFree: cspData.buckets.guiltFree?.amount || 0,
+    };
+  }, [cspData?.buckets]);
+
+  // Calculate scenario expenses based on bucket selection
+  const scenarioMonthlyExpenses = useMemo(() => {
+    if (!incomeScenario.hasExpenseFilters) {
+      return baselineRunway.historicalAvgMonthlyExpenses;
+    }
+    // Sum only the selected buckets
+    const expenseBuckets = incomeScenario.expenseBuckets;
+    let total = 0;
+    if (expenseBuckets.fixedCosts) total += bucketExpenses.fixedCosts || 0;
+    if (expenseBuckets.investments) total += bucketExpenses.investments || 0;
+    if (expenseBuckets.savings) total += bucketExpenses.savings || 0;
+    if (expenseBuckets.guiltFree) total += bucketExpenses.guiltFree || 0;
+    return total;
+  }, [incomeScenario.hasExpenseFilters, incomeScenario.expenseBuckets, bucketExpenses, baselineRunway.historicalAvgMonthlyExpenses]);
+
+  // Build scenario options for runway calculator
+  const scenarioOptions = useMemo(() => {
+    const options = {};
+    // Apply income scenario if enabled and has values
+    if (incomeScenario.isEnabled && incomeScenario.hasScenarioValues) {
+      options.scenarioIncome = incomeScenario.scenarioMonthlyIncome;
+    }
+    // Apply expense scenario if enabled and has filters
+    if (incomeScenario.isEnabled && incomeScenario.hasExpenseFilters) {
+      options.scenarioExpenses = scenarioMonthlyExpenses;
+    }
+    return options;
+  }, [incomeScenario.isEnabled, incomeScenario.hasScenarioValues, incomeScenario.scenarioMonthlyIncome, incomeScenario.hasExpenseFilters, scenarioMonthlyExpenses]);
+
+  // Calculate runway metrics with scenario overrides
+  const runway = useRunwayCalculator(
+    allAccounts,
+    monthlyData,
+    selectedPeriod,
+    scenarioOptions
+  );
 
   const healthConfig = HEALTH_CONFIG[runway.runwayHealth];
   const HealthIcon = healthConfig.icon;
@@ -313,6 +380,37 @@ export default function Runway() {
           </Card>
         </div>
 
+        {/* Income Scenario Planning Panel */}
+        <IncomeScenarioPanel
+          isOpen={incomeScenario.isPanelOpen}
+          onToggle={incomeScenario.togglePanel}
+          isEnabled={incomeScenario.isEnabled}
+          setEnabled={incomeScenario.setEnabled}
+          salary={incomeScenario.salary}
+          setSalary={incomeScenario.setSalary}
+          bonus={incomeScenario.bonus}
+          setBonus={incomeScenario.setBonus}
+          stock={incomeScenario.stock}
+          setStock={incomeScenario.setStock}
+          scenarioMonthlyIncome={incomeScenario.scenarioMonthlyIncome}
+          historicalAvgIncome={incomeScenario.historicalAvgIncome}
+          incomeDelta={incomeScenario.incomeDelta}
+          hasScenarioValues={incomeScenario.hasScenarioValues}
+          // Expense bucket filters
+          expenseBuckets={incomeScenario.expenseBuckets}
+          toggleExpenseBucket={incomeScenario.toggleExpenseBucket}
+          hasExpenseFilters={incomeScenario.hasExpenseFilters}
+          bucketExpenses={bucketExpenses}
+          historicalAvgExpenses={baselineRunway.historicalAvgMonthlyExpenses}
+          scenarioMonthlyExpenses={scenarioMonthlyExpenses}
+          // Actions
+          resetToCurrent={incomeScenario.resetToCurrent}
+          resetExpenseBuckets={incomeScenario.resetExpenseBuckets}
+          isLoading={incomeScenario.isLoading}
+          currentRunwayMonths={baselineRunway.netRunwayMonths}
+          projectedRunwayMonths={runway.netRunwayMonths}
+        />
+
         {/* Cash Reserves Breakdown */}
         <Card className="p-6">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
@@ -462,23 +560,45 @@ export default function Runway() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <Card className="p-4 text-center">
             <p className="text-xs text-gray-500 dark:text-gray-400 uppercase font-medium mb-1">
-              Avg Monthly Income
+              {runway.isUsingScenarioIncome ? 'Scenario Monthly Income' : 'Avg Monthly Income'}
             </p>
-            <PrivacyCurrency
-              amount={runway.avgMonthlyIncome}
-              isPrivacyMode={privacyMode}
-              className="text-xl font-bold text-emerald-600 dark:text-emerald-400"
-            />
+            <div className="flex items-center justify-center gap-2">
+              <PrivacyCurrency
+                amount={runway.avgMonthlyIncome}
+                isPrivacyMode={privacyMode}
+                className={`text-xl font-bold ${
+                  runway.isUsingScenarioIncome
+                    ? 'text-violet-600 dark:text-violet-400'
+                    : 'text-emerald-600 dark:text-emerald-400'
+                }`}
+              />
+              {runway.isUsingScenarioIncome && (
+                <span className="px-1.5 py-0.5 text-[10px] font-medium bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 rounded">
+                  Scenario
+                </span>
+              )}
+            </div>
           </Card>
           <Card className="p-4 text-center">
             <p className="text-xs text-gray-500 dark:text-gray-400 uppercase font-medium mb-1">
-              Avg Monthly Expenses
+              {runway.isUsingScenarioExpenses ? 'Scenario Monthly Expenses' : 'Avg Monthly Expenses'}
             </p>
-            <PrivacyCurrency
-              amount={runway.avgMonthlyExpenses}
-              isPrivacyMode={privacyMode}
-              className="text-xl font-bold text-red-600 dark:text-red-400"
-            />
+            <div className="flex items-center justify-center gap-2">
+              <PrivacyCurrency
+                amount={runway.avgMonthlyExpenses}
+                isPrivacyMode={privacyMode}
+                className={`text-xl font-bold ${
+                  runway.isUsingScenarioExpenses
+                    ? 'text-violet-600 dark:text-violet-400'
+                    : 'text-red-600 dark:text-red-400'
+                }`}
+              />
+              {runway.isUsingScenarioExpenses && (
+                <span className="px-1.5 py-0.5 text-[10px] font-medium bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 rounded">
+                  Scenario
+                </span>
+              )}
+            </div>
           </Card>
           <Card className="p-4 text-center">
             <p className="text-xs text-gray-500 dark:text-gray-400 uppercase font-medium mb-1">
