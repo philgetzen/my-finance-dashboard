@@ -70,6 +70,52 @@ const MetricCard = React.memo(({ title, value, icon: Icon, trend, color, isPriva
 
 MetricCard.displayName = 'MetricCard';
 
+// Enhanced Metric Card with top accounts breakdown
+const MetricCardWithBreakdown = React.memo(({ title, value, icon: Icon, trend, color, isPrivacyMode, topAccounts = [] }) => (
+  <Card className="p-3 sm:p-6">
+    <div className="flex items-center justify-between gap-2 mb-3">
+      <div className="min-w-0 flex-1">
+        <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mb-1">{title}</p>
+        <PrivacyCurrency
+          amount={value}
+          isPrivacyMode={isPrivacyMode}
+          className={`text-sm sm:text-lg md:text-2xl font-bold ${color}`}
+        />
+      </div>
+      <div className={`w-8 h-8 sm:w-12 sm:h-12 rounded-xl flex-shrink-0 flex items-center justify-center ${
+        trend === 'up' ? 'bg-emerald-50 dark:bg-emerald-900/30' :
+        trend === 'down' ? 'bg-red-50 dark:bg-red-900/30' :
+        'bg-violet-50 dark:bg-violet-900/30'
+      }`}>
+        <Icon className={`h-4 w-4 sm:h-6 sm:w-6 ${
+          trend === 'up' ? 'text-emerald-600 dark:text-emerald-400' :
+          trend === 'down' ? 'text-red-500 dark:text-red-400' :
+          'text-violet-600 dark:text-violet-400'
+        }`} />
+      </div>
+    </div>
+    {/* Top accounts breakdown */}
+    {topAccounts.length > 0 && (
+      <div className="border-t border-gray-100 dark:border-gray-700 pt-2 mt-1 space-y-1.5">
+        {topAccounts.map((account, idx) => (
+          <div key={idx} className="flex justify-between items-center text-xs">
+            <span className="text-gray-500 dark:text-gray-400 truncate pr-2 max-w-[60%]">
+              {account.name}
+            </span>
+            <PrivacyCurrency
+              amount={account.balance}
+              isPrivacyMode={isPrivacyMode}
+              className={`font-medium ${color} whitespace-nowrap`}
+            />
+          </div>
+        ))}
+      </div>
+    )}
+  </Card>
+));
+
+MetricCardWithBreakdown.displayName = 'MetricCardWithBreakdown';
+
 // Collapsible section for progressive disclosure
 const CollapsibleSection = React.memo(({ title, subtitle, icon: Icon, defaultOpen = false, children }) => {
   const [isOpen, setIsOpen] = useState(defaultOpen);
@@ -477,14 +523,17 @@ const RUNWAY_HEALTH_COLORS = {
 // Runway Summary Card for Dashboard
 const RunwaySummaryCard = React.memo(({ runway, isPrivacyMode }) => {
   const colors = RUNWAY_HEALTH_COLORS[runway.runwayHealth];
-  const displayMonths = !isFinite(runway.pureRunwayMonths)
+  // Use netRunwayMonths (realistic case with income) instead of pureRunwayMonths (worst case)
+  const displayMonths = !isFinite(runway.netRunwayMonths)
     ? '∞'
-    : runway.pureRunwayMonths >= 24
+    : runway.netRunwayMonths >= 24
       ? '24+'
-      : Math.floor(runway.pureRunwayMonths);
+      : Math.floor(runway.netRunwayMonths);
 
   // Progress bar shows runway (capped at 24 months = 100%)
-  const progressPercent = Math.min((runway.pureRunwayMonths / 24) * 100, 100);
+  const progressPercent = !isFinite(runway.netRunwayMonths)
+    ? 100
+    : Math.min((runway.netRunwayMonths / 24) * 100, 100);
 
   return (
     <Card className="p-4 sm:p-6">
@@ -696,26 +745,44 @@ export default function Dashboard() {
     }
   }, [selectedTimePeriod]);
 
-  // Calculate net worth and totals
-  const { netWorth, totalAssets, totalLiabilities } = useMemo(() => {
+  // Calculate net worth, totals, and top accounts
+  const { netWorth, totalAssets, totalLiabilities, topAssets, topLiabilities } = useMemo(() => {
     let assets = 0;
     let liabilities = 0;
+    const assetAccounts = [];
+    const liabilityAccounts = [];
 
     allAccounts.forEach(account => {
       const balance = getAccountBalance(account);
       const type = normalizeYNABAccountType(account.type);
-      
+      const name = account.name || account.nickname || 'Unknown Account';
+
       if (isLiability(account) || ['credit', 'loan', 'mortgage'].includes(type)) {
         liabilities += Math.abs(balance);
+        liabilityAccounts.push({ name, balance: Math.abs(balance) });
       } else {
         assets += balance;
+        if (balance > 0) {
+          assetAccounts.push({ name, balance });
+        }
       }
     });
+
+    // Sort and get top 3
+    const topAssets = assetAccounts
+      .sort((a, b) => b.balance - a.balance)
+      .slice(0, 3);
+
+    const topLiabilities = liabilityAccounts
+      .sort((a, b) => b.balance - a.balance)
+      .slice(0, 3);
 
     return {
       netWorth: assets - liabilities,
       totalAssets: assets,
-      totalLiabilities: liabilities
+      totalLiabilities: liabilities,
+      topAssets,
+      topLiabilities
     };
   }, [allAccounts]);
 
@@ -961,21 +1028,23 @@ export default function Dashboard() {
 
         {/* Assets, Liabilities, and Runway Quick View */}
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-          <MetricCard
+          <MetricCardWithBreakdown
             title="Total Assets"
             value={totalAssets}
             icon={ArrowTrendingUpIcon}
             trend="up"
             color="text-green-600 dark:text-green-400"
             isPrivacyMode={privacyMode}
+            topAccounts={topAssets}
           />
-          <MetricCard
+          <MetricCardWithBreakdown
             title="Total Liabilities"
             value={totalLiabilities}
             icon={ArrowTrendingDownIcon}
             trend="down"
             color="text-red-600 dark:text-red-400"
             isPrivacyMode={privacyMode}
+            topAccounts={topLiabilities}
           />
           <div className="col-span-2 lg:col-span-1">
             <RunwaySummaryCard

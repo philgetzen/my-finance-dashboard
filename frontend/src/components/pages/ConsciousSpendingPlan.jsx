@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, Suspense, lazy, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, Legend
@@ -108,33 +109,109 @@ const CustomTooltip = ({ active, payload, label, privacyMode }) => {
 
 // Info Tooltip - Hover tooltip for explaining calculations
 // Uses span instead of button to avoid nested button errors
-// Smart positioning: checks if tooltip would be clipped and adjusts
+// Renders via Portal to prevent clipping by overflow:hidden containers
 const InfoTooltip = ({ text, className = '' }) => {
   const [isVisible, setIsVisible] = useState(false);
-  const [position, setPosition] = useState('top'); // 'top' or 'bottom'
+  const [tooltipStyle, setTooltipStyle] = useState({});
+  const [arrowPosition, setArrowPosition] = useState('bottom'); // 'bottom' = arrow points down (tooltip above)
   const triggerRef = useRef(null);
-  const tooltipRef = useRef(null);
 
   const updatePosition = useCallback(() => {
     if (!triggerRef.current) return;
 
     const triggerRect = triggerRef.current.getBoundingClientRect();
+    const tooltipWidth = 288; // w-72 = 18rem = 288px
     const tooltipHeight = 120; // Approximate max tooltip height
+    const padding = 8; // Padding from viewport edges
+    const arrowOffset = 8; // Space for arrow
+
+    // Vertical positioning
     const spaceAbove = triggerRect.top;
     const spaceBelow = window.innerHeight - triggerRect.bottom;
+    const showAbove = spaceAbove >= tooltipHeight || spaceAbove > spaceBelow;
 
-    // If not enough space above, show below
-    if (spaceAbove < tooltipHeight && spaceBelow > spaceAbove) {
-      setPosition('bottom');
+    let top;
+    if (showAbove) {
+      top = triggerRect.top - arrowOffset;
+      setArrowPosition('bottom');
     } else {
-      setPosition('top');
+      top = triggerRect.bottom + arrowOffset;
+      setArrowPosition('top');
     }
+
+    // Horizontal positioning - try to center, but adjust if it would clip
+    let left = triggerRect.left + triggerRect.width / 2 - tooltipWidth / 2;
+    let arrowLeft = '50%';
+
+    // Check left edge
+    if (left < padding) {
+      const shift = padding - left;
+      left = padding;
+      // Adjust arrow to point to trigger
+      arrowLeft = `${Math.max(12, tooltipWidth / 2 - shift)}px`;
+    }
+
+    // Check right edge
+    const rightEdge = left + tooltipWidth;
+    if (rightEdge > window.innerWidth - padding) {
+      const shift = rightEdge - (window.innerWidth - padding);
+      left = window.innerWidth - padding - tooltipWidth;
+      // Adjust arrow to point to trigger
+      arrowLeft = `${Math.min(tooltipWidth - 12, tooltipWidth / 2 + shift)}px`;
+    }
+
+    setTooltipStyle({
+      position: 'fixed',
+      top: showAbove ? 'auto' : `${top}px`,
+      bottom: showAbove ? `${window.innerHeight - top}px` : 'auto',
+      left: `${left}px`,
+      width: `${tooltipWidth}px`,
+      arrowLeft,
+    });
   }, []);
 
   const handleShow = () => {
     updatePosition();
     setIsVisible(true);
   };
+
+  const tooltipContent = isVisible && createPortal(
+    <div
+      style={{
+        position: 'fixed',
+        top: tooltipStyle.top,
+        bottom: tooltipStyle.bottom,
+        left: tooltipStyle.left,
+        width: tooltipStyle.width,
+        zIndex: 9999,
+      }}
+    >
+      <div className="bg-gray-900 text-white text-xs rounded-lg p-3 shadow-lg">
+        <div className="relative">
+          {text}
+          {/* Arrow */}
+          <div
+            className="absolute"
+            style={{
+              left: tooltipStyle.arrowLeft,
+              transform: 'translateX(-50%)',
+              ...(arrowPosition === 'bottom'
+                ? { top: '100%', marginTop: '-1px' }
+                : { bottom: '100%', marginBottom: '-1px' }
+              ),
+            }}
+          >
+            <div className={`w-0 h-0 border-l-8 border-r-8 border-transparent ${
+              arrowPosition === 'bottom'
+                ? 'border-t-8 border-t-gray-900'
+                : 'border-b-8 border-b-gray-900'
+            }`} />
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
 
   return (
     <span className={`relative inline-flex items-center ${className}`}>
@@ -154,32 +231,7 @@ const InfoTooltip = ({ text, className = '' }) => {
       >
         <QuestionMarkCircleIcon className="h-4 w-4" />
       </span>
-
-      {/* Tooltip - positions above or below based on available space */}
-      {isVisible && (
-        <div
-          ref={tooltipRef}
-          className={`absolute z-50 left-1/2 transform -translate-x-1/2 w-64 sm:w-72 ${
-            position === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'
-          }`}
-        >
-          <div className="bg-gray-900 text-white text-xs rounded-lg p-3 shadow-lg">
-            <div className="relative">
-              {text}
-              {/* Arrow - points down when tooltip is above, up when below */}
-              <div className={`absolute left-1/2 transform -translate-x-1/2 ${
-                position === 'top' ? 'top-full -mt-px' : 'bottom-full -mb-px'
-              }`}>
-                <div className={`w-0 h-0 border-l-8 border-r-8 border-transparent ${
-                  position === 'top'
-                    ? 'border-t-8 border-t-gray-900'
-                    : 'border-b-8 border-b-gray-900'
-                }`} />
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {tooltipContent}
     </span>
   );
 };
