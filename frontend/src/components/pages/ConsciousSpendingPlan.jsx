@@ -1301,7 +1301,7 @@ export default function ConsciousSpendingPlan() {
                 </div>
               </div>
               <p className="mt-3 text-xs text-gray-500 dark:text-gray-500">
-                Based on actual transactions in income categories for the selected period. Refunds and reimbursements in spending categories are not counted as income (use Debug Drawer for details). Does not include existing savings balances or investment account values.
+                Based on actual transactions in income categories for the selected period. Refunds and reimbursements in spending categories are not counted as income. Does not include existing savings balances or investment account values.
               </p>
             </div>
           </div>
