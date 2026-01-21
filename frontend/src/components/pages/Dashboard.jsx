@@ -303,7 +303,10 @@ const PeriodSummary = React.memo(({
 
       {/* Main metrics row */}
       <div className="grid grid-cols-3 gap-2 sm:gap-4">
-        <div className="text-center p-2 sm:p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg overflow-hidden">
+        <div
+          className="text-center p-2 sm:p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg overflow-hidden"
+          title="Income from YNAB (includes refunds and reimbursements as positive inflows)"
+        >
           <p className="text-[10px] sm:text-xs text-emerald-600 dark:text-emerald-400 font-medium uppercase mb-1">
             Income
           </p>
@@ -357,7 +360,7 @@ const PeriodSummary = React.memo(({
           Monthly Average
         </p>
         <div className="flex justify-between text-sm">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2" title="Income from YNAB (includes refunds)">
             <span className="text-gray-600 dark:text-gray-400">Income:</span>
             <PrivacyCurrency
               amount={avgIncome}

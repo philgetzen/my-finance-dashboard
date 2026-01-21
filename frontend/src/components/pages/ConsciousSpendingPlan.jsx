@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, Legend
@@ -142,7 +142,7 @@ const InfoTooltip = ({ text, className = '' }) => {
 
 // Calculation explanations for tooltips
 const CALCULATION_EXPLANATIONS = {
-  income: 'Your take-home pay: Total income from "Inflow: Ready to Assign" category, averaged over the selected period. Excludes any payees or categories you\'ve marked as excluded.',
+  income: 'Your take-home pay: Total income from "Inflow: Ready to Assign" category, averaged over the selected period. Note: This does NOT include refunds or reimbursements (positive amounts in spending categories), which may cause a small difference vs YNAB\'s reported income. Excludes any payees or categories you\'ve marked as excluded.',
   fixedCosts: 'Essentials you must pay: Rent, utilities, insurance, groceries, subscriptions, and other recurring expenses. Based on actual spending from budget categories mapped to Fixed Costs.',
   investments: 'Building your future: Includes transfers to investment tracking accounts (401k, IRA, brokerage) and any budget categories mapped to Investments. Shows the actual money moved to investment accounts.',
   savings: 'Money set aside for goals: Shows the AVAILABLE balance in categories mapped to Savings. This is the actual money accumulated in emergency funds, vacation savings, house funds, etc. Displayed as monthly average over the selected period.',
@@ -1057,11 +1057,22 @@ export default function ConsciousSpendingPlan() {
     transactions: ynabTransactions,
     categories,
     months,
+    scheduledTransactions,
     isLoading,
   } = useFinanceData();
   const { privacyMode } = usePrivacy();
 
-  const [selectedPeriod, setSelectedPeriod] = useState(6);
+  const [selectedPeriod, setSelectedPeriod] = useState(() => {
+    // Initialize from localStorage if available
+    const saved = localStorage.getItem('cspSelectedPeriod');
+    return saved ? parseInt(saved, 10) : 6;
+  });
+
+  // Sync period changes to localStorage and dispatch event for Debug Drawer
+  useEffect(() => {
+    localStorage.setItem('cspSelectedPeriod', selectedPeriod.toString());
+    window.dispatchEvent(new CustomEvent('csp-period-changed', { detail: selectedPeriod }));
+  }, [selectedPeriod]);
   const [expandedBuckets, setExpandedBuckets] = useState(new Set(['fixedCosts']));
   const [showIncomeSettings, setShowIncomeSettings] = useState(false);
 
@@ -1093,13 +1104,15 @@ export default function ConsciousSpendingPlan() {
 
   // Calculate CSP data with all settings
   // Pass months data for budgeted amounts (used for savings categories)
+  // Pass scheduledTransactions to include projected recurring income
   const cspData = useConsciousSpendingPlan(
     ynabTransactions,
     categories,
     ynabAccounts,
     selectedPeriod,
     cspSettings,
-    months
+    months,
+    scheduledTransactions
   );
 
   // Future Goals feature
@@ -1285,7 +1298,7 @@ export default function ConsciousSpendingPlan() {
                 </div>
               </div>
               <p className="mt-3 text-xs text-gray-500 dark:text-gray-500">
-                Based on actual transactions for the selected period. Does not include existing savings balances or investment account values.
+                Based on actual transactions in income categories for the selected period. Refunds and reimbursements in spending categories are not counted as income (use Debug Drawer for details). Does not include existing savings balances or investment account values.
               </p>
             </div>
           </div>
