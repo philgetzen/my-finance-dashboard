@@ -32,7 +32,6 @@ import {
   ChartPieIcon,
   LinkIcon,
   ChevronDownIcon,
-  ChevronUpIcon,
   CalendarIcon,
   ClockIcon,
   ChevronRightIcon,
@@ -116,51 +115,29 @@ const MetricCardWithBreakdown = React.memo(({ title, value, icon: Icon, trend, c
 
 MetricCardWithBreakdown.displayName = 'MetricCardWithBreakdown';
 
-// Collapsible section for progressive disclosure
-const CollapsibleSection = React.memo(({ title, subtitle, icon: Icon, defaultOpen = false, children }) => {
-  const [isOpen, setIsOpen] = useState(defaultOpen);
-
-  return (
-    <Card className="overflow-hidden" padding={false}>
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full p-6 flex items-center justify-between bg-white dark:bg-[var(--color-surface)] hover:bg-gray-50 dark:hover:bg-[#252a2f] transition-colors rounded-t-xl"
-      >
-        <div className="flex items-center gap-3">
-          {Icon && <Icon className="h-5 w-5 text-violet-500" />}
-          <div className="text-left">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              {title}
-            </h3>
-            {subtitle && (
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                {subtitle}
-              </p>
-            )}
-          </div>
-        </div>
-        {isOpen ? (
-          <ChevronUpIcon className="h-5 w-5 text-gray-400" />
-        ) : (
-          <ChevronDownIcon className="h-5 w-5 text-gray-400" />
+// Section card with header (non-collapsible)
+const SectionCard = React.memo(({ title, subtitle, icon: Icon, children }) => (
+  <Card className="overflow-hidden h-full" padding={false}>
+    <div className="p-6 pb-4 flex items-center gap-3">
+      {Icon && <Icon className="h-5 w-5 text-violet-500" />}
+      <div>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+          {title}
+        </h3>
+        {subtitle && (
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            {subtitle}
+          </p>
         )}
-      </button>
-      <div
-        className={`transition-all duration-300 ease-in-out bg-white dark:bg-[var(--color-surface)] ${
-          isOpen ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'
-        }`}
-      >
-        <div className="px-6 pb-6 border-t border-gray-100 dark:border-gray-700">
-          <div className="pt-4">
-            {children}
-          </div>
-        </div>
       </div>
-    </Card>
-  );
-});
+    </div>
+    <div className="px-6 pb-6">
+      {children}
+    </div>
+  </Card>
+));
 
-CollapsibleSection.displayName = 'CollapsibleSection';
+SectionCard.displayName = 'SectionCard';
 
 // Time period options matching YNAB
 const TIME_PERIODS = [
@@ -1054,154 +1031,51 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Collapsible: Net Worth Over Time */}
-        <CollapsibleSection
-          title="Net Worth Over Time"
-          subtitle={TIME_PERIODS.find(p => p.key === selectedTimePeriod)?.label || 'Last 6 Months'}
-          icon={ChartBarIcon}
-          defaultOpen={false}
-        >
-          {netWorthHistoryData.length > 0 ? (
-            <div className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={netWorthHistoryData}>
-                  <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                  <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-                  <YAxis
-                    tick={{ fontSize: 12 }}
-                    tickFormatter={(value) => {
-                      if (Math.abs(value) >= 1000000) {
-                        return `$${(value / 1000000).toFixed(1)}M`;
-                      } else if (Math.abs(value) >= 1000) {
-                        return `$${(value / 1000).toFixed(0)}k`;
-                      }
-                      return `$${value}`;
-                    }}
-                  />
-                  <Tooltip
-                    content={({ active, payload, label }) => {
-                      if (!active || !payload || payload.length === 0) return null;
-                      const data = payload[0]?.payload;
-                      return (
-                        <div className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
-                          <p className="text-sm font-medium text-gray-900 dark:text-white mb-2">
-                            {data?.fullMonth || label}
-                          </p>
-                          {payload.map((entry, index) => (
-                            <div key={index} className="flex items-center gap-2">
-                              <div
-                                className="w-3 h-3 rounded-full"
-                                style={{ backgroundColor: entry.stroke }}
-                              />
-                              <span className="text-sm text-gray-600 dark:text-gray-400">
-                                {entry.name}:
-                              </span>
-                              <span className={`text-sm font-medium ${privacyMode ? 'privacy-blur' : ''}`}
-                                style={{ color: entry.stroke }}>
-                                ${formatCurrency(entry.value)}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      );
-                    }}
-                  />
-                  <Legend
-                    wrapperStyle={{ paddingTop: '20px' }}
-                    formatter={(value) => (
-                      <span className="text-sm text-gray-600 dark:text-gray-400">{value}</span>
-                    )}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="assets"
-                    stroke="#10B981"
-                    strokeWidth={2}
-                    dot={{ fill: '#10B981', strokeWidth: 2, r: 4 }}
-                    activeDot={{ r: 6 }}
-                    name="Assets"
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="liabilities"
-                    stroke="#EF4444"
-                    strokeWidth={2}
-                    dot={{ fill: '#EF4444', strokeWidth: 2, r: 4 }}
-                    activeDot={{ r: 6 }}
-                    name="Liabilities"
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="netWorth"
-                    stroke="#3B82F6"
-                    strokeWidth={3}
-                    dot={{ fill: '#3B82F6', strokeWidth: 2, r: 4 }}
-                    activeDot={{ r: 6 }}
-                    name="Net Worth"
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <div className="h-72 flex items-center justify-center">
-              <div className="text-center">
-                <ChartBarIcon className="mx-auto h-8 w-8 text-gray-400 mb-3" />
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  No historical data available
-                </p>
-              </div>
-            </div>
-          )}
-        </CollapsibleSection>
-
-        {/* Collapsible: Portfolio Breakdown */}
-        <CollapsibleSection
-          title="Portfolio Breakdown"
-          subtitle="Asset allocation and account summary"
-          icon={ChartPieIcon}
-          defaultOpen={false}
-        >
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Asset Allocation */}
-            <div>
-              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">Asset Allocation</h4>
-              {allocationData.length > 0 ? (
-              <div className="h-80">
+        {/* Row 1: Net Worth Over Time | Portfolio Breakdown */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Net Worth Over Time */}
+          <SectionCard
+            title="Net Worth Over Time"
+            subtitle={TIME_PERIODS.find(p => p.key === selectedTimePeriod)?.label || 'Last 6 Months'}
+            icon={ChartBarIcon}
+          >
+            {netWorthHistoryData.length > 0 ? (
+              <div className="h-72">
                 <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={allocationData}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius="80%"
-                      label={false}
-                    >
-                      {allocationData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      formatter={(value) => [formatCurrency(value), '']}
-                      contentStyle={{
-                        borderRadius: '8px',
+                  <LineChart data={netWorthHistoryData}>
+                    <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                    <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                    <YAxis
+                      tick={{ fontSize: 12 }}
+                      tickFormatter={(value) => {
+                        if (Math.abs(value) >= 1000000) {
+                          return `$${(value / 1000000).toFixed(1)}M`;
+                        } else if (Math.abs(value) >= 1000) {
+                          return `$${(value / 1000).toFixed(0)}k`;
+                        }
+                        return `$${value}`;
                       }}
-                      wrapperClassName="chart-tooltip"
-                      content={({ active, payload }) => {
+                    />
+                    <Tooltip
+                      content={({ active, payload, label }) => {
                         if (!active || !payload || payload.length === 0) return null;
+                        const data = payload[0]?.payload;
                         return (
                           <div className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
+                            <p className="text-sm font-medium text-gray-900 dark:text-white mb-2">
+                              {data?.fullMonth || label}
+                            </p>
                             {payload.map((entry, index) => (
                               <div key={index} className="flex items-center gap-2">
-                                <div 
+                                <div
                                   className="w-3 h-3 rounded-full"
-                                  style={{ backgroundColor: entry.fill }}
+                                  style={{ backgroundColor: entry.stroke }}
                                 />
                                 <span className="text-sm text-gray-600 dark:text-gray-400">
                                   {entry.name}:
                                 </span>
-                                <span className={`text-sm font-medium text-gray-900 dark:text-white ${privacyMode ? 'privacy-blur' : ''}`}>
+                                <span className={`text-sm font-medium ${privacyMode ? 'privacy-blur' : ''}`}
+                                  style={{ color: entry.stroke }}>
                                   ${formatCurrency(entry.value)}
                                 </span>
                               </div>
@@ -1210,176 +1084,288 @@ export default function Dashboard() {
                         );
                       }}
                     />
-                  </PieChart>
+                    <Legend
+                      wrapperStyle={{ paddingTop: '20px' }}
+                      formatter={(value) => (
+                        <span className="text-sm text-gray-600 dark:text-gray-400">{value}</span>
+                      )}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="assets"
+                      stroke="#10B981"
+                      strokeWidth={2}
+                      dot={{ fill: '#10B981', strokeWidth: 2, r: 4 }}
+                      activeDot={{ r: 6 }}
+                      name="Assets"
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="liabilities"
+                      stroke="#EF4444"
+                      strokeWidth={2}
+                      dot={{ fill: '#EF4444', strokeWidth: 2, r: 4 }}
+                      activeDot={{ r: 6 }}
+                      name="Liabilities"
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="netWorth"
+                      stroke="#3B82F6"
+                      strokeWidth={3}
+                      dot={{ fill: '#3B82F6', strokeWidth: 2, r: 4 }}
+                      activeDot={{ r: 6 }}
+                      name="Net Worth"
+                    />
+                  </LineChart>
                 </ResponsiveContainer>
               </div>
-              ) : (
-                <div className="h-80 flex items-center justify-center">
-                  <div className="text-center">
-                    <ChartPieIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      No allocation data available
-                    </p>
-                  </div>
+            ) : (
+              <div className="h-72 flex items-center justify-center">
+                <div className="text-center">
+                  <ChartBarIcon className="mx-auto h-8 w-8 text-gray-400 mb-3" />
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    No historical data available
+                  </p>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
+          </SectionCard>
 
-            {/* Account Summary */}
-            <div>
-              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">Account Summary</h4>
-              <div className="space-y-3 max-h-80 overflow-y-auto">
-              {/* Use allocationData to ensure colors match the pie chart */}
-              {allocationData.map((item, index) => (
-                <div
-                  key={item.name}
-                  className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-lg"
-                >
-                  <div className="flex items-center">
-                    <div
-                      className="w-4 h-4 rounded-full mr-3"
-                      style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                    />
-                    <span className="text-base font-medium text-gray-900 dark:text-white">
-                      {item.name}
-                    </span>
-                  </div>
-                  <PrivacyCurrency
-                    amount={item.value}
-                    isPrivacyMode={privacyMode}
-                    className="text-base font-semibold text-green-600 dark:text-green-400"
-                  />
+          {/* Portfolio Breakdown */}
+          <SectionCard
+            title="Portfolio Breakdown"
+            subtitle="Asset allocation and account summary"
+            icon={ChartPieIcon}
+          >
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+              {/* Asset Allocation */}
+              <div>
+                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">Asset Allocation</h4>
+                {allocationData.length > 0 ? (
+                <div className="h-56">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={allocationData}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius="80%"
+                        label={false}
+                      >
+                        {allocationData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        formatter={(value) => [formatCurrency(value), '']}
+                        contentStyle={{
+                          borderRadius: '8px',
+                        }}
+                        wrapperClassName="chart-tooltip"
+                        content={({ active, payload }) => {
+                          if (!active || !payload || payload.length === 0) return null;
+                          return (
+                            <div className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
+                              {payload.map((entry, index) => (
+                                <div key={index} className="flex items-center gap-2">
+                                  <div
+                                    className="w-3 h-3 rounded-full"
+                                    style={{ backgroundColor: entry.fill }}
+                                  />
+                                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                                    {entry.name}:
+                                  </span>
+                                  <span className={`text-sm font-medium text-gray-900 dark:text-white ${privacyMode ? 'privacy-blur' : ''}`}>
+                                    ${formatCurrency(entry.value)}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
                 </div>
-              ))}
-              
-                {allAccounts.length === 0 && (
-                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                    <BanknotesIcon className="mx-auto h-12 w-12 mb-4" />
-                    <p className="text-sm">No accounts connected</p>
-                    <p className="text-xs mt-1">Connect your accounts to see your financial summary</p>
+                ) : (
+                  <div className="h-56 flex items-center justify-center">
+                    <div className="text-center">
+                      <ChartPieIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        No allocation data available
+                      </p>
+                    </div>
                   </div>
                 )}
               </div>
-            </div>
-          </div>
-        </CollapsibleSection>
 
-        {/* Collapsible: Income vs Expenses */}
-        <CollapsibleSection
-          title="Income vs Expenses"
-          subtitle={TIME_PERIODS.find(p => p.key === selectedTimePeriod)?.label || 'Selected period'}
-          icon={ChartBarIcon}
-          defaultOpen={false}
-        >
-          {chartData.length > 0 ? (
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                  <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-                  <YAxis
-                    tick={{ fontSize: 12 }}
-                    tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
-                  />
-                  <Tooltip
-                    formatter={(value) => [formatCurrency(value), '']}
-                    contentStyle={{
-                      borderRadius: '8px',
-                    }}
-                    wrapperClassName="chart-tooltip"
-                    content={({ active, payload, label }) => {
-                      if (!active || !payload || payload.length === 0) return null;
-                      return (
-                        <div className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
-                          <p className="text-sm font-medium text-gray-900 dark:text-white mb-2">{label}</p>
-                          {payload.map((entry, index) => (
-                            <div key={index} className="flex items-center gap-2">
-                              <div 
-                                className="w-3 h-3 rounded-full"
-                                style={{ backgroundColor: entry.fill }}
-                              />
-                              <span className="text-sm text-gray-600 dark:text-gray-400">
-                                {entry.name}:
-                              </span>
-                              <span className={`text-sm font-medium ${
-                                entry.dataKey === 'income' 
-                                  ? 'text-green-600 dark:text-green-400' 
-                                  : 'text-red-600 dark:text-red-400'
-                              } ${privacyMode ? 'privacy-blur' : ''}`}>
-                                ${formatCurrency(entry.value)}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      );
-                    }}
-                  />
-                  <Bar dataKey="income" fill="#10B981" radius={[4, 4, 0, 0]} name="Income" />
-                  <Bar dataKey="expenses" fill="#EF4444" radius={[4, 4, 0, 0]} name="Expenses" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <div className="h-64 flex items-center justify-center">
-              <div className="text-center">
-                <ChartBarIcon className="mx-auto h-8 w-8 text-gray-400 mb-3" />
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  No transaction data available
-                </p>
+              {/* Account Summary */}
+              <div>
+                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">Account Summary</h4>
+                <div className="space-y-2 max-h-56 overflow-y-auto">
+                {allocationData.map((item, index) => (
+                  <div
+                    key={item.name}
+                    className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg"
+                  >
+                    <div className="flex items-center">
+                      <div
+                        className="w-3 h-3 rounded-full mr-2"
+                        style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                      />
+                      <span className="text-sm font-medium text-gray-900 dark:text-white">
+                        {item.name}
+                      </span>
+                    </div>
+                    <PrivacyCurrency
+                      amount={item.value}
+                      isPrivacyMode={privacyMode}
+                      className="text-sm font-semibold text-green-600 dark:text-green-400"
+                    />
+                  </div>
+                ))}
+
+                  {allAccounts.length === 0 && (
+                    <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                      <BanknotesIcon className="mx-auto h-12 w-12 mb-4" />
+                      <p className="text-sm">No accounts connected</p>
+                      <p className="text-xs mt-1">Connect your accounts to see your financial summary</p>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-          )}
-        </CollapsibleSection>
+          </SectionCard>
+        </div>
 
-        {/* Collapsible: Recent Transactions */}
-        <CollapsibleSection
-          title="Recent Transactions"
-          subtitle="Latest financial activity"
-          icon={CreditCardIcon}
-          defaultOpen={false}
-        >
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200 dark:border-gray-700">
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                    Date
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                    Description
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                    Amount
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                    Account
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {processedTransactions
-                  .slice()
-                  .sort((a, b) => new Date(b.date) - new Date(a.date))
-                  .slice(0, 10)
-                  .map((txn, index) => (
-                  <TransactionRow
-                    key={`${txn.id || txn.transaction_id}-${index}`}
-                    transaction={txn}
-                    account={allAccounts.find(acc => 
-                      (acc.account_id || acc.id) === txn.account_id
-                    )}
-                    isPrivacyMode={privacyMode}
-                  />
-                ))}
-              </tbody>
-            </table>
-            {processedTransactions.length === 0 && (
-              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                <p className="text-sm">No transactions available</p>
+        {/* Row 2: Income vs Expenses | Recent Transactions */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Income vs Expenses */}
+          <SectionCard
+            title="Income vs Expenses"
+            subtitle={TIME_PERIODS.find(p => p.key === selectedTimePeriod)?.label || 'Selected period'}
+            icon={ChartBarIcon}
+          >
+            {chartData.length > 0 ? (
+              <div className="h-72">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                    <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                    <YAxis
+                      tick={{ fontSize: 12 }}
+                      tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
+                    />
+                    <Tooltip
+                      formatter={(value) => [formatCurrency(value), '']}
+                      contentStyle={{
+                        borderRadius: '8px',
+                      }}
+                      wrapperClassName="chart-tooltip"
+                      content={({ active, payload, label }) => {
+                        if (!active || !payload || payload.length === 0) return null;
+                        return (
+                          <div className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
+                            <p className="text-sm font-medium text-gray-900 dark:text-white mb-2">{label}</p>
+                            {payload.map((entry, index) => (
+                              <div key={index} className="flex items-center gap-2">
+                                <div
+                                  className="w-3 h-3 rounded-full"
+                                  style={{ backgroundColor: entry.fill }}
+                                />
+                                <span className="text-sm text-gray-600 dark:text-gray-400">
+                                  {entry.name}:
+                                </span>
+                                <span className={`text-sm font-medium ${
+                                  entry.dataKey === 'income'
+                                    ? 'text-green-600 dark:text-green-400'
+                                    : 'text-red-600 dark:text-red-400'
+                                } ${privacyMode ? 'privacy-blur' : ''}`}>
+                                  ${formatCurrency(entry.value)}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      }}
+                    />
+                    <Bar dataKey="income" fill="#10B981" radius={[4, 4, 0, 0]} name="Income" />
+                    <Bar dataKey="expenses" fill="#EF4444" radius={[4, 4, 0, 0]} name="Expenses" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="h-72 flex items-center justify-center">
+                <div className="text-center">
+                  <ChartBarIcon className="mx-auto h-8 w-8 text-gray-400 mb-3" />
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    No transaction data available
+                  </p>
+                </div>
               </div>
             )}
-          </div>
-        </CollapsibleSection>
+          </SectionCard>
+
+          {/* Recent Transactions */}
+          <SectionCard
+            title="Recent Transactions"
+            subtitle="Latest financial activity"
+            icon={CreditCardIcon}
+          >
+            <div className="overflow-x-auto max-h-72 overflow-y-auto">
+              <table className="w-full">
+                <thead className="sticky top-0 bg-white dark:bg-[var(--color-surface)]">
+                  <tr className="border-b border-gray-200 dark:border-gray-700">
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                      Date
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                      Description
+                    </th>
+                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                      Amount
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                  {processedTransactions
+                    .slice()
+                    .sort((a, b) => new Date(b.date) - new Date(a.date))
+                    .slice(0, 10)
+                    .map((txn, index) => {
+                      const amount = txn.processedAmount || 0;
+                      const isExpense = amount < 0;
+                      return (
+                        <tr key={`${txn.id || txn.transaction_id}-${index}`} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                          <td className="px-3 py-2 text-sm text-gray-900 dark:text-white whitespace-nowrap">
+                            {new Date(txn.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          </td>
+                          <td className="px-3 py-2 text-sm text-gray-900 dark:text-white truncate max-w-[150px]">
+                            {txn.payee_name || txn.name || 'Unknown'}
+                          </td>
+                          <td className="px-3 py-2 text-sm font-medium text-right whitespace-nowrap">
+                            <PrivacyCurrency
+                              amount={amount}
+                              isPrivacyMode={privacyMode}
+                              className={isExpense ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+              {processedTransactions.length === 0 && (
+                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                  <p className="text-sm">No transactions available</p>
+                </div>
+              )}
+            </div>
+          </SectionCard>
+        </div>
 
         {/* Modals */}
         <ManualAccountModal
