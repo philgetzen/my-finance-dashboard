@@ -5,6 +5,8 @@ const dotenv = require('dotenv');
 const admin = require('firebase-admin');
 const axios = require('axios');
 const fs = require('fs');
+const cron = require('node-cron');
+const logger = require('./logger');
 
 dotenv.config();
 
@@ -557,6 +559,38 @@ app.get('/api/ynab/budgets/:budgetId/months', async (req, res) => {
   }
 });
 
+// Scheduled transactions endpoint
+app.get('/api/ynab/budgets/:budgetId/scheduled_transactions', async (req, res) => {
+  const { budgetId } = req.params;
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    return res.status(401).json({ error: 'Authorization header required' });
+  }
+
+  const token = authHeader.replace('Bearer ', '');
+  const cacheKey = getCacheKey(token, `budgets/${budgetId}/scheduled_transactions`);
+  const cached = getFromCache(cacheKey);
+  if (cached) {
+    setCacheHeaders(res);
+    return res.json(cached);
+  }
+
+  try {
+    const response = await axios.get(`${YNAB_API_BASE_URL}/budgets/${budgetId}/scheduled_transactions`, {
+      headers: {
+        'Authorization': authHeader,
+        'Accept': 'application/json'
+      }
+    });
+    setCache(cacheKey, response.data);
+    setCacheHeaders(res);
+    res.json(response.data);
+  } catch (error) {
+    console.error('Error fetching scheduled transactions:', error.response?.data || error.message);
+    res.status(error.response?.status || 500).json({ error: 'Unable to fetch scheduled transactions' });
+  }
+});
+
 // Altruist CSV import endpoint
 app.post('/api/import-altruist-holdings', async (req, res) => {
   const { user_id, csvData } = req.body;
@@ -663,6 +697,69 @@ app.post('/api/ynab/save_token', async (req, res) => {
   } catch (error) {
     console.error('Error saving YNAB token:', error.message);
     res.status(500).json({ error: 'Unable to save YNAB token' });
+  }
+});
+
+// YNAB token refresh - exchanges refresh_token for new access_token
+app.post('/api/ynab/refresh_token', async (req, res) => {
+  const { user_id, refresh_token } = req.body;
+
+  if (!user_id || !refresh_token) {
+    return res.status(400).json({ error: 'user_id and refresh_token are required' });
+  }
+
+  if (!YNAB_CLIENT_ID || !YNAB_CLIENT_SECRET) {
+    console.error('❌ Missing YNAB credentials for token refresh');
+    return res.status(500).json({ error: 'Server configuration error: Missing YNAB credentials' });
+  }
+
+  try {
+    console.log('Attempting YNAB token refresh for user:', user_id);
+
+    const tokenPayload = {
+      client_id: YNAB_CLIENT_ID,
+      client_secret: YNAB_CLIENT_SECRET,
+      grant_type: 'refresh_token',
+      refresh_token
+    };
+
+    const response = await axios.post('https://app.ynab.com/oauth/token', tokenPayload, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      timeout: 10000
+    });
+
+    const { access_token: new_access_token, refresh_token: new_refresh_token } = response.data;
+
+    // Save new tokens to Firestore
+    const userDocRef = db.collection('ynab_tokens').doc(user_id);
+    await userDocRef.set({
+      access_token: new_access_token,
+      refresh_token: new_refresh_token,
+      updated_at: new Date().toISOString()
+    }, { merge: true });
+
+    console.log('✅ YNAB token refresh successful for user:', user_id);
+    res.json({ access_token: new_access_token, refresh_token: new_refresh_token });
+  } catch (error) {
+    console.error('❌ Error refreshing YNAB token:', error.message);
+
+    if (error.response) {
+      console.error('Response status:', error.response.status);
+      console.error('Response data:', error.response.data);
+
+      // If refresh token is invalid/expired, user needs to re-authenticate
+      if (error.response.status === 401 || error.response.status === 400) {
+        return res.status(401).json({
+          error: 'Refresh token expired or invalid. Please re-authenticate with YNAB.',
+          requiresReauth: true
+        });
+      }
+    }
+
+    res.status(500).json({ error: 'Unable to refresh YNAB token' });
   }
 });
 
@@ -781,7 +878,7 @@ app.put('/api/manual_accounts/:accountId', async (req, res) => {
 
 app.delete('/api/manual_accounts/:accountId', async (req, res) => {
   const { accountId } = req.params;
-  
+
   try {
     await db.collection('manual_accounts').doc(accountId).delete();
     res.json({ success: true, message: 'Account deleted successfully' });
@@ -790,6 +887,173 @@ app.delete('/api/manual_accounts/:accountId', async (req, res) => {
     res.status(500).json({ error: 'Unable to delete manual account' });
   }
 });
+
+// ============================================
+// NEWSLETTER API ENDPOINTS
+// ============================================
+
+// Lazy load newsletter service to avoid circular dependencies
+let newsletterService = null;
+function getNewsletterService() {
+  if (!newsletterService) {
+    newsletterService = require('./services/newsletterService');
+  }
+  return newsletterService;
+}
+
+// Manual trigger - send newsletter now
+app.post('/api/newsletter/send', async (req, res) => {
+  const { user_id, skipAI = false } = req.body;
+
+  if (!user_id) {
+    return res.status(400).json({ error: 'user_id is required' });
+  }
+
+  logger.info('Manual newsletter trigger', { userId: user_id, skipAI });
+
+  try {
+    const service = getNewsletterService();
+    const result = await service.generateAndSend(user_id, { skipAI });
+    res.json({
+      success: true,
+      message: 'Newsletter sent successfully',
+      ...result
+    });
+  } catch (error) {
+    logger.error('Manual newsletter failed', { userId: user_id, error: error.message });
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      stage: error.stage || 'unknown'
+    });
+  }
+});
+
+// Preview email without sending (returns HTML)
+app.get('/api/newsletter/preview', async (req, res) => {
+  const { user_id } = req.query;
+
+  if (!user_id) {
+    return res.status(400).json({ error: 'user_id is required' });
+  }
+
+  try {
+    const service = getNewsletterService();
+    const html = await service.generatePreview(user_id);
+    res.type('html').send(html);
+  } catch (error) {
+    logger.error('Newsletter preview failed', { userId: user_id, error: error.message });
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Preview AI prompt without calling Claude (saves tokens)
+app.get('/api/newsletter/preview-prompt', async (req, res) => {
+  const { user_id } = req.query;
+
+  if (!user_id) {
+    return res.status(400).json({ error: 'user_id is required' });
+  }
+
+  try {
+    const service = getNewsletterService();
+    const result = await service.buildAIPrompt(user_id);
+    res.json(result);
+  } catch (error) {
+    logger.error('Newsletter prompt preview failed', { userId: user_id, error: error.message });
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// View recent logs + check last send status
+app.get('/api/newsletter/logs', async (req, res) => {
+  const { user_id, limit = 10 } = req.query;
+
+  if (!user_id) {
+    return res.status(400).json({ error: 'user_id is required' });
+  }
+
+  try {
+    const service = getNewsletterService();
+    const logs = await service.getLogs(user_id, parseInt(limit));
+    res.json(logs);
+  } catch (error) {
+    logger.error('Newsletter logs fetch failed', { userId: user_id, error: error.message });
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Check status of last newsletter (for UI)
+app.get('/api/newsletter/status', async (req, res) => {
+  const { user_id } = req.query;
+
+  if (!user_id) {
+    return res.status(400).json({ error: 'user_id is required' });
+  }
+
+  try {
+    const service = getNewsletterService();
+    const status = await service.getStatus(user_id);
+    res.json(status);
+  } catch (error) {
+    logger.error('Newsletter status check failed', { userId: user_id, error: error.message });
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Check newsletter configuration
+app.get('/api/newsletter/config', (req, res) => {
+  try {
+    const service = getNewsletterService();
+    const config = service.validateConfiguration();
+    res.json(config);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+console.log('✅ Registered newsletter routes: /api/newsletter/*');
+
+// ============================================
+// NEWSLETTER CRON SCHEDULER
+// ============================================
+
+// Initialize cron job for automatic newsletter sending
+// Saturday at 9am in configured timezone
+const NEWSLETTER_CRON = '0 9 * * 6'; // Every Saturday at 9:00 AM
+const NEWSLETTER_TIMEZONE = process.env.NEWSLETTER_TIMEZONE || 'America/Los_Angeles';
+
+// Only start cron if Resend is configured
+if (process.env.RESEND_API_KEY && process.env.NEWSLETTER_RECIPIENTS) {
+  cron.schedule(NEWSLETTER_CRON, async () => {
+    logger.info('Newsletter cron triggered', { timezone: NEWSLETTER_TIMEZONE });
+
+    try {
+      // Get all users with newsletter enabled
+      // For single-user setup, we'll use the first user with YNAB tokens
+      const tokensSnapshot = await db.collection('ynab_tokens').limit(1).get();
+
+      if (tokensSnapshot.empty) {
+        logger.warn('No users with YNAB tokens found for newsletter');
+        return;
+      }
+
+      const userId = tokensSnapshot.docs[0].id;
+      const service = getNewsletterService();
+      const result = await service.generateAndSend(userId);
+
+      logger.info('Scheduled newsletter completed', { userId, result });
+    } catch (error) {
+      logger.error('Scheduled newsletter failed', { error: error.message });
+    }
+  }, {
+    timezone: NEWSLETTER_TIMEZONE
+  });
+
+  console.log(`✅ Newsletter cron scheduled: ${NEWSLETTER_CRON} (${NEWSLETTER_TIMEZONE})`);
+} else {
+  console.log('⚠️ Newsletter cron not started - missing RESEND_API_KEY or NEWSLETTER_RECIPIENTS');
+}
 
 // Error handlers
 process.on('uncaughtException', (error) => {
