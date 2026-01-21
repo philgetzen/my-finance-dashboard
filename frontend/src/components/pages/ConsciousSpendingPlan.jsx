@@ -1,25 +1,23 @@
 import React, { useState, useMemo, useEffect, Suspense, lazy, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis,
+  BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from 'recharts';
 import { useFinanceData, usePrivacy } from '../../contexts/ConsolidatedDataContext';
 import { useConsciousSpendingPlan, useCSPSettings, CSP_TARGETS, CSP_BUCKETS } from '../../hooks/useConsciousSpendingPlan';
 import { useCSPGoals } from '../../hooks/useCSPGoals';
-import { normalizeYNABAccountType } from '../../utils/ynabHelpers';
 import { formatCurrency } from '../../utils/formatters';
 import PageTransition from '../ui/PageTransition';
 import Card from '../ui/Card';
 import PrivacyCurrency from '../ui/PrivacyCurrency';
-import CSPGoalsPanel from '../ui/CSPGoalsPanel';
+import CSPGoalsInlinePanel from '../ui/CSPGoalsInlinePanel';
 
 // Lazy load Debug Drawer for development only
 const DebugDrawerContainer = lazy(() => import('../DebugDrawer/DebugDrawerContainer'));
 import {
   CalendarIcon,
   ChevronDownIcon,
-  ChevronRightIcon,
   HomeIcon,
   ChartBarIcon,
   BanknotesIcon,
@@ -30,12 +28,7 @@ import {
   ArrowTopRightOnSquareIcon,
   AdjustmentsHorizontalIcon,
   XMarkIcon,
-  BuildingLibraryIcon,
-  CurrencyDollarIcon,
-  ArrowTrendingUpIcon,
-  MinusCircleIcon,
   QuestionMarkCircleIcon,
-  RocketLaunchIcon,
 } from '@heroicons/react/24/outline';
 
 // CSP bucket colors - rich, vibrant palette with gradients
@@ -309,7 +302,7 @@ const CSPScoreRing = ({ buckets, isOnTrack }) => {
   const colors = getScoreColor();
 
   return (
-    <div className="relative w-32 h-32 mx-auto">
+    <div className="relative w-40 h-40 mx-auto">
       {/* Background circle */}
       <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
         <circle
@@ -318,7 +311,7 @@ const CSPScoreRing = ({ buckets, isOnTrack }) => {
           r="45"
           fill="none"
           stroke="currentColor"
-          strokeWidth="8"
+          strokeWidth="7"
           className="text-gray-200 dark:text-gray-700"
         />
         {/* Progress circle */}
@@ -328,7 +321,7 @@ const CSPScoreRing = ({ buckets, isOnTrack }) => {
           r="45"
           fill="none"
           stroke={colors.stroke}
-          strokeWidth="8"
+          strokeWidth="7"
           strokeLinecap="round"
           strokeDasharray={circumference}
           strokeDashoffset={strokeDashoffset}
@@ -337,9 +330,9 @@ const CSPScoreRing = ({ buckets, isOnTrack }) => {
       </svg>
       {/* Score text */}
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className={`text-3xl font-bold ${colors.text}`}>{score}</span>
+        <span className={`text-4xl font-bold ${colors.text}`}>{score}</span>
         <div className="flex items-center gap-1">
-          <span className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Score</span>
+          <span className="text-sm text-gray-500 dark:text-gray-400 uppercase tracking-wide">Score</span>
           <InfoTooltip text={CALCULATION_EXPLANATIONS.score} className="ml-0" />
         </div>
       </div>
@@ -347,364 +340,23 @@ const CSPScoreRing = ({ buckets, isOnTrack }) => {
   );
 };
 
-// Net Worth Section Component
-const NetWorthSection = ({ netWorth, preTaxInvestments, privacyMode }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
-
-  const categories = [
-    {
-      key: 'assets',
-      label: 'Assets',
-      icon: HomeIcon,
-      amount: netWorth?.assets || 0,
-      accounts: netWorth?.breakdown?.assets || [],
-      color: 'text-blue-600 dark:text-blue-400',
-      bgColor: 'bg-blue-50 dark:bg-blue-950/30',
-      description: 'Home value, property, vehicles'
-    },
-    {
-      key: 'investments',
-      label: 'Investments',
-      icon: ArrowTrendingUpIcon,
-      amount: netWorth?.investments || 0,
-      accounts: netWorth?.breakdown?.investments || [],
-      color: 'text-emerald-600 dark:text-emerald-400',
-      bgColor: 'bg-emerald-50 dark:bg-emerald-950/30',
-      description: 'Retirement, brokerage, stocks'
-    },
-    {
-      key: 'savings',
-      label: 'Savings',
-      icon: BanknotesIcon,
-      amount: netWorth?.savings || 0,
-      accounts: netWorth?.breakdown?.savings || [],
-      color: 'text-cyan-600 dark:text-cyan-400',
-      bgColor: 'bg-cyan-50 dark:bg-cyan-950/30',
-      description: 'Emergency fund, cash reserves'
-    },
-    {
-      key: 'debt',
-      label: 'Debt',
-      icon: MinusCircleIcon,
-      amount: -(netWorth?.debt || 0),
-      accounts: netWorth?.breakdown?.debt || [],
-      color: 'text-red-600 dark:text-red-400',
-      bgColor: 'bg-red-50 dark:bg-red-950/30',
-      description: 'Mortgage, loans, credit'
-    }
-  ];
-
-  return (
-    <Card className="overflow-hidden">
-      {/* Header */}
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full p-5 flex items-center justify-between group"
-      >
-        <div className="flex items-center gap-4">
-          <div className="p-3 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 shadow-lg">
-            <BuildingLibraryIcon className="h-6 w-6 text-white" />
-          </div>
-          <div className="text-left">
-            <div className="flex items-center gap-1.5">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white group-hover:text-gray-700 dark:group-hover:text-gray-100 transition-colors">
-                Net Worth
-              </h3>
-              <InfoTooltip text={CALCULATION_EXPLANATIONS.netWorth} />
-            </div>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Your complete financial picture
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-4">
-          <PrivacyCurrency
-            amount={netWorth?.total || 0}
-            isPrivacyMode={privacyMode}
-            className={`text-2xl font-bold ${(netWorth?.total || 0) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}
-          />
-          <div className={`p-1 rounded-lg transition-colors ${isExpanded ? 'bg-gray-100 dark:bg-gray-700' : 'group-hover:bg-gray-100 dark:group-hover:bg-gray-700'}`}>
-            {isExpanded ? (
-              <ChevronDownIcon className="h-5 w-5 text-gray-500" />
-            ) : (
-              <ChevronRightIcon className="h-5 w-5 text-gray-400 group-hover:text-gray-500" />
-            )}
-          </div>
-        </div>
-      </button>
-
-      {/* Expanded content */}
-      <div
-        className={`transition-all duration-300 ease-in-out overflow-hidden ${
-          isExpanded ? 'max-h-[1000px] opacity-100' : 'max-h-0 opacity-0'
-        }`}
-      >
-        <div className="px-5 pb-5 space-y-4">
-          {/* Category cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            {categories.map(cat => {
-              const Icon = cat.icon;
-              return (
-                <div key={cat.key} className={`p-4 rounded-xl ${cat.bgColor}`}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Icon className={`h-5 w-5 ${cat.color}`} />
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      {cat.label}
-                    </span>
-                  </div>
-                  <PrivacyCurrency
-                    amount={cat.amount}
-                    isPrivacyMode={privacyMode}
-                    className={`text-lg font-bold ${cat.color}`}
-                  />
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    {cat.accounts.length} account{cat.accounts.length !== 1 ? 's' : ''}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Account breakdown */}
-          {categories.map(cat => (
-            cat.accounts.length > 0 && (
-              <div key={`${cat.key}-breakdown`} className="space-y-2">
-                <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                  <span className={`w-2 h-2 rounded-full ${cat.color.replace('text-', 'bg-')}`}></span>
-                  {cat.label} Breakdown ({cat.accounts.length} accounts)
-                </p>
-                <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3 max-h-48 overflow-y-auto">
-                  <div className="space-y-2">
-                    {cat.accounts.map((acc, idx) => (
-                      <div key={idx} className="flex justify-between items-center py-1.5 border-b border-gray-100 dark:border-gray-700 last:border-0">
-                        <span className="text-sm text-gray-600 dark:text-gray-400 truncate pr-2">
-                          {acc.name}
-                        </span>
-                        <PrivacyCurrency
-                          amount={cat.key === 'debt' ? -Math.abs(acc.balance) : acc.balance}
-                          isPrivacyMode={privacyMode}
-                          className={`text-sm font-medium ${cat.color} whitespace-nowrap`}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )
-          ))}
-
-          {/* Pre-tax investments note */}
-          {preTaxInvestments?.monthlyAmount > 0 && (
-            <div className="mt-4 p-4 bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-950/30 dark:to-purple-950/20 rounded-xl border border-violet-200 dark:border-violet-800">
-              <div className="flex items-start gap-3">
-                <InformationCircleIcon className="h-5 w-5 text-violet-600 dark:text-violet-400 mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="text-sm font-medium text-violet-800 dark:text-violet-200 mb-1">
-                    Pre-Tax Contributions (401k, Traditional IRA)
-                  </p>
-                  <p className="text-sm text-violet-600 dark:text-violet-300">
-                    You're also contributing{' '}
-                    <PrivacyCurrency
-                      amount={preTaxInvestments.monthlyAmount}
-                      isPrivacyMode={privacyMode}
-                      className="font-semibold"
-                    />
-                    /month to pre-tax retirement accounts. These come out before your take-home pay and are tracked separately from your CSP investments target.
-                  </p>
-                  {preTaxInvestments.accounts?.length > 0 && (
-                    <div className="mt-2 text-xs text-violet-500 dark:text-violet-400">
-                      {preTaxInvestments.accounts.map((acc, i) => (
-                        <span key={i}>
-                          {acc.name}: <PrivacyCurrency amount={acc.monthlyAmount} isPrivacyMode={privacyMode} />/mo
-                          {i < preTaxInvestments.accounts.length - 1 ? ' • ' : ''}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </Card>
-  );
-};
-
-// Bucket Card Component - Enhanced with better visuals
-const BucketCard = React.memo(({ bucketKey, bucket, privacyMode, isExpanded, onToggle }) => {
-  const Icon = BUCKET_ICONS[bucketKey];
-  const color = BUCKET_COLORS[bucketKey];
-  const gradient = BUCKET_GRADIENTS[bucketKey];
-  const bgLight = BUCKET_BG_LIGHT[bucketKey];
-  const target = bucket.target;
-
-  const statusColor = bucket.isOnTarget
-    ? 'text-emerald-600 dark:text-emerald-400'
-    : 'text-amber-600 dark:text-amber-400';
-
-  const StatusIcon = bucket.isOnTarget ? CheckCircleIcon : ExclamationTriangleIcon;
-
-  return (
-    <div className={`rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm hover:shadow-md transition-all duration-200`}>
-      <button
-        onClick={onToggle}
-        className="w-full p-5 flex items-center justify-between group"
-      >
-        <div className="flex items-center gap-4">
-          {/* Gradient icon background */}
-          <div className={`p-3 rounded-xl bg-gradient-to-br ${gradient} shadow-lg`}>
-            <Icon className="h-6 w-6 text-white" />
-          </div>
-          <div className="text-left">
-            <div className="flex items-center gap-1.5">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white group-hover:text-gray-700 dark:group-hover:text-gray-100 transition-colors">
-                {target.label}
-              </h3>
-              <InfoTooltip text={CALCULATION_EXPLANATIONS[bucketKey]} />
-            </div>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Target: {target.min === target.max ? `${target.min}%` : `${target.min}-${target.max}%`}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-4">
-          <div className="text-right">
-            <div className="flex items-baseline justify-end gap-1">
-              <PrivacyCurrency
-                amount={bucket.amount}
-                isPrivacyMode={privacyMode}
-                className="text-xl font-bold text-gray-900 dark:text-white"
-              />
-              <span className="text-sm text-gray-500 dark:text-gray-400">/mo</span>
-            </div>
-            <div className="flex items-center gap-1.5 justify-end mt-1">
-              <StatusIcon className={`h-4 w-4 ${statusColor}`} />
-              <span className={`text-sm font-semibold ${statusColor}`}>
-                {bucket.percentage}% of income
-              </span>
-            </div>
-          </div>
-          <div className={`p-1 rounded-lg transition-colors ${isExpanded ? 'bg-gray-100 dark:bg-gray-700' : 'group-hover:bg-gray-100 dark:group-hover:bg-gray-700'}`}>
-            {isExpanded ? (
-              <ChevronDownIcon className="h-5 w-5 text-gray-500" />
-            ) : (
-              <ChevronRightIcon className="h-5 w-5 text-gray-400 group-hover:text-gray-500" />
-            )}
-          </div>
-        </div>
-      </button>
-
-      {/* Expanded content with smooth animation */}
-      <div
-        className={`transition-all duration-300 ease-in-out overflow-hidden ${
-          isExpanded ? 'max-h-[800px] opacity-100' : 'max-h-0 opacity-0'
-        }`}
-      >
-        <div className={`px-5 pb-5 ${bgLight}`}>
-          {/* Enhanced Progress bar */}
-          <div className="mt-4 mb-5">
-            <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-2">
-              <span>0%</span>
-              <span className="font-semibold text-sm" style={{ color }}>
-                {bucket.percentage}% of income
-              </span>
-              <span>100%</span>
-            </div>
-            <div className="h-4 bg-gray-200/60 dark:bg-gray-700/60 rounded-full overflow-hidden relative backdrop-blur-sm">
-              {/* Target zone indicator */}
-              <div
-                className="absolute h-full bg-gray-300/50 dark:bg-gray-600/50 border-l border-r border-gray-400/30 dark:border-gray-500/30"
-                style={{
-                  left: `${target.min}%`,
-                  width: `${target.max - target.min}%`
-                }}
-              />
-              {/* Actual percentage bar with gradient */}
-              <div
-                className={`h-full rounded-full transition-all duration-700 ease-out relative z-10 bg-gradient-to-r ${gradient} shadow-sm`}
-                style={{
-                  width: `${Math.min(bucket.percentage, 100)}%`,
-                }}
-              />
-            </div>
-            <div className="flex items-center gap-2 mt-2 text-xs text-gray-500 dark:text-gray-400">
-              <div className="w-3 h-2 bg-gray-300/50 dark:bg-gray-600/50 rounded-sm"></div>
-              <span>Target zone: {target.min}-{target.max}%</span>
-            </div>
-          </div>
-
-          {/* Category breakdown with improved styling */}
-          {bucket.categories?.length > 0 && (
-            <div className="space-y-1">
-              <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
-                <span className="w-1 h-4 rounded-full bg-gradient-to-b" style={{ background: `linear-gradient(to bottom, ${color}, transparent)` }}></span>
-                Categories ({bucket.categories.length})
-              </p>
-              <div className="bg-white/60 dark:bg-gray-800/60 rounded-lg p-3 backdrop-blur-sm max-h-64 overflow-y-auto">
-                {bucket.categories.map((cat, idx) => (
-                  <div
-                    key={cat.name}
-                    className={`flex items-center justify-between py-2.5 ${idx !== bucket.categories.length - 1 ? 'border-b border-gray-200/50 dark:border-gray-700/50' : ''}`}
-                  >
-                    <span className="text-sm text-gray-700 dark:text-gray-300">
-                      {cat.name}
-                    </span>
-                    <PrivacyCurrency
-                      amount={cat.monthlyAmount}
-                      isPrivacyMode={privacyMode}
-                      className="text-sm font-semibold text-gray-900 dark:text-white"
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-});
-
-BucketCard.displayName = 'BucketCard';
-
-// Compact Suggestions Panel - Collapsible to reduce visual noise
+// Suggestions Panel - Always visible list of areas needing attention
 const SuggestionsPanel = ({ suggestions }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
-
   if (!suggestions || suggestions.length === 0) return null;
 
   return (
-    <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 overflow-hidden">
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors"
-      >
-        <div className="flex items-center gap-3">
-          <InformationCircleIcon className="h-5 w-5 text-amber-500" />
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-            {suggestions.length} area{suggestions.length !== 1 ? 's' : ''} need{suggestions.length === 1 ? 's' : ''} attention
+    <div className="flex items-start gap-3">
+      <InformationCircleIcon className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
+      <div className="flex-1 flex flex-wrap gap-x-4 gap-y-1">
+        {suggestions.map((suggestion, idx) => (
+          <span
+            key={idx}
+            className="text-sm text-gray-600 dark:text-gray-400"
+          >
+            {suggestion.message}
           </span>
-        </div>
-        <ChevronDownIcon
-          className={`h-5 w-5 text-gray-400 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
-        />
-      </button>
-      {isExpanded && (
-        <div className="px-4 pb-3 space-y-2 border-t border-gray-200 dark:border-gray-700">
-          {suggestions.map((suggestion, idx) => (
-            <div
-              key={idx}
-              className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-400 pt-2"
-            >
-              <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0" />
-              <span>{suggestion.message}</span>
-            </div>
-          ))}
-        </div>
-      )}
+        ))}
+      </div>
     </div>
   );
 };
@@ -1169,7 +821,6 @@ export default function ConsciousSpendingPlan() {
     localStorage.setItem('cspSelectedPeriod', selectedPeriod.toString());
     window.dispatchEvent(new CustomEvent('csp-period-changed', { detail: selectedPeriod }));
   }, [selectedPeriod]);
-  const [expandedBuckets, setExpandedBuckets] = useState(new Set(['fixedCosts']));
   const [showIncomeSettings, setShowIncomeSettings] = useState(false);
 
   // CSP settings (persisted to Firestore)
@@ -1219,27 +870,6 @@ export default function ConsciousSpendingPlan() {
   const activeCategoryExclusions = cspData.incomeCategories?.filter(c => c.isExcluded).length || 0;
   const activeExpenseExclusions = cspData.allExpenseCategories?.filter(c => c.isExcluded).length || 0;
   const activeExclusionCount = activePayeeExclusions + activeCategoryExclusions + activeExpenseExclusions;
-
-  const toggleBucket = (key) => {
-    setExpandedBuckets(prev => {
-      const next = new Set(prev);
-      if (next.has(key)) {
-        next.delete(key);
-      } else {
-        next.add(key);
-      }
-      return next;
-    });
-  };
-
-  // Pie chart data - always exactly 4 buckets totaling 100% (Ramit's CSP formula)
-  const pieData = useMemo(() => {
-    return Object.entries(cspData.buckets).map(([key, bucket]) => ({
-      name: bucket.target.label,
-      value: bucket.amount,
-      color: BUCKET_COLORS[key]
-    }));
-  }, [cspData.buckets]);
 
   // Bar chart data for monthly breakdown
   const barData = useMemo(() => {
@@ -1295,15 +925,6 @@ export default function ConsciousSpendingPlan() {
 
           {/* Controls */}
           <div className="flex items-center gap-2">
-            {/* Future Goals Button */}
-            <button
-              onClick={goalsState.openPanel}
-              className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-violet-500 to-indigo-500 hover:from-violet-600 hover:to-indigo-600 text-white rounded-lg text-sm font-medium transition-all shadow-md hover:shadow-lg"
-            >
-              <RocketLaunchIcon className="h-4 w-4" />
-              <span className="hidden sm:inline">Future Goals</span>
-            </button>
-
             {/* Income Settings Button */}
             <button
               onClick={() => setShowIncomeSettings(true)}
@@ -1341,247 +962,216 @@ export default function ConsciousSpendingPlan() {
           </div>
         </div>
 
-        {/* Hero Status Card with CSP Score */}
-        <div className={`rounded-2xl p-6 ${cspData.isOnTrack
-          ? 'bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 dark:from-emerald-950/40 dark:via-teal-950/30 dark:to-cyan-950/20 border border-emerald-200/50 dark:border-emerald-800/50'
-          : 'bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 dark:from-amber-950/40 dark:via-orange-950/30 dark:to-yellow-950/20 border border-amber-200/50 dark:border-amber-800/50'
-        }`}>
-          <div className="flex flex-col sm:flex-row items-center gap-6">
-            {/* CSP Score Ring */}
-            <div className="flex-shrink-0">
-              <CSPScoreRing buckets={cspData.buckets} isOnTrack={cspData.isOnTrack} />
-            </div>
-
-            {/* Status Text */}
-            <div className="flex-1 text-center sm:text-left">
-              <div className="flex items-center justify-center sm:justify-start gap-2 mb-2">
-                {cspData.isOnTrack ? (
-                  <CheckCircleIcon className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
-                ) : (
-                  <ExclamationTriangleIcon className="h-6 w-6 text-amber-600 dark:text-amber-400" />
-                )}
-                <h2 className={`text-xl font-bold ${cspData.isOnTrack
-                  ? 'text-emerald-700 dark:text-emerald-300'
-                  : 'text-amber-700 dark:text-amber-300'
-                }`}>
-                  {cspData.isOnTrack
-                    ? "You're on track!"
-                    : 'Needs attention'
-                  }
-                </h2>
-              </div>
-              <p className="text-gray-600 dark:text-gray-400 mb-3">
-                {cspData.isOnTrack
-                  ? "Your spending aligns with Ramit Sethi's Conscious Spending Plan guidelines."
-                  : "Some spending categories are outside the recommended ranges."
-                }
-              </p>
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/60 dark:bg-gray-800/60 rounded-lg backdrop-blur-sm">
-                  <span className="text-sm text-gray-500 dark:text-gray-400">Monthly Take-Home Pay:</span>
-                  <PrivacyCurrency
-                    amount={cspData.monthlyIncome}
-                    isPrivacyMode={privacyMode}
-                    className="text-sm font-bold text-gray-900 dark:text-white"
-                  />
-                  <InfoTooltip text={CALCULATION_EXPLANATIONS.income} />
-                </div>
-                <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/60 dark:bg-gray-800/60 rounded-lg backdrop-blur-sm">
-                  <span className="text-sm text-gray-500 dark:text-gray-400">Based on:</span>
-                  <span className="text-sm font-bold text-gray-900 dark:text-white">
-                    {selectedPeriod === 0 ? 'this month' : `${selectedPeriod} month average`}
-                  </span>
-                </div>
-              </div>
-              <p className="mt-3 text-xs text-gray-500 dark:text-gray-500">
-                Based on actual transactions in income categories for the selected period. Refunds and reimbursements in spending categories are not counted as income. Does not include existing savings balances or investment account values.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Net Worth Section */}
-        <NetWorthSection
-          netWorth={cspData.netWorth}
-          preTaxInvestments={cspData.preTaxInvestments}
-          privacyMode={privacyMode}
-        />
-
-        {/* Suggestions - Compact collapsible panel */}
-        <SuggestionsPanel suggestions={cspData.suggestions} />
-
-        {/* Quick Stats Row - Clean horizontal layout */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {[
-            { label: 'Fixed Costs', key: 'fixedCosts', icon: HomeIcon },
-            { label: 'Investments', key: 'investments', icon: ChartBarIcon },
-            { label: 'Savings', key: 'savings', icon: BanknotesIcon },
-            { label: 'Guilt-Free', key: 'guiltFree', icon: SparklesIcon },
-          ].map(({ label, key, icon: Icon }) => {
-            const bucket = cspData.buckets[key];
-            const gradient = BUCKET_GRADIENTS[key];
-            const isOnTarget = bucket?.isOnTarget;
-            return (
-              <div
-                key={key}
-                className="relative overflow-hidden rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-4 group hover:shadow-md transition-all duration-200"
-              >
-                {/* Subtle gradient accent */}
-                <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${gradient}`} />
-
-                <div className="flex items-center justify-between mb-2">
-                  <div className={`p-2 rounded-lg bg-gradient-to-br ${gradient}`}>
-                    <Icon className="h-4 w-4 text-white" />
+        {/* Integrated Hero Section - Score + Bucket Cards */}
+        <Card className="overflow-hidden">
+          <div className="p-6">
+            <div className="flex flex-col lg:flex-row items-stretch gap-6">
+              {/* Left side: Score Ring + Status */}
+              <div className="flex flex-col items-center justify-center w-full lg:w-64 lg:min-w-[16rem] p-4 rounded-2xl bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-800/30">
+                <CSPScoreRing buckets={cspData.buckets} isOnTrack={cspData.isOnTrack} />
+                <div className="mt-4 text-center">
+                  <div className="flex items-center justify-center gap-2">
+                    {cspData.isOnTrack ? (
+                      <CheckCircleIcon className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                    ) : (
+                      <ExclamationTriangleIcon className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                    )}
+                    <span className={`text-sm font-semibold ${cspData.isOnTrack
+                      ? 'text-emerald-700 dark:text-emerald-300'
+                      : 'text-amber-700 dark:text-amber-300'
+                    }`}>
+                      {cspData.isOnTrack ? "On Track" : 'Needs Attention'}
+                    </span>
                   </div>
-                  {isOnTarget ? (
-                    <CheckCircleIcon className="h-5 w-5 text-emerald-500" />
-                  ) : (
-                    <ExclamationTriangleIcon className="h-5 w-5 text-amber-500" />
-                  )}
+                  <div className="mt-3 flex items-center justify-center gap-1.5">
+                    <PrivacyCurrency
+                      amount={cspData.monthlyIncome}
+                      isPrivacyMode={privacyMode}
+                      className="text-lg font-bold text-gray-900 dark:text-white"
+                    />
+                    <span className="text-sm text-gray-500 dark:text-gray-400">/mo</span>
+                    <InfoTooltip text={CALCULATION_EXPLANATIONS.income} />
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    {selectedPeriod === 0 ? 'This month' : `${selectedPeriod} mo avg`}
+                  </p>
                 </div>
-
-                <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mb-1">
-                  {label}
-                </p>
-                <PrivacyCurrency
-                  amount={bucket?.amount || 0}
-                  isPrivacyMode={privacyMode}
-                  className="text-lg font-bold text-gray-900 dark:text-white"
-                />
-                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                  {bucket?.percentage || 0}% of income
-                </p>
               </div>
-            );
-          })}
-        </div>
 
-        {/* Pie Chart and Target Comparison */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Pie Chart */}
-          <Card className="p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              Your Spending Breakdown
-            </h3>
-            <div className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="45%"
-                    outerRadius="70%"
-                    label={false}
-                  >
-                    {pieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    content={<CustomTooltip privacyMode={privacyMode} />}
-                  />
-                  <Legend
-                    verticalAlign="bottom"
-                    height={36}
-                    formatter={(value) => {
-                      const item = pieData.find(d => d.name === value);
-                      const total = pieData.reduce((sum, d) => sum + d.value, 0);
-                      const percent = total > 0 ? ((item?.value || 0) / total * 100).toFixed(0) : 0;
-                      return <span className="text-sm text-gray-700 dark:text-gray-300">{value} ({percent}%)</span>;
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </Card>
+              {/* Right side: 2x2 Bucket Progress Cards */}
+              <div className="flex-1 grid grid-cols-2 gap-3 w-full">
+                {Object.entries(cspData.buckets).map(([key, bucket]) => {
+                  const Icon = BUCKET_ICONS[key];
+                  const gradient = BUCKET_GRADIENTS[key];
+                  const color = BUCKET_COLORS[key];
+                  const target = CSP_TARGETS[key];
+                  const isOnTarget = bucket.isOnTarget;
 
-          {/* Target Comparison */}
-          <Card className="p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              Target vs Actual
-            </h3>
-            <div className="space-y-4">
-              {Object.entries(cspData.buckets).map(([key, bucket]) => {
-                return (
-                  <div key={key} className="space-y-1">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                        {bucket.target.label}
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="text-sm font-semibold"
-                          style={{ color: BUCKET_COLORS[key] }}
-                        >
+                  return (
+                    <div
+                      key={key}
+                      className="relative overflow-hidden rounded-xl bg-gray-50 dark:bg-gray-800/50 p-4"
+                    >
+                      {/* Top: Icon + Name + Status */}
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <div className={`p-1.5 rounded-lg bg-gradient-to-br ${gradient}`}>
+                            <Icon className="h-3.5 w-3.5 text-white" />
+                          </div>
+                          <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                            {bucket.target.label}
+                          </span>
+                        </div>
+                        {isOnTarget ? (
+                          <CheckCircleIcon className="h-4 w-4 text-emerald-500" />
+                        ) : (
+                          <ExclamationTriangleIcon className="h-4 w-4 text-amber-500" />
+                        )}
+                      </div>
+
+                      {/* Amount + Percentage */}
+                      <div className="flex items-baseline gap-1.5 mb-2">
+                        <PrivacyCurrency
+                          amount={bucket.amount}
+                          isPrivacyMode={privacyMode}
+                          className="text-lg font-bold text-gray-900 dark:text-white"
+                        />
+                        <span className="text-xs font-medium" style={{ color }}>
                           {bucket.percentage}%
                         </span>
-                        <span className="text-xs text-gray-400">
-                          (target: {bucket.target.min === bucket.target.max
-                            ? `${bucket.target.min}%`
-                            : `${bucket.target.min}-${bucket.target.max}%`
-                          })
+                      </div>
+
+                      {/* Mini Progress Bar with Target Range */}
+                      <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden relative">
+                        {/* Target zone indicator */}
+                        <div
+                          className="absolute h-full bg-gray-300/50 dark:bg-gray-600/50"
+                          style={{
+                            left: `${Math.min(target.min, 100)}%`,
+                            width: `${Math.min(target.max - target.min, 100 - target.min)}%`
+                          }}
+                        />
+                        {/* Actual percentage bar */}
+                        <div
+                          className={`h-full rounded-full transition-all duration-500 relative z-10 bg-gradient-to-r ${gradient}`}
+                          style={{
+                            width: `${Math.min(bucket.percentage, 100)}%`,
+                          }}
+                        />
+                      </div>
+                      <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1">
+                        Target: {target.min === target.max ? `${target.min}%` : `${target.min}-${target.max}%`}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Suggestions - inline in hero */}
+            {cspData.suggestions?.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
+                <SuggestionsPanel suggestions={cspData.suggestions} />
+              </div>
+            )}
+          </div>
+        </Card>
+
+        {/* Future Goals - Inline collapsible panel */}
+        <CSPGoalsInlinePanel
+          isOpen={goalsState.isPanelOpen}
+          onToggle={() => goalsState.isPanelOpen ? goalsState.closePanel() : goalsState.openPanel()}
+          draftIncome={goalsState.draftIncome}
+          setDraftIncome={goalsState.setDraftIncome}
+          draftBucketAmounts={goalsState.draftBucketAmounts}
+          setDraftBucketAmount={goalsState.setDraftBucketAmount}
+          hasChanges={goalsState.hasChanges}
+          resetDraft={goalsState.resetDraft}
+          actualIncome={goalsState.actualIncome}
+          actualBuckets={goalsState.actualBuckets}
+          projectedData={goalsState.projectedData}
+          deltas={goalsState.deltas}
+          savedGoals={goalsState.savedGoals}
+          activeGoalId={goalsState.activeGoalId}
+          saveGoal={goalsState.saveGoal}
+          loadGoal={goalsState.loadGoal}
+          deleteGoal={goalsState.deleteGoal}
+          isLoading={goalsState.isLoading}
+          error={goalsState.error}
+          setError={goalsState.setError}
+        />
+
+        {/* Spending Categories - Grouped by Bucket */}
+        <Card className="p-6">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            Spending Categories
+          </h3>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {Object.entries(cspData.buckets).map(([bucketKey, bucket]) => {
+              const Icon = BUCKET_ICONS[bucketKey];
+              const gradient = BUCKET_GRADIENTS[bucketKey];
+              const bgLight = BUCKET_BG_LIGHT[bucketKey];
+              const categories = bucket.categories || [];
+
+              return (
+                <div key={bucketKey}>
+                  {/* Bucket Header */}
+                  <div className={`flex items-center justify-between px-4 py-3 rounded-xl ${bgLight} mb-2`}>
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-lg bg-gradient-to-br ${gradient}`}>
+                        <Icon className="h-4 w-4 text-white" />
+                      </div>
+                      <div>
+                        <span className="font-semibold text-gray-900 dark:text-white">
+                          {bucket.target.label}
+                        </span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                          {bucket.percentage}%
                         </span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 h-3 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden relative">
-                        {/* Target range indicator */}
+                    <PrivacyCurrency
+                      amount={bucket.amount}
+                      isPrivacyMode={privacyMode}
+                      className="font-bold text-gray-900 dark:text-white"
+                    />
+                  </div>
+
+                  {/* Category List */}
+                  {categories.length > 0 ? (
+                    <div className="ml-4 pl-4 border-l-2 border-gray-100 dark:border-gray-700 space-y-1">
+                      {categories.slice(0, 6).map((cat, idx) => (
                         <div
-                          className="absolute h-full bg-gray-200 dark:bg-gray-600"
-                          style={{
-                            left: `${bucket.target.min}%`,
-                            width: `${bucket.target.max - bucket.target.min}%`
-                          }}
-                        />
-                        {/* Actual bar */}
-                        <div
-                          className="h-full rounded-full transition-all duration-500 relative z-10"
-                          style={{
-                            width: `${Math.min(bucket.percentage, 100)}%`,
-                            backgroundColor: BUCKET_COLORS[key]
-                          }}
-                        />
-                      </div>
-                      {bucket.isOnTarget ? (
-                        <CheckCircleIcon className="h-5 w-5 text-emerald-500 flex-shrink-0" />
-                      ) : (
-                        <ExclamationTriangleIcon className="h-5 w-5 text-amber-500 flex-shrink-0" />
+                          key={cat.name || idx}
+                          className="flex items-center justify-between py-1.5 text-sm"
+                        >
+                          <span className="text-gray-600 dark:text-gray-400 truncate pr-4">
+                            {cat.name}
+                          </span>
+                          <PrivacyCurrency
+                            amount={cat.monthlyAmount}
+                            isPrivacyMode={privacyMode}
+                            className="text-gray-900 dark:text-white font-medium tabular-nums"
+                          />
+                        </div>
+                      ))}
+                      {categories.length > 6 && (
+                        <p className="text-xs text-gray-400 dark:text-gray-500 py-1">
+                          +{categories.length - 6} more categories
+                        </p>
                       )}
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  ) : (
+                    <p className="ml-4 pl-4 text-sm text-gray-400 dark:text-gray-500 italic py-2">
+                      No categories in this bucket
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
 
-            {/* Legend */}
-            <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-700">
-              <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-2">
-                <span className="inline-block w-8 h-2 bg-gray-200 dark:bg-gray-600 rounded"></span>
-                Target range
-              </p>
-            </div>
-          </Card>
-        </div>
-
-        {/* Bucket Detail Cards */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Spending Categories
-          </h3>
-          {Object.entries(cspData.buckets).map(([key, bucket]) => (
-            <BucketCard
-              key={key}
-              bucketKey={key}
-              bucket={bucket}
-              privacyMode={privacyMode}
-              isExpanded={expandedBuckets.has(key)}
-              onToggle={() => toggleBucket(key)}
-            />
-          ))}
-
-          {/* Total allocation indicator - shows actual spending as % of income */}
+          {/* Total Spending Indicator */}
           {(() => {
             const totalPercent = Object.values(cspData.buckets).reduce(
               (sum, bucket) => sum + (bucket.percentage || 0), 0
@@ -1589,7 +1179,7 @@ export default function ConsciousSpendingPlan() {
             const isOver = totalPercent > 100;
             const isUnder = totalPercent < 95;
             return (
-              <div className="flex items-center justify-between py-3 px-4 bg-zinc-100 dark:bg-zinc-800 rounded-xl">
+              <div className="flex items-center justify-between py-3 px-4 bg-zinc-100 dark:bg-zinc-800 rounded-xl mt-6">
                 <span className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
                   Total Spending
                 </span>
@@ -1602,7 +1192,7 @@ export default function ConsciousSpendingPlan() {
               </div>
             );
           })()}
-        </div>
+        </Card>
 
         {/* Monthly Trend Chart */}
         <Card className="p-6">
@@ -1675,30 +1265,6 @@ export default function ConsciousSpendingPlan() {
           privacyMode={privacyMode}
           isOpen={showIncomeSettings}
           onClose={() => setShowIncomeSettings(false)}
-        />
-
-        {/* Future Goals Panel */}
-        <CSPGoalsPanel
-          isOpen={goalsState.isPanelOpen}
-          onClose={goalsState.closePanel}
-          draftIncome={goalsState.draftIncome}
-          setDraftIncome={goalsState.setDraftIncome}
-          draftBucketAmounts={goalsState.draftBucketAmounts}
-          setDraftBucketAmount={goalsState.setDraftBucketAmount}
-          hasChanges={goalsState.hasChanges}
-          resetDraft={goalsState.resetDraft}
-          actualIncome={goalsState.actualIncome}
-          actualBuckets={goalsState.actualBuckets}
-          projectedData={goalsState.projectedData}
-          deltas={goalsState.deltas}
-          savedGoals={goalsState.savedGoals}
-          activeGoalId={goalsState.activeGoalId}
-          saveGoal={goalsState.saveGoal}
-          loadGoal={goalsState.loadGoal}
-          deleteGoal={goalsState.deleteGoal}
-          isLoading={goalsState.isLoading}
-          error={goalsState.error}
-          setError={goalsState.setError}
         />
 
         {/* Debug Drawer - Press 'D' twice to toggle (dev only) */}

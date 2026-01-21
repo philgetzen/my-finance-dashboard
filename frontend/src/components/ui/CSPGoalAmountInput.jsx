@@ -89,20 +89,20 @@ export default function CSPGoalAmountInput({
   };
 
   return (
-    <div className={`space-y-3 ${className}`}>
+    <div className={`space-y-1.5 ${className}`}>
       {/* Label row with percentage */}
-      <div className="flex items-baseline justify-between">
-        <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-xs font-medium text-zinc-900 dark:text-zinc-100 truncate">
           {label}
         </span>
         {percentage !== null && (
-          <span className={`text-xs tabular-nums ${
+          <span className={`text-[10px] tabular-nums whitespace-nowrap ${
             isOnTarget ? 'text-zinc-400' : 'text-amber-500'
           }`}>
             {percentage.toFixed(0)}%
             {target && (
-              <span className="text-zinc-300 dark:text-zinc-600 ml-1">
-                / {bucketKey === 'fixedCosts' || bucketKey === 'guiltFree'
+              <span className="text-zinc-300 dark:text-zinc-600 ml-0.5">
+                /{bucketKey === 'fixedCosts' || bucketKey === 'guiltFree'
                   ? `≤${target.max}`
                   : `≥${target.min}`}%
               </span>
@@ -112,21 +112,21 @@ export default function CSPGoalAmountInput({
       </div>
 
       {/* Input with inline steppers */}
-      <div className="flex items-center">
+      <div className="flex items-center max-w-[200px]">
         <button
           type="button"
           onClick={handleDecrement}
-          className="flex-shrink-0 w-10 h-10 flex items-center justify-center
-                     rounded-l-xl bg-zinc-100 dark:bg-zinc-800
+          className="flex-shrink-0 w-8 h-8 flex items-center justify-center
+                     rounded-l-lg bg-zinc-100 dark:bg-zinc-800
                      hover:bg-zinc-200 dark:hover:bg-zinc-700
                      text-zinc-500 dark:text-zinc-400
                      transition-colors focus:outline-none focus:z-10 focus:ring-2 focus:ring-zinc-900 dark:focus:ring-white"
           aria-label={`Decrease ${label} by $${step}`}
         >
-          <MinusIcon className="h-4 w-4" />
+          <MinusIcon className="h-3.5 w-3.5" />
         </button>
 
-        <div className="relative flex-1">
+        <div className="relative flex-1 min-w-0">
           <input
             type="text"
             inputMode="numeric"
@@ -135,7 +135,7 @@ export default function CSPGoalAmountInput({
             onFocus={handleInputFocus}
             onBlur={handleInputBlur}
             onKeyDown={handleKeyDown}
-            className={`w-full h-10 px-4 text-center font-medium text-lg tabular-nums
+            className={`w-full h-8 px-2 text-center font-medium text-sm tabular-nums
                        bg-zinc-50 dark:bg-zinc-800
                        border-y border-zinc-200 dark:border-zinc-700
                        focus:outline-none focus:bg-white dark:focus:bg-zinc-700
@@ -145,7 +145,7 @@ export default function CSPGoalAmountInput({
             aria-label={label}
           />
           {/* Dollar sign overlay */}
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm pointer-events-none">
+          <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-zinc-400 text-xs pointer-events-none">
             $
           </span>
         </div>
@@ -153,21 +153,20 @@ export default function CSPGoalAmountInput({
         <button
           type="button"
           onClick={handleIncrement}
-          className="flex-shrink-0 w-10 h-10 flex items-center justify-center
-                     rounded-r-xl bg-zinc-100 dark:bg-zinc-800
+          className="flex-shrink-0 w-8 h-8 flex items-center justify-center
+                     rounded-r-lg bg-zinc-100 dark:bg-zinc-800
                      hover:bg-zinc-200 dark:hover:bg-zinc-700
                      text-zinc-500 dark:text-zinc-400
                      transition-colors focus:outline-none focus:z-10 focus:ring-2 focus:ring-zinc-900 dark:focus:ring-white"
           aria-label={`Increase ${label} by $${step}`}
         >
-          <PlusIcon className="h-4 w-4" />
+          <PlusIcon className="h-3.5 w-3.5" />
         </button>
       </div>
 
       {/* Delta indicator - only show when changed */}
       {hasDelta && (
-        <div className={`flex items-center justify-end text-xs ${privacyMode ? 'privacy-blur' : ''}`}>
-          <span className="text-zinc-400 mr-1">was ${formatCurrency(currentValue ?? value)}</span>
+        <div className={`text-[10px] text-right ${privacyMode ? 'privacy-blur' : ''}`}>
           <span className={`font-medium ${
             delta > 0 ? 'text-emerald-500' : 'text-rose-500'
           }`}>
