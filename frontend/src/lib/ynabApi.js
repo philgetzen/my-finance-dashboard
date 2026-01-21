@@ -230,15 +230,21 @@ class YNABService {
     return result.data?.months || [];
   }
 
+  async getScheduledTransactions(budgetId = 'last-used') {
+    const result = await this.makeRequest(`/api/ynab/budgets/${budgetId}/scheduled_transactions`);
+    return result.data?.scheduled_transactions || [];
+  }
+
   async getBudgetSummary(budgetId = 'last-used') {
     // Try parallel fetch first for performance
     try {
-      const [budgets, accounts, transactions, categories, months] = await Promise.all([
+      const [budgets, accounts, transactions, categories, months, scheduledTransactions] = await Promise.all([
         this.getBudgets(),
         this.getAccounts(budgetId),
         this.getTransactions(budgetId),
         this.getCategories(budgetId),
-        this.getMonths(budgetId)
+        this.getMonths(budgetId),
+        this.getScheduledTransactions(budgetId)
       ]);
 
       return {
@@ -246,7 +252,8 @@ class YNABService {
         accounts,
         transactions,
         categories: categories,
-        months
+        months,
+        scheduledTransactions
       };
     } catch (parallelError) {
       console.warn('Parallel fetch failed, attempting sequential fallback:', parallelError.message);
@@ -258,7 +265,8 @@ class YNABService {
           accounts: [],
           transactions: [],
           categories: { category_groups: [] },
-          months: []
+          months: [],
+          scheduledTransactions: []
         };
 
         // Fetch critical data first
@@ -291,6 +299,12 @@ class YNABService {
           result.months = await this.getMonths(budgetId);
         } catch (e) {
           console.warn('Failed to fetch months:', e.message);
+        }
+
+        try {
+          result.scheduledTransactions = await this.getScheduledTransactions(budgetId);
+        } catch (e) {
+          console.warn('Failed to fetch scheduled transactions:', e.message);
         }
 
         // If we got at least accounts or transactions, return partial data

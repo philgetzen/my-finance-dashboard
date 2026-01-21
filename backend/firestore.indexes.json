@@ -1,0 +1,21 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "newsletter_snapshots",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "weekEnding", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "newsletter_logs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "startedAt", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

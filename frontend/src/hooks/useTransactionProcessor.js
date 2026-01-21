@@ -1,19 +1,16 @@
 import { useMemo } from 'react';
 import { getTransactionAmount } from '../utils/ynabHelpers';
+import {
+  INCOME_CATEGORIES,
+  DEBT_PAYMENT_CATEGORIES,
+  SAVINGS_INVESTMENT_CATEGORIES,
+  isIncomeCategory,
+  shouldSkipTransaction,
+} from '../utils/calculations/constants';
 
-// Define income categories based on YNAB report structure
-export const YNAB_INCOME_CATEGORIES = [
-  "Inflow: Ready to Assign",
-  "Ready to Assign",
-  "To be Budgeted",
-  "Deferred Income SubCategory"
-];
-
-export const DEBT_PAYMENT_CATEGORIES = ["8331 Mortgage", "2563 Mortgage", "Kia Loan"];
-
-export const SAVINGS_INVESTMENT_CATEGORIES = [
-  "Investments (Stocks, ETFs, MFs)",
-];
+// Re-export for backward compatibility (aliased to match old name)
+export const YNAB_INCOME_CATEGORIES = INCOME_CATEGORIES;
+export { DEBT_PAYMENT_CATEGORIES, SAVINGS_INVESTMENT_CATEGORIES };
 
 /**
  * Custom hook for processing transaction data
@@ -49,8 +46,7 @@ export function useTransactionProcessor(transactions, accounts, investmentAccoun
       }
       
       // Skip reconciliation transactions
-      if (txn.payee_name === 'Reconciliation Balance Adjustment' || 
-          txn.payee_name === 'Starting Balance') {
+      if (shouldSkipTransaction(txn)) {
         return null;
       }
 
@@ -64,7 +60,7 @@ export function useTransactionProcessor(transactions, accounts, investmentAccoun
       }
       
       // Categorize as income or expense
-      const isIncome = YNAB_INCOME_CATEGORIES.includes(txn.category_name);
+      const isIncome = isIncomeCategory(txn.category_name);
       
       if (isIncome) {
         monthlyData[monthKey].income += amount;

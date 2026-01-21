@@ -123,6 +123,7 @@ export const useYNABData = (budgetId = 'last-used', enabled = false, accessToken
     transactions: summaryData.transactions || [],
     categories: summaryData.categories || { category_groups: [] },
     months: summaryData.months || [],
+    scheduledTransactions: summaryData.scheduledTransactions || [],
     summary: summaryData,
     isLoading: summary.isLoading,
     isError: summary.isError,

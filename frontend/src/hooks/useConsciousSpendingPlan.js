@@ -3,22 +3,21 @@ import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useFinanceData } from '../contexts/ConsolidatedDataContext';
 import { getTransactionAmount } from '../utils/ynabHelpers';
+import {
+  INCOME_CATEGORIES,
+  CSP_TARGETS,
+  CSP_BUCKETS,
+  DEFAULT_FIXED_COST_KEYWORDS,
+  DEFAULT_INVESTMENT_KEYWORDS,
+  DEFAULT_SAVINGS_KEYWORDS,
+  GROUP_NAME_TO_BUCKET,
+  DEFAULT_CSP_SETTINGS,
+  isIncomeCategory,
+  shouldSkipTransaction,
+} from '../utils/calculations/constants';
 
-// Ramit Sethi's Conscious Spending Plan recommended percentages
-export const CSP_TARGETS = {
-  fixedCosts: { min: 50, max: 60, label: 'Fixed Costs' },
-  investments: { min: 10, max: 10, label: 'Investments' },
-  savings: { min: 5, max: 10, label: 'Savings' },
-  guiltFree: { min: 20, max: 35, label: 'Guilt-Free Spending' }
-};
-
-// CSP Bucket types for category mapping
-export const CSP_BUCKETS = {
-  fixedCosts: { key: 'fixedCosts', label: 'Fixed Costs', color: '#6366F1' },
-  investments: { key: 'investments', label: 'Investments', color: '#10B981' },
-  savings: { key: 'savings', label: 'Savings', color: '#3B82F6' },
-  guiltFree: { key: 'guiltFree', label: 'Guilt-Free', color: '#F59E0B' }
-};
+// Re-export for backward compatibility
+export { CSP_TARGETS, CSP_BUCKETS };
 
 // LocalStorage keys (for migration)
 const CSP_EXCLUDED_PAYEES_KEY = 'csp_excluded_payees';
@@ -28,30 +27,8 @@ const CSP_EXCLUDED_EXPENSE_CATEGORIES_KEY = 'csp_excluded_expense_categories'; /
 const CSP_SETTINGS_KEY = 'csp_settings';
 const CSP_MIGRATED_KEY = 'csp_migrated_to_firestore';
 
-// Default keyword-based mappings (used when no custom mapping exists)
-const DEFAULT_FIXED_COST_KEYWORDS = [
-  'rent', 'mortgage', 'utilities', 'electric', 'gas', 'water', 'internet',
-  'phone', 'insurance', 'car payment', 'auto', 'transportation', 'groceries',
-  'food', 'subscription', 'netflix', 'spotify', 'gym', 'membership',
-  'loan', 'debt', 'payment', 'cable', 'trash', 'sewer', 'hoa'
-];
-
-const DEFAULT_INVESTMENT_KEYWORDS = [
-  'investment', 'retirement', '401k', 'ira', 'roth', 'stock', 'etf',
-  'mutual fund', 'brokerage', 'investing'
-];
-
-const DEFAULT_SAVINGS_KEYWORDS = [
-  'savings', 'emergency', 'vacation', 'travel', 'gift', 'holiday',
-  'christmas', 'birthday', 'wedding', 'fund', 'goal', 'reserve',
-  'house', 'down payment', 'sinking'
-];
-
-// Default settings
-const DEFAULT_SETTINGS = {
-  includeTrackingAccounts: true,
-  useKeywordFallback: false,  // Changed to false - prefer custom category mappings over keyword inference
-};
+// Default settings alias for local use
+const DEFAULT_SETTINGS = DEFAULT_CSP_SETTINGS;
 
 // Helper to read from localStorage with fallback
 function readLocalStorage(key, defaultValue) {
@@ -347,43 +324,7 @@ export function useExcludedPayees() {
   };
 }
 
-// Income categories (excluded from spending)
-const INCOME_CATEGORIES = [
-  "Inflow: Ready to Assign",
-  "Ready to Assign",
-  "To be Budgeted",
-  "Deferred Income SubCategory"
-];
-
-/**
- * Map YNAB group names to CSP buckets
- * This allows direct matching of user's YNAB group structure
- */
-const GROUP_NAME_TO_BUCKET = {
-  // Fixed Costs variations
-  'fixed costs': 'fixedCosts',
-  'fixed': 'fixedCosts',
-  'bills': 'fixedCosts',
-  'monthly bills': 'fixedCosts',
-  // Investments variations
-  'investments': 'investments',
-  'investing': 'investments',
-  'post tax investments': 'investments',
-  'post-tax investments': 'investments',
-  // Savings variations
-  'savings': 'savings',
-  'saving': 'savings',
-  'savings goals': 'savings',
-  'true expenses': 'guiltFree', // Common YNAB pattern - irregular but expected expenses
-  // Guilt-free variations
-  'guilt-free': 'guiltFree',
-  'guilt free': 'guiltFree',
-  'guilt-free spending': 'guiltFree',
-  'discretionary': 'guiltFree',
-  'fun money': 'guiltFree',
-  'spending': 'guiltFree',
-  'variable expenses': 'guiltFree',
-};
+// INCOME_CATEGORIES and GROUP_NAME_TO_BUCKET now imported from constants.js
 
 /**
  * Get bucket from YNAB group name (direct match)
@@ -453,8 +394,9 @@ export function getInferredBucket(categoryName, categoryGroupName) {
  * @param {number} periodMonths - Number of months to analyze (default: 6)
  * @param {Object} cspSettings - CSP settings from useCSPSettings hook
  * @param {Array} months - YNAB budget months array (contains budgeted amounts per category)
+ * @param {Array} scheduledTransactions - YNAB scheduled transactions array (for projected recurring income)
  */
-export function useConsciousSpendingPlan(transactions, categories, accounts, periodMonths = 6, cspSettings = {}, months = []) {
+export function useConsciousSpendingPlan(transactions, categories, accounts, periodMonths = 6, cspSettings = {}, months = [], scheduledTransactions = []) {
   const {
     categoryMappings = {},
     excludedCategories = new Set(),
@@ -680,6 +622,7 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
 
     // Process transactions
     let totalIncome = 0;
+    let excludedIncomeTotal = 0; // Track income excluded via payee/category settings
     const bucketTotals = {
       fixedCosts: 0,
       investments: 0,
@@ -693,6 +636,28 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
     const incomeByPayee = new Map();
     const incomeByCategory = new Map();
 
+    // Track skipped transactions for diagnostics
+    const skippedTransactions = {
+      trackingAccount: { count: 0, total: 0, samples: [] },
+      trackingAccountIncome: { count: 0, total: 0, samples: [] }, // Income in tracking accounts
+      uncategorizedTransfer: { count: 0, total: 0, samples: [] },
+      creditCardPayment: { count: 0, total: 0, samples: [] },
+      outsideDateRange: { count: 0, total: 0 },
+      startingBalanceIncome: { count: 0, total: 0, samples: [] }, // Starting balances that are income
+      reconciliationIncome: { count: 0, total: 0, samples: [] }, // Reconciliation adjustments that are income
+    };
+
+    // Track income diagnostics
+    const incomeDiagnostics = {
+      totalIncomeTransactions: 0,
+      incomeByCategory: new Map(), // category name -> { count, total }
+      positiveNonIncomeTransactions: [], // Transactions with positive amounts not in income categories (samples)
+      positiveNonIncomeTotal: 0, // Total of ALL positive non-income transactions (not just samples)
+      positiveNonIncomeCount: 0, // Count of ALL positive non-income transactions
+      futureDatedIncome: { count: 0, total: 0, samples: [] }, // Income with dates after today
+      transferIncome: { count: 0, total: 0, samples: [] }, // Income that's also a transfer
+    };
+
     // Track pre-tax and post-tax investment contributions separately
     // These are for INFORMATIONAL purposes only (showing in Net Worth section)
     // They do NOT count toward CSP investment bucket - only budget expense categories do
@@ -701,11 +666,17 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
 
     transactions.forEach(txn => {
       const txnDate = new Date(txn.date);
+      const txnAmount = getTransactionAmount(txn);
+
       if (txnDate < startDate) {
+        skippedTransactions.outsideDateRange.count++;
+        skippedTransactions.outsideDateRange.total += Math.abs(txnAmount);
         return;
       }
       // For "Previous Month" option, also filter out transactions after the end date
       if (endDate && txnDate > endDate) {
+        skippedTransactions.outsideDateRange.count++;
+        skippedTransactions.outsideDateRange.total += Math.abs(txnAmount);
         return;
       }
 
@@ -720,6 +691,30 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
       if (isTrackingAccount) {
         // If not including tracking accounts, skip entirely
         if (!settings.includeTrackingAccounts) {
+          // Track this for diagnostics
+          if (txnAmount < 0) { // Track outflows
+            skippedTransactions.trackingAccount.count++;
+            skippedTransactions.trackingAccount.total += Math.abs(txnAmount);
+            if (skippedTransactions.trackingAccount.samples.length < 5) {
+              skippedTransactions.trackingAccount.samples.push({
+                payee: txn.payee_name,
+                amount: Math.abs(txnAmount),
+                date: txn.date,
+              });
+            }
+          } else if (txnAmount > 0 && INCOME_CATEGORIES.includes(txn.category_name)) {
+            // Track income in tracking accounts
+            skippedTransactions.trackingAccountIncome.count++;
+            skippedTransactions.trackingAccountIncome.total += txnAmount;
+            if (skippedTransactions.trackingAccountIncome.samples.length < 5) {
+              skippedTransactions.trackingAccountIncome.samples.push({
+                payee: txn.payee_name,
+                amount: txnAmount,
+                date: txn.date,
+                category: txn.category_name,
+              });
+            }
+          }
           return;
         }
 
@@ -819,17 +814,85 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
         // (e.g., checking → mortgage loan account, but with category "8331 Mortgage")
         if (!txn.category_id) {
           // Uncategorized transfers between budget accounts - skip
+          // Only track OUTFLOWS (negative amounts) to avoid double-counting both sides of transfer
+          if (txnAmount < 0) {
+            const transferAmount = Math.abs(txnAmount);
+            const transferToAccount = accountMap.get(txn.transfer_account_id);
+            const isCreditCardTransfer = transferToAccount?.type === 'creditCard';
+
+            if (isCreditCardTransfer) {
+              skippedTransactions.creditCardPayment.count++;
+              skippedTransactions.creditCardPayment.total += transferAmount;
+              if (skippedTransactions.creditCardPayment.samples.length < 5) {
+                skippedTransactions.creditCardPayment.samples.push({
+                  payee: txn.payee_name || `Transfer to ${transferToAccount?.name}`,
+                  amount: transferAmount,
+                  date: txn.date,
+                });
+              }
+            } else {
+              skippedTransactions.uncategorizedTransfer.count++;
+              skippedTransactions.uncategorizedTransfer.total += transferAmount;
+              if (skippedTransactions.uncategorizedTransfer.samples.length < 5) {
+                skippedTransactions.uncategorizedTransfer.samples.push({
+                  payee: txn.payee_name || `Transfer to ${transferToAccount?.name || 'Unknown'}`,
+                  amount: transferAmount,
+                  date: txn.date,
+                });
+              }
+            }
+          }
           return;
         }
         // Fall through to normal expense processing for categorized transfers
       }
       if (txn.payee_name?.toLowerCase().startsWith('transfer :') && !txn.category_id) {
+        // Track this as uncategorized transfer - only outflows to avoid double-counting
+        if (txnAmount < 0) {
+          skippedTransactions.uncategorizedTransfer.count++;
+          skippedTransactions.uncategorizedTransfer.total += Math.abs(txnAmount);
+          if (skippedTransactions.uncategorizedTransfer.samples.length < 5) {
+            skippedTransactions.uncategorizedTransfer.samples.push({
+              payee: txn.payee_name,
+              amount: Math.abs(txnAmount),
+              date: txn.date,
+            });
+          }
+        }
         return;
       }
 
-      // Skip reconciliation
+      // Skip reconciliation and starting balance transactions
+      // But track them if they're income (positive amounts in income categories)
       if (txn.payee_name === 'Reconciliation Balance Adjustment' ||
           txn.payee_name === 'Starting Balance') {
+        const amount = getTransactionAmount(txn);
+        // Track if this is income that YNAB might be counting
+        if (amount > 0 && INCOME_CATEGORIES.includes(txn.category_name)) {
+          if (txn.payee_name === 'Starting Balance') {
+            skippedTransactions.startingBalanceIncome.count++;
+            skippedTransactions.startingBalanceIncome.total += amount;
+            if (skippedTransactions.startingBalanceIncome.samples.length < 5) {
+              skippedTransactions.startingBalanceIncome.samples.push({
+                payee: txn.payee_name,
+                amount,
+                date: txn.date,
+                account: txn.account_name || 'Unknown',
+              });
+            }
+          } else {
+            skippedTransactions.reconciliationIncome.count++;
+            skippedTransactions.reconciliationIncome.total += amount;
+            if (skippedTransactions.reconciliationIncome.samples.length < 5) {
+              skippedTransactions.reconciliationIncome.samples.push({
+                payee: txn.payee_name,
+                amount,
+                date: txn.date,
+                account: txn.account_name || 'Unknown',
+              });
+            }
+          }
+        }
         return;
       }
 
@@ -853,6 +916,43 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
         const payeeName = txn.payee_name || 'Unknown';
         const categoryId = txn.category_id;
         const categoryName = txn.category_name || 'Uncategorized';
+
+        // Track income diagnostics
+        incomeDiagnostics.totalIncomeTransactions++;
+        if (!incomeDiagnostics.incomeByCategory.has(categoryName)) {
+          incomeDiagnostics.incomeByCategory.set(categoryName, { count: 0, total: 0 });
+        }
+        const diagData = incomeDiagnostics.incomeByCategory.get(categoryName);
+        diagData.count++;
+        diagData.total += amount;
+
+        // Track if this is a future-dated transaction (could explain why YNAB shows more)
+        const today = new Date();
+        today.setHours(23, 59, 59, 999);
+        if (txnDate > today) {
+          incomeDiagnostics.futureDatedIncome.count++;
+          incomeDiagnostics.futureDatedIncome.total += amount;
+          if (incomeDiagnostics.futureDatedIncome.samples.length < 5) {
+            incomeDiagnostics.futureDatedIncome.samples.push({
+              payee: payeeName,
+              amount,
+              date: txn.date,
+            });
+          }
+        }
+
+        // Track if this is also a transfer
+        if (txn.transfer_account_id) {
+          incomeDiagnostics.transferIncome.count++;
+          incomeDiagnostics.transferIncome.total += amount;
+          if (incomeDiagnostics.transferIncome.samples.length < 5) {
+            incomeDiagnostics.transferIncome.samples.push({
+              payee: payeeName,
+              amount,
+              date: txn.date,
+            });
+          }
+        }
 
         // Track all income by payee for the UI
         if (!incomeByPayee.has(payeeName)) {
@@ -882,8 +982,28 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
         if (!isPayeeExcluded && !isCategoryExcluded) {
           totalIncome += amount;
           monthlyBuckets[monthKey].income += amount;
+        } else {
+          // Track excluded income for diagnostics
+          excludedIncomeTotal += amount;
         }
         return;
+      }
+
+      // Track positive amounts that aren't in income categories (potential income we're missing)
+      if (amount > 0 && !INCOME_CATEGORIES.includes(txn.category_name)) {
+        // This might be a refund, reimbursement, or income in a non-standard category
+        // Track total and count for ALL such transactions
+        incomeDiagnostics.positiveNonIncomeTotal += amount;
+        incomeDiagnostics.positiveNonIncomeCount++;
+        // Only store samples for display
+        if (incomeDiagnostics.positiveNonIncomeTransactions.length < 10) {
+          incomeDiagnostics.positiveNonIncomeTransactions.push({
+            payee: txn.payee_name,
+            category: txn.category_name,
+            amount: amount,
+            date: txn.date,
+          });
+        }
       }
 
       // Process both expenses (negative) and savings/investment inflows (positive non-income)
@@ -953,6 +1073,111 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
         }
       }
     });
+
+    // Process scheduled transactions to calculate projected income
+    // This explains the gap between app income and YNAB's month.income
+    let scheduledIncomeTotal = 0;
+    const scheduledIncomeDiagnostics = {
+      count: 0,
+      total: 0,
+      byFrequency: {},
+      samples: [],
+    };
+
+    if (scheduledTransactions?.length > 0) {
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+      // Helper to calculate occurrences of a scheduled transaction within date range
+      const getOccurrencesInRange = (scheduled, startDate, endDate) => {
+        const frequency = scheduled.frequency;
+        const dateNext = new Date(scheduled.date_next);
+        const rawAmount = (scheduled.amount || 0) / 1000; // milliunits to dollars
+
+        // In YNAB, income is NEGATIVE (inflows are negative, outflows are positive)
+        // Skip if not income (positive amounts are expenses)
+        if (rawAmount >= 0) return { count: 0, total: 0 };
+        if (!INCOME_CATEGORIES.includes(scheduled.category_name)) return { count: 0, total: 0 };
+
+        // Convert to positive amount for calculations
+        const amount = Math.abs(rawAmount);
+
+        // For "never" frequency or if next date is past the range, no occurrences
+        if (frequency === 'never') return { count: 0, total: 0 };
+        if (dateNext > endDate) return { count: 0, total: 0 };
+
+        // Calculate how many times this transaction occurs in the date range
+        let occurrences = 0;
+        let currentDate = new Date(dateNext);
+
+        // Frequency to days mapping (approximate)
+        const frequencyDays = {
+          daily: 1,
+          weekly: 7,
+          everyOtherWeek: 14,
+          twiceAMonth: 15, // approximate
+          every4Weeks: 28,
+          monthly: 30, // approximate
+          everyOtherMonth: 60,
+          every3Months: 90,
+          every4Months: 120,
+          twiceAYear: 180,
+          yearly: 365,
+          everyOtherYear: 730,
+        };
+
+        const daysBetween = frequencyDays[frequency] || 30;
+        const maxIterations = 100; // Safety limit
+
+        while (currentDate <= endDate && occurrences < maxIterations) {
+          if (currentDate >= startDate && currentDate <= endDate) {
+            // Only count occurrences after today (future scheduled income)
+            if (currentDate > today) {
+              occurrences++;
+            }
+          }
+          // Move to next occurrence
+          currentDate = new Date(currentDate.getTime() + daysBetween * 24 * 60 * 60 * 1000);
+        }
+
+        return { count: occurrences, total: occurrences * amount };
+      };
+
+      // Calculate date range end (end of current month for YNAB comparison)
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+      scheduledTransactions.forEach(scheduled => {
+        const result = getOccurrencesInRange(scheduled, startDate, endOfMonth);
+        if (result.total > 0) {
+          scheduledIncomeTotal += result.total;
+          scheduledIncomeDiagnostics.count += result.count;
+          scheduledIncomeDiagnostics.total += result.total;
+
+          // Track by frequency
+          const freq = scheduled.frequency;
+          if (!scheduledIncomeDiagnostics.byFrequency[freq]) {
+            scheduledIncomeDiagnostics.byFrequency[freq] = { count: 0, total: 0 };
+          }
+          scheduledIncomeDiagnostics.byFrequency[freq].count += result.count;
+          scheduledIncomeDiagnostics.byFrequency[freq].total += result.total;
+
+          // Sample entries
+          if (scheduledIncomeDiagnostics.samples.length < 5) {
+            scheduledIncomeDiagnostics.samples.push({
+              payee: scheduled.payee_name,
+              amount: (scheduled.amount || 0) / 1000,
+              frequency: scheduled.frequency,
+              dateNext: scheduled.date_next,
+              occurrences: result.count,
+              projectedTotal: result.total,
+            });
+          }
+        }
+      });
+
+      // Add scheduled income to total income
+      totalIncome += scheduledIncomeTotal;
+    }
 
     // Calculate monthly averages
     // For "This Month" (periodMonths=0), force numMonths=1 since it's partial month data
@@ -1373,6 +1598,7 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
     return {
       monthlyIncome,
       totalIncome,
+      excludedIncomeTotal,
       monthlySpending,
       totalSpending,
       buckets,
@@ -1400,7 +1626,22 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
       },
       // Pre-tax vs post-tax investment contributions (period totals)
       preTaxInvestments,
-      postTaxInvestments
+      postTaxInvestments,
+      // Diagnostic data for Debug Drawer
+      skippedTransactions,
+      // Income diagnostics for debugging
+      incomeDiagnostics: {
+        totalIncomeTransactions: incomeDiagnostics.totalIncomeTransactions,
+        incomeByCategory: Object.fromEntries(incomeDiagnostics.incomeByCategory),
+        positiveNonIncomeTransactions: incomeDiagnostics.positiveNonIncomeTransactions,
+        positiveNonIncomeTotal: incomeDiagnostics.positiveNonIncomeTotal,
+        positiveNonIncomeCount: incomeDiagnostics.positiveNonIncomeCount,
+        futureDatedIncome: incomeDiagnostics.futureDatedIncome,
+        transferIncome: incomeDiagnostics.transferIncome,
+      },
+      // Scheduled transactions diagnostics
+      scheduledIncomeDiagnostics,
+      scheduledIncomeTotal,
     };
-  }, [transactions, categories, accounts, periodMonths, categoryMappings, excludedCategories, excludedPayees, excludedExpenseCategories, settings, months]);
+  }, [transactions, categories, accounts, periodMonths, categoryMappings, excludedCategories, excludedPayees, excludedExpenseCategories, settings, months, scheduledTransactions]);
 }
