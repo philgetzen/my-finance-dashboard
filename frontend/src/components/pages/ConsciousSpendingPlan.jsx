@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, Suspense, lazy } from 'react';
+import React, { useState, useMemo, useEffect, Suspense, lazy, useRef, useCallback } from 'react';
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, Legend
@@ -108,32 +108,73 @@ const CustomTooltip = ({ active, payload, label, privacyMode }) => {
 
 // Info Tooltip - Hover tooltip for explaining calculations
 // Uses span instead of button to avoid nested button errors
+// Smart positioning: checks if tooltip would be clipped and adjusts
 const InfoTooltip = ({ text, className = '' }) => {
   const [isVisible, setIsVisible] = useState(false);
+  const [position, setPosition] = useState('top'); // 'top' or 'bottom'
+  const triggerRef = useRef(null);
+  const tooltipRef = useRef(null);
+
+  const updatePosition = useCallback(() => {
+    if (!triggerRef.current) return;
+
+    const triggerRect = triggerRef.current.getBoundingClientRect();
+    const tooltipHeight = 120; // Approximate max tooltip height
+    const spaceAbove = triggerRect.top;
+    const spaceBelow = window.innerHeight - triggerRect.bottom;
+
+    // If not enough space above, show below
+    if (spaceAbove < tooltipHeight && spaceBelow > spaceAbove) {
+      setPosition('bottom');
+    } else {
+      setPosition('top');
+    }
+  }, []);
+
+  const handleShow = () => {
+    updatePosition();
+    setIsVisible(true);
+  };
 
   return (
     <span className={`relative inline-flex items-center ${className}`}>
       <span
-        onMouseEnter={() => setIsVisible(true)}
+        ref={triggerRef}
+        onMouseEnter={handleShow}
         onMouseLeave={() => setIsVisible(false)}
         onClick={(e) => {
           e.stopPropagation();
-          setIsVisible(!isVisible);
+          if (!isVisible) {
+            handleShow();
+          } else {
+            setIsVisible(false);
+          }
         }}
         className="p-0.5 rounded-full text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors cursor-help"
       >
         <QuestionMarkCircleIcon className="h-4 w-4" />
       </span>
 
-      {/* Tooltip */}
+      {/* Tooltip - positions above or below based on available space */}
       {isVisible && (
-        <div className="absolute z-50 bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-64 sm:w-72">
+        <div
+          ref={tooltipRef}
+          className={`absolute z-50 left-1/2 transform -translate-x-1/2 w-64 sm:w-72 ${
+            position === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'
+          }`}
+        >
           <div className="bg-gray-900 text-white text-xs rounded-lg p-3 shadow-lg">
             <div className="relative">
               {text}
-              {/* Arrow */}
-              <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-px">
-                <div className="w-0 h-0 border-l-8 border-r-8 border-t-8 border-transparent border-t-gray-900" />
+              {/* Arrow - points down when tooltip is above, up when below */}
+              <div className={`absolute left-1/2 transform -translate-x-1/2 ${
+                position === 'top' ? 'top-full -mt-px' : 'bottom-full -mb-px'
+              }`}>
+                <div className={`w-0 h-0 border-l-8 border-r-8 border-transparent ${
+                  position === 'top'
+                    ? 'border-t-8 border-t-gray-900'
+                    : 'border-b-8 border-b-gray-900'
+                }`} />
               </div>
             </div>
           </div>
