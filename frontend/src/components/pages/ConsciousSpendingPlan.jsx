@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, Suspense, lazy } from 'react';
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, Legend
@@ -12,6 +12,9 @@ import PageTransition from '../ui/PageTransition';
 import Card from '../ui/Card';
 import PrivacyCurrency from '../ui/PrivacyCurrency';
 import CSPGoalsPanel from '../ui/CSPGoalsPanel';
+
+// Lazy load Debug Drawer for development only
+const DebugDrawerContainer = lazy(() => import('../DebugDrawer/DebugDrawerContainer'));
 import {
   CalendarIcon,
   ChevronDownIcon,
@@ -1604,6 +1607,13 @@ export default function ConsciousSpendingPlan() {
           error={goalsState.error}
           setError={goalsState.setError}
         />
+
+        {/* Debug Drawer - Press 'D' twice to toggle (dev only) */}
+        {process.env.NODE_ENV === 'development' && (
+          <Suspense fallback={null}>
+            <DebugDrawerContainer />
+          </Suspense>
+        )}
       </div>
     </PageTransition>
   );

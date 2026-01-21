@@ -101,18 +101,20 @@ function ProtectedRoutes() {
   }
 
   return (
-    <Layout>
-      <Suspense fallback={<PageLoader />}>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/accounts" element={<Accounts />} />
-          <Route path="/spending" element={<CashFlow />} />
-          <Route path="/investments" element={<InvestmentAllocation />} />
-          <Route path="/runway" element={<Runway />} />
-          <Route path="/conscious-spending" element={<ConsciousSpendingPlan />} />
-          <Route path="*" element={<Navigate to="/" />} />
-        </Routes>
-      </Suspense>
-    </Layout>
+    <>
+      <Layout>
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/accounts" element={<Accounts />} />
+            <Route path="/spending" element={<CashFlow />} />
+            <Route path="/investments" element={<InvestmentAllocation />} />
+            <Route path="/runway" element={<Runway />} />
+            <Route path="/conscious-spending" element={<ConsciousSpendingPlan />} />
+            <Route path="*" element={<Navigate to="/" />} />
+          </Routes>
+        </Suspense>
+      </Layout>
+    </>
   );
 }
