@@ -185,11 +185,76 @@ export const FinanceDataProvider = ({ children }) => {
       ynabData: mockYNABData
     });
     setLoading(false);
-    
+
+    // Set up CSP category mappings for demo mode
+    // These map mock data categories to CSP buckets per Ramit Sethi's framework
+    const demoCategoryMappings = {
+      // Fixed Costs (50-60%): Essential recurring expenses
+      'cat-mortgage': 'fixedCosts',
+      'cat-electric': 'fixedCosts',
+      'cat-gas-utility': 'fixedCosts',
+      'cat-water': 'fixedCosts',
+      'cat-internet': 'fixedCosts',
+      'cat-cell-phone': 'fixedCosts',
+      'cat-auto-insurance': 'fixedCosts',
+      'cat-home-insurance': 'fixedCosts',
+      'cat-car-payment': 'fixedCosts',
+      'cat-health-insurance': 'fixedCosts',
+      'cat-gas-fuel': 'fixedCosts',
+      'cat-groceries': 'fixedCosts',
+      'cat-parking': 'fixedCosts',
+      // Investments (10%): Retirement and wealth building
+      'cat-401k-contribution': 'investments',
+      'cat-roth-ira': 'investments',
+      'cat-brokerage': 'investments',
+      // Savings (5-10%): Sinking funds and goals
+      'cat-emergency-fund': 'savings',
+      'cat-vacation': 'savings',
+      'cat-house-projects': 'savings',
+      'cat-new-car': 'savings',
+      'cat-home-maintenance': 'savings',
+      'cat-car-maintenance': 'savings',
+      'cat-annual-subscriptions': 'savings',
+      'cat-car-registration': 'savings',
+      'cat-christmas': 'savings',
+      // Guilt-Free (20-35%): Discretionary spending
+      'cat-restaurants': 'guiltFree',
+      'cat-coffee-shops': 'guiltFree',
+      'cat-streaming': 'guiltFree',
+      'cat-hobbies': 'guiltFree',
+      'cat-books-media': 'guiltFree',
+      'cat-clothing': 'guiltFree',
+      'cat-household': 'guiltFree',
+      'cat-electronics': 'guiltFree',
+      'cat-medical': 'guiltFree',
+      'cat-pharmacy': 'guiltFree',
+      'cat-dental': 'guiltFree',
+      'cat-haircut': 'guiltFree',
+      'cat-gym': 'guiltFree',
+      'cat-gifts': 'guiltFree',
+      'cat-charity': 'guiltFree',
+    };
+
     // Track demo session in sessionStorage
     try {
       sessionStorage.setItem('demoModeActive', 'true');
       sessionStorage.setItem('demoStartTime', Date.now().toString());
+      // Back up existing CSP settings before overwriting (in case user had their own)
+      const existingMappings = localStorage.getItem('csp_category_mappings');
+      const existingSettings = localStorage.getItem('csp_settings');
+      if (existingMappings) {
+        sessionStorage.setItem('csp_category_mappings_backup', existingMappings);
+      }
+      if (existingSettings) {
+        sessionStorage.setItem('csp_settings_backup', existingSettings);
+      }
+      // Set CSP mappings for demo mode
+      localStorage.setItem('csp_category_mappings', JSON.stringify(demoCategoryMappings));
+      // Enable keyword fallback for demo mode
+      localStorage.setItem('csp_settings', JSON.stringify({
+        includeTrackingAccounts: true,
+        useKeywordFallback: true
+      }));
     } catch (error) {
       console.warn('Failed to set demo session storage:', error);
     }
@@ -211,10 +276,25 @@ export const FinanceDataProvider = ({ children }) => {
     // Don't set loading to true - there's no Firebase auth state change to trigger
     // setLoading will remain false, allowing immediate redirect to login
 
-    // Clear any demo-related session storage
+    // Clear any demo-related session storage and restore original localStorage
     try {
       sessionStorage.removeItem('demoModeActive');
       sessionStorage.removeItem('demoStartTime');
+      // Restore original CSP settings if they existed before demo mode
+      const backupMappings = sessionStorage.getItem('csp_category_mappings_backup');
+      const backupSettings = sessionStorage.getItem('csp_settings_backup');
+      if (backupMappings) {
+        localStorage.setItem('csp_category_mappings', backupMappings);
+        sessionStorage.removeItem('csp_category_mappings_backup');
+      } else {
+        localStorage.removeItem('csp_category_mappings');
+      }
+      if (backupSettings) {
+        localStorage.setItem('csp_settings', backupSettings);
+        sessionStorage.removeItem('csp_settings_backup');
+      } else {
+        localStorage.removeItem('csp_settings');
+      }
     } catch (error) {
       console.warn('Failed to clear demo session storage:', error);
     }
