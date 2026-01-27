@@ -295,10 +295,12 @@ export default function Runway() {
             <HealthIcon className={`h-6 w-6 ${healthConfig.color}`} />
             <div>
               <p className={`font-semibold ${healthConfig.color}`}>
-                {healthConfig.label}: {pureDisplay.value} {pureDisplay.label} of runway
+                {healthConfig.label}: {!isFinite(runway.netRunwayMonths) ? 'Cash is growing' : `${pureDisplay.value} ${pureDisplay.label} of runway`}
               </p>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                {healthConfig.description}
+                {!isFinite(runway.netRunwayMonths)
+                  ? 'Income exceeds expenses - your cash reserves are increasing'
+                  : healthConfig.description}
               </p>
             </div>
           </div>

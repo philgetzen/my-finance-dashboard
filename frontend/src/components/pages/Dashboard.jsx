@@ -141,13 +141,13 @@ SectionCard.displayName = 'SectionCard';
 
 // Time period options matching YNAB
 const TIME_PERIODS = [
-  { key: 'this-month', label: 'This Month', months: 1 },
-  { key: 'last-3-months', label: 'Last 3 Months', months: 3 },
-  { key: 'last-6-months', label: 'Last 6 Months', months: 6 },
-  { key: 'last-12-months', label: 'Last 12 Months', months: 12 },
-  { key: 'ytd', label: 'Year To Date', months: null },
-  { key: 'last-year', label: 'Last Year', months: null },
-  { key: 'all', label: 'All Dates', months: null },
+  { key: 'this-month', label: 'This Month', shortLabel: 'This Mo', months: 1 },
+  { key: 'last-3-months', label: 'Last 3 Months', shortLabel: '3 Months', months: 3 },
+  { key: 'last-6-months', label: 'Last 6 Months', shortLabel: '6 Months', months: 6 },
+  { key: 'last-12-months', label: 'Last 12 Months', shortLabel: '12 Months', months: 12 },
+  { key: 'ytd', label: 'Year To Date', shortLabel: 'YTD', months: null },
+  { key: 'last-year', label: 'Last Year', shortLabel: 'Last Yr', months: null },
+  { key: 'all', label: 'All Dates', shortLabel: 'All', months: null },
 ];
 
 // Time Period Selector component
@@ -159,11 +159,12 @@ const TimePeriodSelector = React.memo(({ selectedPeriod, onPeriodChange }) => {
     <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+        className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
       >
-        <CalendarIcon className="h-4 w-4" />
-        <span>{selectedOption.label}</span>
-        <ChevronDownIcon className="h-4 w-4" />
+        <CalendarIcon className="h-4 w-4 flex-shrink-0" />
+        <span className="hidden sm:inline">{selectedOption.label}</span>
+        <span className="sm:hidden">{selectedOption.shortLabel}</span>
+        <ChevronDownIcon className="h-4 w-4 flex-shrink-0" />
       </button>
 
       {isOpen && (
@@ -247,6 +248,7 @@ HeroMetric.displayName = 'HeroMetric';
 // Period Summary component
 const PeriodSummary = React.memo(({
   title,
+  shortTitle,
   income,
   expenses,
   savings,
@@ -320,14 +322,15 @@ const PeriodSummary = React.memo(({
 
   return (
     <Card className="p-4 sm:p-6">
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-        {title}
+      <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-4">
+        <span className="hidden sm:inline">{title}</span>
+        <span className="sm:hidden">{shortTitle || title}</span>
       </h3>
 
       {/* Main metrics row */}
       <div className="grid grid-cols-3 gap-2 sm:gap-4">
         <div
-          className="text-center p-2 sm:p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg overflow-hidden"
+          className="text-center p-2 sm:p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg"
           title="Income from YNAB (includes refunds and reimbursements as positive inflows)"
         >
           <p className="text-[10px] sm:text-xs text-emerald-600 dark:text-emerald-400 font-medium uppercase mb-1">
@@ -336,20 +339,20 @@ const PeriodSummary = React.memo(({
           <PrivacyCurrency
             amount={income}
             isPrivacyMode={isPrivacyMode}
-            className="text-xs sm:text-base font-bold text-emerald-700 dark:text-emerald-400 truncate block"
+            className="text-[11px] sm:text-base font-bold text-emerald-700 dark:text-emerald-400"
           />
         </div>
-        <div className="text-center p-2 sm:p-3 bg-red-50 dark:bg-red-900/20 rounded-lg overflow-hidden">
+        <div className="text-center p-2 sm:p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
           <p className="text-[10px] sm:text-xs text-red-600 dark:text-red-400 font-medium uppercase mb-1">
             Spent
           </p>
           <PrivacyCurrency
             amount={expenses}
             isPrivacyMode={isPrivacyMode}
-            className="text-xs sm:text-base font-bold text-red-700 dark:text-red-400 truncate block"
+            className="text-[11px] sm:text-base font-bold text-red-700 dark:text-red-400"
           />
         </div>
-        <div className={`text-center p-2 sm:p-3 rounded-lg overflow-hidden ${
+        <div className={`text-center p-2 sm:p-3 rounded-lg ${
           savings >= 0
             ? 'bg-blue-50 dark:bg-blue-900/20'
             : 'bg-orange-50 dark:bg-orange-900/20'
@@ -361,7 +364,7 @@ const PeriodSummary = React.memo(({
           }`}>
             Net Cash Flow
           </p>
-          <span className={`text-xs sm:text-base font-bold truncate block ${
+          <span className={`text-[11px] sm:text-base font-bold ${
             savings >= 0
               ? 'text-blue-700 dark:text-blue-400'
               : 'text-orange-700 dark:text-orange-400'
@@ -990,6 +993,7 @@ export default function Dashboard() {
           <PeriodSummary
             key={selectedTimePeriod}
             title={TIME_PERIODS.find(p => p.key === selectedTimePeriod)?.label || 'Summary'}
+            shortTitle={TIME_PERIODS.find(p => p.key === selectedTimePeriod)?.shortLabel || 'Summary'}
             income={periodSummaryData.income}
             expenses={periodSummaryData.expenses}
             savings={periodSummaryData.savings}

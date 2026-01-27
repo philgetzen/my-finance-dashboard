@@ -136,9 +136,14 @@ export function useRunwayCalculator(allAccounts, monthlyData, periodMonths = 6, 
       expenses: m.expenses
     }));
 
-    // 7. Determine health status (based on pure burn - worst case)
+    // 7. Determine health status
+    // If net runway is infinite (income >= expenses), cash is growing - always excellent
+    // Otherwise, base health on pure burn (worst case scenario)
     let runwayHealth = 'excellent';
-    if (pureRunwayMonths < 3) {
+    if (!isFinite(netRunwayMonths)) {
+      // Income >= expenses means cash is growing, not depleting
+      runwayHealth = 'excellent';
+    } else if (pureRunwayMonths < 3) {
       runwayHealth = 'critical';
     } else if (pureRunwayMonths < 6) {
       runwayHealth = 'caution';
