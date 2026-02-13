@@ -31,7 +31,11 @@ function getFirestore() {
   if (!firestoreDb) {
     const adminInstance = getFirebaseAdmin();
     firestoreDb = adminInstance.firestore();
-    firestoreDb.settings({ ignoreUndefinedProperties: true });
+    try {
+      firestoreDb.settings({ ignoreUndefinedProperties: true });
+    } catch (e) {
+      // Settings may already be applied if Firestore was accessed elsewhere
+    }
   }
   return firestoreDb;
 }
