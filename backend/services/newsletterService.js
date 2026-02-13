@@ -179,6 +179,7 @@ async function getCspSettings(userId) {
     excludedCategories: new Set(data.excludedCategories || []),
     excludedPayees: new Set(data.excludedPayees || []),
     excludedExpenseCategories: new Set(data.excludedExpenseCategories || []),
+    useKeywordFallback: data.settings?.useKeywordFallback ?? false,
     settings: data.settings || {}
   };
 }
@@ -309,7 +310,14 @@ async function generateAndSend(userId, options = {}) {
     const accessToken = await getValidYnabToken(userId);
 
     // Step 2: Fetch YNAB data
-    const ynabData = await fetchYnabData(accessToken);
+    let ynabData;
+    try {
+      ynabData = await fetchYnabData(accessToken);
+    } catch (fetchError) {
+      logger.error('YNAB data fetch failed', { userId, error: fetchError.message, stage: 'fetchYnabData' });
+      errors.push({ stage: 'fetchYnabData', error: fetchError.message });
+      throw fetchError;
+    }
 
     // Step 3: Get user settings
     const [cspSettings, newsletterSettings, snapshots] = await Promise.all([
@@ -319,10 +327,17 @@ async function generateAndSend(userId, options = {}) {
     ]);
 
     // Step 4: Calculate metrics
-    const metrics = calculateAllMetrics(ynabData, {
-      periodMonths: 6,
-      cspSettings
-    });
+    let metrics;
+    try {
+      metrics = calculateAllMetrics(ynabData, {
+        periodMonths: 6,
+        cspSettings
+      });
+    } catch (metricsError) {
+      logger.error('Metrics calculation failed', { userId, error: metricsError.message, stage: 'calculateMetrics' });
+      errors.push({ stage: 'calculateMetrics', error: metricsError.message });
+      throw metricsError;
+    }
 
     logger.info('Metrics calculated', {
       userId,
@@ -330,14 +345,22 @@ async function generateAndSend(userId, options = {}) {
       runway: metrics.runway?.pureRunwayMonths
     });
 
-    // Step 5: Calculate trends (pass investmentAccountIds to exclude from expense calculations)
-    const trends = calculateAllTrends(
-      ynabData.transactions,
-      metrics,
-      snapshots,
-      newsletterSettings.goals,
-      metrics.investmentAccountIds
-    );
+    // Step 5: Calculate trends
+    let trends;
+    try {
+      trends = calculateAllTrends(
+        ynabData.transactions,
+        metrics,
+        snapshots,
+        newsletterSettings.goals,
+        metrics.investmentAccountIds,
+        cspSettings
+      );
+    } catch (trendsError) {
+      logger.error('Trends calculation failed', { userId, error: trendsError.message, stage: 'calculateTrends' });
+      errors.push({ stage: 'calculateTrends', error: trendsError.message });
+      throw trendsError;
+    }
 
     logger.info('Trends calculated', { userId });
 
@@ -376,7 +399,15 @@ async function generateAndSend(userId, options = {}) {
     const subject = generateSubject({ weekEnding, trends });
 
     // Step 8: Save snapshot
-    const snapshotId = await saveSnapshot(userId, metrics, trends);
+    let snapshotId;
+    try {
+      snapshotId = await saveSnapshot(userId, metrics, trends);
+    } catch (snapshotError) {
+      logger.error('Snapshot save failed', { userId, error: snapshotError.message, stage: 'saveSnapshot' });
+      errors.push({ stage: 'saveSnapshot', error: snapshotError.message });
+      // Non-fatal: continue to send email even if snapshot fails
+      snapshotId = null;
+    }
 
     // Step 9: Send email
     let emailsSent = 0;
@@ -414,15 +445,20 @@ async function generateAndSend(userId, options = {}) {
     // Step 10: Log result
     const status = errors.length === 0 ? 'success' : (emailsSent > 0 ? 'partial' : 'failed');
 
-    await logNewsletterRun(userId, {
-      startedAt,
-      status,
-      errors,
-      emailsSent,
-      aiTokens,
-      aiFallback,
-      snapshotId
-    });
+    try {
+      await logNewsletterRun(userId, {
+        startedAt,
+        status,
+        errors,
+        emailsSent,
+        aiTokens,
+        aiFallback,
+        snapshotId
+      });
+    } catch (logError) {
+      logger.error('Newsletter log save failed', { userId, error: logError.message, stage: 'logNewsletterRun' });
+      // Non-fatal: don't throw, the newsletter was already sent
+    }
 
     logger.info('Newsletter generation completed', { userId, status, emailsSent });
 
@@ -439,12 +475,16 @@ async function generateAndSend(userId, options = {}) {
   } catch (error) {
     logger.error('Newsletter generation failed', { userId, error: error.message, stack: error.stack });
 
-    await logNewsletterRun(userId, {
-      startedAt,
-      status: 'failed',
-      errors: [{ stage: 'general', error: error.message }],
-      emailsSent: 0
-    });
+    try {
+      await logNewsletterRun(userId, {
+        startedAt,
+        status: 'failed',
+        errors: [{ stage: 'general', error: error.message }],
+        emailsSent: 0
+      });
+    } catch (logError) {
+      logger.error('Failed to log newsletter failure', { userId, error: logError.message, stage: 'logNewsletterRun' });
+    }
 
     throw error;
   }
@@ -465,7 +505,7 @@ async function generatePreview(userId) {
   ]);
 
   const metrics = calculateAllMetrics(ynabData, { periodMonths: 6, cspSettings });
-  const trends = calculateAllTrends(ynabData.transactions, metrics, snapshots, newsletterSettings.goals, metrics.investmentAccountIds);
+  const trends = calculateAllTrends(ynabData.transactions, metrics, snapshots, newsletterSettings.goals, metrics.investmentAccountIds, cspSettings);
 
   // Generate AI analysis for preview
   let aiAnalysis = null;
@@ -495,7 +535,7 @@ async function buildAIPrompt(userId) {
   ]);
 
   const metrics = calculateAllMetrics(ynabData, { periodMonths: 6, cspSettings });
-  const trends = calculateAllTrends(ynabData.transactions, metrics, snapshots, newsletterSettings.goals, metrics.investmentAccountIds);
+  const trends = calculateAllTrends(ynabData.transactions, metrics, snapshots, newsletterSettings.goals, metrics.investmentAccountIds, cspSettings);
 
   return getAnalysisPrompt({ metrics, trends });
 }

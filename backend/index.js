@@ -5,7 +5,7 @@ const dotenv = require('dotenv');
 const admin = require('firebase-admin');
 const axios = require('axios');
 const fs = require('fs');
-const cron = require('node-cron');
+
 const logger = require('./logger');
 
 dotenv.config();
@@ -1013,47 +1013,6 @@ app.get('/api/newsletter/config', (req, res) => {
 });
 
 console.log('✅ Registered newsletter routes: /api/newsletter/*');
-
-// ============================================
-// NEWSLETTER CRON SCHEDULER
-// ============================================
-
-// Initialize cron job for automatic newsletter sending
-// Saturday at 9am in configured timezone
-const NEWSLETTER_CRON = '0 9 * * 6'; // Every Saturday at 9:00 AM
-const NEWSLETTER_TIMEZONE = process.env.NEWSLETTER_TIMEZONE || 'America/Los_Angeles';
-
-// Only start cron if Resend is configured
-if (process.env.RESEND_API_KEY && process.env.NEWSLETTER_RECIPIENTS) {
-  cron.schedule(NEWSLETTER_CRON, async () => {
-    logger.info('Newsletter cron triggered', { timezone: NEWSLETTER_TIMEZONE });
-
-    try {
-      // Get all users with newsletter enabled
-      // For single-user setup, we'll use the first user with YNAB tokens
-      const tokensSnapshot = await db.collection('ynab_tokens').limit(1).get();
-
-      if (tokensSnapshot.empty) {
-        logger.warn('No users with YNAB tokens found for newsletter');
-        return;
-      }
-
-      const userId = tokensSnapshot.docs[0].id;
-      const service = getNewsletterService();
-      const result = await service.generateAndSend(userId);
-
-      logger.info('Scheduled newsletter completed', { userId, result });
-    } catch (error) {
-      logger.error('Scheduled newsletter failed', { error: error.message });
-    }
-  }, {
-    timezone: NEWSLETTER_TIMEZONE
-  });
-
-  console.log(`✅ Newsletter cron scheduled: ${NEWSLETTER_CRON} (${NEWSLETTER_TIMEZONE})`);
-} else {
-  console.log('⚠️ Newsletter cron not started - missing RESEND_API_KEY or NEWSLETTER_RECIPIENTS');
-}
 
 // Error handlers
 process.on('uncaughtException', (error) => {

@@ -3,6 +3,23 @@
   "buildCommand": "cd frontend && npm install && npm run build",
   "outputDirectory": "frontend/dist",
   "framework": null,
+  "crons": [
+    {
+      "path": "/api/cron/newsletter",
+      "schedule": "0 17 * * 6"
+    }
+  ],
+  "functions": {
+    "api/cron/newsletter.js": {
+      "maxDuration": 60
+    },
+    "api/newsletter/send.js": {
+      "maxDuration": 60
+    },
+    "api/newsletter/preview.js": {
+      "maxDuration": 60
+    }
+  },
   "routes": [
     {
       "src": "/api/(.*)",

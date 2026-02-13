@@ -492,9 +492,10 @@ function calculateAnnualProgress(transactions, currentMetrics, snapshots = [], g
  * Calculate true expenses for a set of transactions (excluding investments/savings)
  * @param {Array} transactions - Transactions to process
  * @param {Set} investmentAccountIds - Account IDs to exclude
+ * @param {Object} cspSettings - CSP settings for categorization
  * @returns {number} - Total true expenses
  */
-function calculateTrueExpenses(transactions, investmentAccountIds = new Set()) {
+function calculateTrueExpenses(transactions, investmentAccountIds = new Set(), cspSettings = {}) {
   let totalExpenses = 0;
 
   transactions.forEach(txn => {
@@ -507,7 +508,7 @@ function calculateTrueExpenses(transactions, investmentAccountIds = new Set()) {
 
     const amount = getTransactionAmount(txn);
     // Only count negative amounts (outflows) that are true expenses
-    if (amount < 0 && isTrueExpense(txn.category_name, txn.category_group_name)) {
+    if (amount < 0 && isTrueExpense(txn.category_name, txn.category_group_name, cspSettings, txn.category_id)) {
       totalExpenses += Math.abs(amount);
     }
   });
@@ -519,9 +520,10 @@ function calculateTrueExpenses(transactions, investmentAccountIds = new Set()) {
  * Calculate week-over-week trends
  * @param {Array} transactions - All YNAB transactions
  * @param {Set} investmentAccountIds - Set of investment account IDs to exclude
+ * @param {Object} cspSettings - CSP settings for categorization
  * @returns {Object} - Weekly comparison data
  */
-function calculateWeeklyTrends(transactions, investmentAccountIds = new Set()) {
+function calculateWeeklyTrends(transactions, investmentAccountIds = new Set(), cspSettings = {}) {
   const now = new Date();
 
   // Get start of current week (Sunday)
@@ -541,14 +543,14 @@ function calculateWeeklyTrends(transactions, investmentAccountIds = new Set()) {
   const lastWeekTxns = getTransactionsForRange(transactions, lastWeekStart, lastWeekEnd);
 
   // Calculate true expenses (excluding investments and savings)
-  const currentWeekExpenses = calculateTrueExpenses(currentWeekTxns, investmentAccountIds);
-  const lastWeekExpenses = calculateTrueExpenses(lastWeekTxns, investmentAccountIds);
+  const currentWeekExpenses = calculateTrueExpenses(currentWeekTxns, investmentAccountIds, cspSettings);
+  const lastWeekExpenses = calculateTrueExpenses(lastWeekTxns, investmentAccountIds, cspSettings);
 
   // Calculate 6-week average of true expenses (excluding current partial week)
   const sixWeeksAgo = new Date(lastWeekStart);
   sixWeeksAgo.setDate(sixWeeksAgo.getDate() - (5 * 7)); // 5 more weeks back from last week start
   const historicalTxns = getTransactionsForRange(transactions, sixWeeksAgo, lastWeekEnd);
-  const historicalExpenses = calculateTrueExpenses(historicalTxns, investmentAccountIds);
+  const historicalExpenses = calculateTrueExpenses(historicalTxns, investmentAccountIds, cspSettings);
   const sixWeekAverage = historicalExpenses / 6;
 
   // Days elapsed in current week
@@ -590,11 +592,12 @@ function calculateWeeklyTrends(transactions, investmentAccountIds = new Set()) {
  * @param {Array} snapshots - Historical newsletter snapshots
  * @param {Object} goals - User's financial goals
  * @param {Set} investmentAccountIds - Set of investment account IDs to exclude
+ * @param {Object} cspSettings - CSP settings for categorization
  * @returns {Object} - All trend data
  */
-function calculateAllTrends(transactions, currentMetrics, snapshots = [], goals = {}, investmentAccountIds = new Set()) {
+function calculateAllTrends(transactions, currentMetrics, snapshots = [], goals = {}, investmentAccountIds = new Set(), cspSettings = {}) {
   return {
-    weekly: calculateWeeklyTrends(transactions, investmentAccountIds),
+    weekly: calculateWeeklyTrends(transactions, investmentAccountIds, cspSettings),
     monthOverMonth: calculateMonthOverMonth(transactions, currentMetrics, investmentAccountIds),
     yearOverYear: calculateYearOverYear(transactions, currentMetrics, snapshots, investmentAccountIds),
     annualProgress: calculateAnnualProgress(transactions, currentMetrics, snapshots, goals, investmentAccountIds),

@@ -57,7 +57,7 @@ export const CSP_BUCKETS = {
 export const DEFAULT_FIXED_COST_KEYWORDS = [
   'rent', 'mortgage', 'utilities', 'electric', 'gas', 'water', 'internet',
   'phone', 'insurance', 'car payment', 'auto', 'transportation', 'groceries',
-  'food', 'subscription', 'netflix', 'spotify', 'gym', 'membership',
+  'subscription', 'netflix', 'spotify', 'gym', 'membership',
   'loan', 'debt', 'payment', 'cable', 'trash', 'sewer', 'hoa'
 ];
 

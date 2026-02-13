@@ -145,12 +145,6 @@ function shouldExcludeTransaction(transaction) {
   // Check if this is a debt payment (these should NOT be excluded)
   const isCategorizedDebtPayment = isDebtPaymentCategory(transaction.category_name);
 
-  // DEBUG: Log potential mortgage/loan exclusions
-  const catName = (transaction.category_name || '').toLowerCase();
-  if (catName.includes('mortgage') || catName.includes('loan') || catName.includes('2563') || catName.includes('8331')) {
-    console.log(`[EXCLUDE DEBUG] Category: "${transaction.category_name}", isDebtPayment: ${isCategorizedDebtPayment}, hasTransferAccount: ${!!transaction.transfer_account_id}, payee: "${payee}"`);
-  }
-
   // Skip transfers UNLESS they are categorized debt payments
   if (transaction.transfer_account_id && !isCategorizedDebtPayment) {
     return true;

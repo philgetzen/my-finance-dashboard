@@ -26,34 +26,53 @@ const CSP_TARGETS = {
   guiltFree: { min: 20, max: 35, label: 'Guilt-Free Spending' }
 };
 
-// Default keyword-based mappings for category classification
-// These match against both category names AND category group names
+// Map YNAB group names to CSP buckets (matches frontend constants.js GROUP_NAME_TO_BUCKET)
+const GROUP_NAME_TO_BUCKET = {
+  // Fixed Costs variations
+  'fixed costs': 'fixedCosts',
+  'fixed': 'fixedCosts',
+  'bills': 'fixedCosts',
+  'monthly bills': 'fixedCosts',
+  // Investments variations
+  'investments': 'investments',
+  'investing': 'investments',
+  'post tax investments': 'investments',
+  'post-tax investments': 'investments',
+  // Savings variations
+  'savings': 'savings',
+  'saving': 'savings',
+  'savings goals': 'savings',
+  'true expenses': 'guiltFree', // Common YNAB pattern - irregular but expected expenses
+  // Guilt-free variations
+  'guilt-free': 'guiltFree',
+  'guilt free': 'guiltFree',
+  'guilt-free spending': 'guiltFree',
+  'discretionary': 'guiltFree',
+  'fun money': 'guiltFree',
+  'spending': 'guiltFree',
+  'variable expenses': 'guiltFree',
+};
+
+// Default keyword-based mappings for CSP bucket inference (category name only)
+// Matches frontend constants.js DEFAULT_FIXED_COST_KEYWORDS
 const DEFAULT_FIXED_COST_KEYWORDS = [
-  'fixed cost', 'fixed costs',  // Match category groups like "🔗 Fixed Costs"
   'rent', 'mortgage', 'utilities', 'electric', 'gas', 'water', 'internet',
   'phone', 'insurance', 'car payment', 'auto', 'transportation', 'groceries',
-  'food', 'subscription', 'netflix', 'spotify', 'gym', 'membership',
+  'subscription', 'netflix', 'spotify', 'gym', 'membership',
   'loan', 'debt', 'payment', 'cable', 'trash', 'sewer', 'hoa'
 ];
 
+// Matches frontend constants.js DEFAULT_INVESTMENT_KEYWORDS
 const DEFAULT_INVESTMENT_KEYWORDS = [
-  'investment', 'investments', 'post tax investment',  // Match "🤑 Post Tax Investments"
-  'retirement', '401k', 'ira', 'roth', 'stock', 'etf',
+  'investment', 'retirement', '401k', 'ira', 'roth', 'stock', 'etf',
   'mutual fund', 'brokerage', 'investing'
 ];
 
+// Matches frontend constants.js DEFAULT_SAVINGS_KEYWORDS
 const DEFAULT_SAVINGS_KEYWORDS = [
-  'savings', 'saving',  // Match "💵 Savings"
-  'emergency', 'vacation', 'travel', 'gift', 'holiday',
+  'savings', 'emergency', 'vacation', 'travel', 'gift', 'holiday',
   'christmas', 'birthday', 'wedding', 'fund', 'goal', 'reserve',
   'house', 'down payment', 'sinking'
-];
-
-// Keywords for guilt-free spending (matched BEFORE fixed costs check)
-const DEFAULT_GUILT_FREE_KEYWORDS = [
-  'guilt free', 'guilt-free', 'guiltfree',  // Match "Family Guilt Free Spending", etc.
-  'fun money', 'personal spending', 'entertainment', 'dining out', 'restaurant',
-  'coffee', 'hobby', 'recreation'
 ];
 
 // ============================================
@@ -274,38 +293,55 @@ function calculateRunway(accounts, monthlyData, periodMonths = 6) {
 
 /**
  * Categorize a transaction into a CSP bucket
+ * Matches frontend getCategoryBucket() priority: custom mapping → group name → keyword (if enabled) → default
  * @param {string} categoryName - Category name
  * @param {string} categoryGroupName - Category group name
- * @param {Object} customMappings - Custom category-to-bucket mappings
+ * @param {Object} customMappings - Custom category-to-bucket mappings (by category ID)
+ * @param {boolean} useKeywordFallback - Whether to use keyword inference (default false)
+ * @param {string} categoryId - Category ID for custom mapping lookup
  * @returns {string} - Bucket name
  */
-function categorizeTransaction(categoryName, categoryGroupName, customMappings = {}) {
+function categorizeTransaction(categoryName, categoryGroupName, customMappings = {}, useKeywordFallback = false, categoryId = null) {
   if (!categoryName) return 'guiltFree';
 
-  const lowerCategory = categoryName.toLowerCase();
-  const lowerGroup = (categoryGroupName || '').toLowerCase();
-
-  // Check for investments first (highest priority for tracking)
-  if (DEFAULT_INVESTMENT_KEYWORDS.some(kw => lowerCategory.includes(kw) || lowerGroup.includes(kw))) {
-    return 'investments';
+  // Priority 1: Custom mappings by category ID or name (matches frontend getCategoryBucket)
+  if (categoryId && customMappings[categoryId]) {
+    return customMappings[categoryId];
+  }
+  if (customMappings[categoryName]) {
+    return customMappings[categoryName];
   }
 
-  // Check for savings
-  if (DEFAULT_SAVINGS_KEYWORDS.some(kw => lowerCategory.includes(kw) || lowerGroup.includes(kw))) {
-    return 'savings';
+  // Priority 2: Group name mapping (matches frontend mapGroupNameToBucket)
+  if (categoryGroupName) {
+    const normalizedGroup = categoryGroupName.toLowerCase().trim();
+    const groupBucket = GROUP_NAME_TO_BUCKET[normalizedGroup];
+    if (groupBucket) {
+      return groupBucket;
+    }
   }
 
-  // Check for guilt-free BEFORE fixed costs (so "dining out" stays guilt-free, not matched by "food")
-  if (DEFAULT_GUILT_FREE_KEYWORDS.some(kw => lowerCategory.includes(kw) || lowerGroup.includes(kw))) {
-    return 'guiltFree';
+  // Priority 3: Keyword inference on category name only (if enabled)
+  if (useKeywordFallback) {
+    const lowerCategory = categoryName.toLowerCase().trim();
+
+    // Check investment keywords first (most specific)
+    if (DEFAULT_INVESTMENT_KEYWORDS.some(kw => lowerCategory.includes(kw))) {
+      return 'investments';
+    }
+
+    // Check savings keywords
+    if (DEFAULT_SAVINGS_KEYWORDS.some(kw => lowerCategory.includes(kw))) {
+      return 'savings';
+    }
+
+    // Check fixed cost keywords
+    if (DEFAULT_FIXED_COST_KEYWORDS.some(kw => lowerCategory.includes(kw))) {
+      return 'fixedCosts';
+    }
   }
 
-  // Check for fixed costs
-  if (DEFAULT_FIXED_COST_KEYWORDS.some(kw => lowerCategory.includes(kw) || lowerGroup.includes(kw))) {
-    return 'fixedCosts';
-  }
-
-  // Default to guilt-free spending
+  // Default: guilt-free spending
   return 'guiltFree';
 }
 
@@ -322,7 +358,8 @@ function calculateCSPBuckets(transactions, categories, periodMonths = 6, cspSett
     categoryMappings = {},
     excludedCategories = new Set(),
     excludedPayees = new Set(),
-    excludedExpenseCategories = new Set()
+    excludedExpenseCategories = new Set(),
+    useKeywordFallback = false
   } = cspSettings;
 
   if (!transactions?.length) {
@@ -365,42 +402,19 @@ function calculateCSPBuckets(transactions, categories, periodMonths = 6, cspSett
   };
   const categoryTotals = new Map();
 
-  // DEBUG: Track mortgage transactions through the flow
-  let mortgageDebugCount = 0;
-
   transactions.forEach(txn => {
     const txnDate = new Date(txn.date);
-    const catName = (txn.category_name || '').toLowerCase();
-    const isMortgageTxn = catName.includes('mortgage') || catName.includes('2563') || catName.includes('8331');
 
-    if (isMortgageTxn && mortgageDebugCount < 3) {
-      console.log(`[MORTGAGE TRACE] Date: ${txn.date}, Category: "${txn.category_name}", Amount: ${txn.amount/1000}, startDate: ${startDate.toISOString().slice(0,10)}, accountId: ${txn.account_id}`);
-    }
-
-    if (txnDate < startDate) {
-      if (isMortgageTxn && mortgageDebugCount < 3) console.log(`  -> SKIPPED: Before start date`);
-      return;
-    }
+    if (txnDate < startDate) return;
 
     // Skip investment account transactions
-    if (investmentAccountIds.has(txn.account_id)) {
-      if (isMortgageTxn && mortgageDebugCount < 3) console.log(`  -> SKIPPED: Investment account`);
-      return;
-    }
+    if (investmentAccountIds.has(txn.account_id)) return;
 
     // Skip excluded transactions
-    if (shouldExcludeTransaction(txn)) {
-      if (isMortgageTxn && mortgageDebugCount < 3) console.log(`  -> SKIPPED: shouldExcludeTransaction`);
-      return;
-    }
+    if (shouldExcludeTransaction(txn)) return;
 
     const amount = getTransactionAmount(txn);
     const categoryInfo = categoryMap.get(txn.category_id) || { name: txn.category_name, groupName: '' };
-
-    if (isMortgageTxn && mortgageDebugCount < 3) {
-      console.log(`  -> PASSED filters. Amount: ${amount}, CategoryInfo: ${JSON.stringify(categoryInfo)}`);
-      mortgageDebugCount++;
-    }
 
     // Check if income
     if (isIncomeCategory(txn.category_name)) {
@@ -420,10 +434,10 @@ function calculateCSPBuckets(transactions, categories, periodMonths = 6, cspSett
       const isExpenseCategoryExcluded = excludedExpenseCategories.has(txn.category_id);
 
       if (!isExpenseCategoryExcluded) {
-        // Determine bucket
-        const customBucket = categoryMappings[txn.category_id];
-        const bucket = customBucket || categorizeTransaction(categoryInfo.name, categoryInfo.groupName);
-
+        // Determine bucket using unified categorization (matches frontend getCategoryBucket)
+        const bucket = categorizeTransaction(
+          categoryInfo.name, categoryInfo.groupName, categoryMappings, useKeywordFallback, txn.category_id
+        );
 
         bucketTotals[bucket] += expenseAmount;
 
@@ -600,10 +614,13 @@ function calculateBurnRate(monthlyData, periodMonths = 6) {
  * Check if a category should be counted as a true expense (not investment/savings)
  * @param {string} categoryName - Category name
  * @param {string} categoryGroupName - Category group name (optional)
+ * @param {Object} cspSettings - CSP settings for categorization
+ * @param {string} categoryId - Category ID for custom mapping lookup
  * @returns {boolean} - True if this is a real expense
  */
-function isTrueExpense(categoryName, categoryGroupName = '') {
-  const bucket = categorizeTransaction(categoryName, categoryGroupName);
+function isTrueExpense(categoryName, categoryGroupName = '', cspSettings = {}, categoryId = null) {
+  const { categoryMappings = {}, useKeywordFallback = false } = cspSettings;
+  const bucket = categorizeTransaction(categoryName, categoryGroupName, categoryMappings, useKeywordFallback, categoryId);
   // Only count fixed costs and guilt-free as true expenses
   // Investments and savings are wealth-building, not spending
   return bucket === 'fixedCosts' || bucket === 'guiltFree';
@@ -614,9 +631,11 @@ function isTrueExpense(categoryName, categoryGroupName = '') {
  * @param {Array} transactions - YNAB transactions array
  * @param {Object} monthlyData - Monthly data for average calculation
  * @param {number} periodMonths - Period for average calculation
+ * @param {Set} investmentAccountIds - Account IDs to exclude
+ * @param {Object} cspSettings - CSP settings for categorization
  * @returns {Array} - Top categories with amounts and vs-average comparison
  */
-function getTopSpendingCategories(transactions, monthlyData, periodMonths = 6, investmentAccountIds = new Set()) {
+function getTopSpendingCategories(transactions, monthlyData, periodMonths = 6, investmentAccountIds = new Set(), cspSettings = {}) {
   if (!transactions?.length) return [];
 
   const now = new Date();
@@ -631,8 +650,7 @@ function getTopSpendingCategories(transactions, monthlyData, periodMonths = 6, i
     if (investmentAccountIds.has(txn.account_id)) return;
     if (shouldExcludeTransaction(txn)) return;
     if (isIncomeCategory(txn.category_name)) return;
-    // Exclude investments and savings - they're not true expenses
-    if (!isTrueExpense(txn.category_name, txn.category_group_name)) return;
+    if (!isTrueExpense(txn.category_name, txn.category_group_name, cspSettings, txn.category_id)) return;
 
     const amount = Math.abs(getTransactionAmount(txn));
     const category = txn.category_name || 'Uncategorized';
@@ -647,7 +665,6 @@ function getTopSpendingCategories(transactions, monthlyData, periodMonths = 6, i
   // Calculate average from all transactions in the period
   const periodStart = new Date(now.getFullYear(), now.getMonth() - periodMonths, 1);
   const periodCategoryTotals = {};
-  let monthsWithData = 0;
 
   transactions.forEach(txn => {
     const txnDate = new Date(txn.date);
@@ -655,8 +672,7 @@ function getTopSpendingCategories(transactions, monthlyData, periodMonths = 6, i
     if (investmentAccountIds.has(txn.account_id)) return;
     if (shouldExcludeTransaction(txn)) return;
     if (isIncomeCategory(txn.category_name)) return;
-    // Exclude investments and savings - they're not true expenses
-    if (!isTrueExpense(txn.category_name, txn.category_group_name)) return;
+    if (!isTrueExpense(txn.category_name, txn.category_group_name, cspSettings, txn.category_id)) return;
 
     const amount = Math.abs(getTransactionAmount(txn));
     const category = txn.category_name || 'Uncategorized';
@@ -690,36 +706,37 @@ function getTopSpendingCategories(transactions, monthlyData, periodMonths = 6, i
 
 /**
  * Get top spending categories for the CURRENT WEEK (matches newsletter hero)
+ * Uses Sunday-Saturday week definition (matches template and trends)
  * Compares this week's spending to 6-week weekly average by category
  * @param {Array} transactions - All transactions
  * @param {Set} investmentAccountIds - Account IDs to exclude
+ * @param {Object} cspSettings - CSP settings for categorization
  * @returns {Array} - Top categories with weekly comparison
  */
-function getWeeklyTopCategories(transactions, investmentAccountIds = new Set()) {
+function getWeeklyTopCategories(transactions, investmentAccountIds = new Set(), cspSettings = {}) {
   if (!transactions?.length) return [];
 
   const now = new Date();
 
-  // Calculate this week's date range (same as newsletter hero)
-  const dayOfWeek = now.getDay();
-  const daysToLastSaturday = dayOfWeek === 6 ? 0 : dayOfWeek + 1;
-  const lastSaturday = new Date(now);
-  lastSaturday.setDate(now.getDate() - daysToLastSaturday);
-  lastSaturday.setHours(0, 0, 0, 0);
+  // Calculate this week's date range: Sunday-Saturday (matches template and trends)
+  const dayOfWeek = now.getDay(); // 0=Sunday
+  const weekStart = new Date(now);
+  weekStart.setDate(now.getDate() - dayOfWeek);
+  weekStart.setHours(0, 0, 0, 0);
 
-  const thisFriday = new Date(lastSaturday);
-  thisFriday.setDate(lastSaturday.getDate() + 6);
-  thisFriday.setHours(23, 59, 59, 999);
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekStart.getDate() + 6);
+  weekEnd.setHours(23, 59, 59, 999);
 
   // Get this week's spending by category
   const thisWeekSpending = {};
   transactions.forEach(txn => {
     const txnDate = new Date(txn.date);
-    if (txnDate < lastSaturday || txnDate > thisFriday) return;
+    if (txnDate < weekStart || txnDate > weekEnd) return;
     if (investmentAccountIds.has(txn.account_id)) return;
     if (shouldExcludeTransaction(txn)) return;
     if (isIncomeCategory(txn.category_name)) return;
-    if (!isTrueExpense(txn.category_name, txn.category_group_name)) return;
+    if (!isTrueExpense(txn.category_name, txn.category_group_name, cspSettings, txn.category_id)) return;
 
     const amount = Math.abs(getTransactionAmount(txn));
     const category = txn.category_name || 'Uncategorized';
@@ -728,12 +745,11 @@ function getWeeklyTopCategories(transactions, investmentAccountIds = new Set()) 
   });
 
   // Calculate 6-week historical average by category (excluding current week)
-  const sixWeeksAgo = new Date(lastSaturday);
+  const sixWeeksAgo = new Date(weekStart);
   sixWeeksAgo.setDate(sixWeeksAgo.getDate() - (6 * 7));
 
-  const lastWeekEnd = new Date(lastSaturday);
-  lastWeekEnd.setDate(lastWeekEnd.getDate() - 1);
-  lastWeekEnd.setHours(23, 59, 59, 999);
+  const lastWeekEnd = new Date(weekStart);
+  lastWeekEnd.setMilliseconds(-1);
 
   const historicalCategoryTotals = {};
   transactions.forEach(txn => {
@@ -742,7 +758,7 @@ function getWeeklyTopCategories(transactions, investmentAccountIds = new Set()) 
     if (investmentAccountIds.has(txn.account_id)) return;
     if (shouldExcludeTransaction(txn)) return;
     if (isIncomeCategory(txn.category_name)) return;
-    if (!isTrueExpense(txn.category_name, txn.category_group_name)) return;
+    if (!isTrueExpense(txn.category_name, txn.category_group_name, cspSettings, txn.category_id)) return;
 
     const amount = Math.abs(getTransactionAmount(txn));
     const category = txn.category_name || 'Uncategorized';
@@ -797,8 +813,6 @@ function calculateAllMetrics(data, options = {}) {
   } = options;
 
   // Identify investment account IDs to exclude from expense calculations
-  // Investment accounts are "otherAsset" type in YNAB or have investment-related names
-  // BUT: Exclude liability accounts (mortgages, loans) - these should NOT be investment accounts
   const investmentAccountIds = new Set(
     accounts
       .filter(acc => {
@@ -806,20 +820,17 @@ function calculateAllMetrics(data, options = {}) {
         const name = (acc.name || '').toLowerCase();
 
         // NEVER mark liability accounts as investment accounts
-        // These include mortgages, loans, credit cards
         if (type === 'mortgage' || type === 'otherliability' || type === 'loan' ||
             type === 'creditcard' || type === 'lineofcredit') {
           return false;
         }
 
         // YNAB "otherAsset" type is typically used for investment/tracking accounts
-        // But skip if it's clearly a property/home value tracking account
         if (type === 'otherasset') {
           // Home value accounts should be included in net worth, not treated as investment
           if (name.includes('home value') || name.includes('property') || name.includes('redfin')) {
             return false;
           }
-          console.log(`[INVESTMENT ACCT] "${acc.name}" (type: ${type}) marked as investment`);
           return true;
         }
 
@@ -828,7 +839,6 @@ function calculateAllMetrics(data, options = {}) {
             name.includes('401k') || name.includes('ira') || name.includes('roth') ||
             name.includes('stock') || name.includes('etf') || name.includes('fidelity') ||
             name.includes('vanguard') || name.includes('schwab')) {
-          console.log(`[INVESTMENT ACCT] "${acc.name}" (type: ${type}) marked as investment by name`);
           return true;
         }
 
@@ -845,8 +855,8 @@ function calculateAllMetrics(data, options = {}) {
   const runway = calculateRunway(accounts, monthlyData, periodMonths);
   const csp = calculateCSPBuckets(transactions, categories, periodMonths, cspSettings, investmentAccountIds);
   const burnRate = calculateBurnRate(monthlyData, periodMonths);
-  const topCategories = getTopSpendingCategories(transactions, monthlyData, periodMonths, investmentAccountIds);
-  const weeklyTopCategories = getWeeklyTopCategories(transactions, investmentAccountIds);
+  const topCategories = getTopSpendingCategories(transactions, monthlyData, periodMonths, investmentAccountIds, cspSettings);
+  const weeklyTopCategories = getWeeklyTopCategories(transactions, investmentAccountIds, cspSettings);
 
   return {
     netWorth,
@@ -864,6 +874,7 @@ function calculateAllMetrics(data, options = {}) {
 
 module.exports = {
   CSP_TARGETS,
+  GROUP_NAME_TO_BUCKET,
   calculateNetWorth,
   calculateRunway,
   calculateCSPBuckets,
