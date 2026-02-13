@@ -306,6 +306,42 @@ async function generateAndSend(userId, options = {}) {
   logger.info('Newsletter generation started', { userId, skipAI, skipEmail });
 
   try {
+    // Step 0: Dedup check — skip if already sent successfully in last 6 hours
+    const db = getDb();
+    const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
+    try {
+      const recentSendQuery = await db.collection('newsletter_logs')
+        .where('userId', '==', userId)
+        .where('status', '==', 'success')
+        .where('startedAt', '>', sixHoursAgo)
+        .limit(1)
+        .get();
+
+      if (!recentSendQuery.empty) {
+        const lastSend = recentSendQuery.docs[0].data();
+        logger.info('Newsletter already sent recently, skipping', {
+          userId,
+          lastSentAt: lastSend.completedAt || lastSend.startedAt
+        });
+        return {
+          success: true,
+          status: 'skipped',
+          reason: 'already_sent_recently',
+          lastSentAt: lastSend.completedAt || lastSend.startedAt
+        };
+      }
+    } catch (dedupError) {
+      // If dedup check fails (e.g. missing index), log and continue
+      if (dedupError.code === 9 || dedupError.message?.includes('index')) {
+        logger.warn('Dedup check skipped - Firestore index not yet created', {
+          userId,
+          indexUrl: dedupError.message?.match(/https:\/\/[^\s]+/)?.[0]
+        });
+      } else {
+        logger.warn('Dedup check failed, continuing with send', { userId, error: dedupError.message });
+      }
+    }
+
     // Step 1: Get YNAB token
     const accessToken = await getValidYnabToken(userId);
 
