@@ -55,4 +55,3 @@ async function handler(req, res) {
 }
 
 module.exports = handler;
-module.exports.config = { maxDuration: 60 };

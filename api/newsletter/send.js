@@ -51,6 +51,4 @@ async function handler(req, res) {
   }
 }
 
-const wrapped = handleCors(handler);
-wrapped.config = { maxDuration: 60 };
-module.exports = wrapped;
+module.exports = handleCors(handler);
