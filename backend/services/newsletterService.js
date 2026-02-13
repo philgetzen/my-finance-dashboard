@@ -307,18 +307,23 @@ async function generateAndSend(userId, options = {}) {
 
   try {
     // Step 0: Dedup check — skip if already sent successfully in last 6 hours
+    // Uses single-field query (userId) + in-code filtering to avoid needing a composite Firestore index
     const db = getDb();
     const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
     try {
-      const recentSendQuery = await db.collection('newsletter_logs')
+      const recentLogsQuery = await db.collection('newsletter_logs')
         .where('userId', '==', userId)
-        .where('status', '==', 'success')
-        .where('startedAt', '>', sixHoursAgo)
-        .limit(1)
+        .orderBy('startedAt', 'desc')
+        .limit(5)
         .get();
 
-      if (!recentSendQuery.empty) {
-        const lastSend = recentSendQuery.docs[0].data();
+      const recentSuccess = recentLogsQuery.docs.find(doc => {
+        const data = doc.data();
+        return data.status === 'success' && data.startedAt > sixHoursAgo;
+      });
+
+      if (recentSuccess) {
+        const lastSend = recentSuccess.data();
         logger.info('Newsletter already sent recently, skipping', {
           userId,
           lastSentAt: lastSend.completedAt || lastSend.startedAt
