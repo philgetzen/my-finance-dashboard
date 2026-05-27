@@ -34,3 +34,11 @@ pnpm-debug.log*
 yarn-debug.log*
 .vercel
 .env.vercel
+.env*.local
+
+# iCloud .nosync pattern (symlinked siblings)
+**/*.nosync
+**/*.nosync/
+
+# Per-machine Claude config
+.claude/
