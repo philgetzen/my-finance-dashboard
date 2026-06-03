@@ -41,6 +41,52 @@ export default function AuthenticationPage() {
     }
   }, [user, ynabToken]);
 
+  // Fallback path: if the OAuth popup was severed (no window.opener), the
+  // callback stashes the code in sessionStorage and redirects here. Once the
+  // user is authenticated, complete the exchange + save so tokens still land.
+  useEffect(() => {
+    if (!user) return;
+
+    let pendingCode = null;
+    try {
+      pendingCode = sessionStorage.getItem('ynab_pending_auth_code');
+    } catch (storageError) {
+      console.error('Unable to read pending YNAB auth code:', storageError);
+    }
+    if (!pendingCode) return;
+
+    // Clear immediately so a failed exchange can't loop on every render.
+    try {
+      sessionStorage.removeItem('ynab_pending_auth_code');
+    } catch (storageError) {
+      console.error('Unable to clear pending YNAB auth code:', storageError);
+    }
+
+    (async () => {
+      try {
+        setAuthState(AUTH_STATES.YNAB_CONNECTING);
+        const tokenResponse = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/ynab/token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: pendingCode })
+        });
+
+        if (!tokenResponse.ok) {
+          const errorData = await tokenResponse.json().catch(() => ({ error: 'Unknown error during token exchange' }));
+          throw new Error(errorData.error || 'Token exchange failed');
+        }
+
+        const { access_token, refresh_token } = await tokenResponse.json();
+        await handleYNABConnect(access_token, refresh_token);
+      } catch (error) {
+        console.error('Pending YNAB code exchange failed:', error);
+        setYnabAuthError(error.message || 'Failed to connect YNAB');
+        setAuthState(AUTH_STATES.GOOGLE_ONLY);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
   const handleDemoMode = () => {
     initializeDemoMode();
     navigate('/');

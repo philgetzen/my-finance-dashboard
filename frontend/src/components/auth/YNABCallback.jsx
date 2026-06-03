@@ -58,9 +58,16 @@ export default function YNABCallback() {
         console.log('Closing callback window after successful auth');
         window.close();
       } else {
-        console.log('⚠️ No opener window found, redirecting to dashboard');
-        // If no opener, redirect to dashboard
-        navigate('/');
+        // No opener (popup was severed, or YNAB redirected the top-level
+        // window instead of the popup). Don't drop the code: stash it so the
+        // app can complete the exchange after redirect, then go to the auth page.
+        console.log('⚠️ No opener window found, preserving code and redirecting');
+        try {
+          sessionStorage.setItem('ynab_pending_auth_code', code);
+        } catch (storageError) {
+          console.error('Unable to persist YNAB auth code:', storageError);
+        }
+        navigate('/login');
       }
     } else {
       console.error('❌ No authorization code or error found in callback URL');

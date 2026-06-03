@@ -31,30 +31,40 @@ export default function YNABConnectionCard({
   
   const handleConnect = async () => {
     setConnectionError(null); // Clear previous errors
+
+    // Open the popup synchronously, inside the click handler, so the browser's
+    // user-activation gate is still satisfied. Opening it after an awaited fetch
+    // loses user activation and strict browsers (Safari) silently block it.
+    const authWindow = window.open('about:blank', 'ynab-auth', 'width=500,height=600');
+
+    if (!authWindow) {
+      const errorMsg = 'Failed to open authentication window. Please check popup blockers.';
+      setConnectionError(errorMsg);
+      if (onError) onError(errorMsg);
+      return;
+    }
+
     try {
       setIsConnecting(true);
       console.log('Starting YNAB connection process...');
-      
+
       // Fetch auth URL from backend
       console.log('Fetching auth URL from backend...');
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/ynab/auth`);
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Failed to get auth URL:', response.status, errorText);
+        authWindow.close();
         throw new Error(`Failed to get auth URL: ${response.status}`);
       }
-      
+
       const { authUrl } = await response.json();
       console.log('Got auth URL:', authUrl);
-      
-      // Open YNAB OAuth in new window
-      console.log('Opening YNAB OAuth window...');
-      const authWindow = window.open(authUrl, 'ynab-auth', 'width=500,height=600');
-      
-      if (!authWindow) {
-        throw new Error('Failed to open authentication window. Please check popup blockers.');
-      }
+
+      // Point the already-open popup at the YNAB OAuth URL
+      console.log('Navigating YNAB OAuth window...');
+      authWindow.location.href = authUrl;
       
       let checkClosedIntervalId = null;
       let messageListenerAttached = false;
