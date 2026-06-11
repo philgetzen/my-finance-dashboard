@@ -136,6 +136,7 @@ class YNABService {
 
       const response = await fetch(`${this.apiBaseUrl}${endpoint}`, {
         ...options,
+        cache: options.cache ?? 'no-store',
         headers,
         signal: controller.signal
       });
@@ -231,7 +232,7 @@ class YNABService {
   }
 
   async getScheduledTransactions(budgetId = 'last-used') {
-    const result = await this.makeRequest(`/api/ynab/budgets/${budgetId}/scheduled_transactions`);
+    const result = await this.makeRequest(`/api/ynab/budgets?budgetId=${budgetId}&resource=scheduled_transactions`);
     return result.data?.scheduled_transactions || [];
   }
 

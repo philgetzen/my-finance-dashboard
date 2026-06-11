@@ -1,5 +1,5 @@
-const { handleCors } = require('../../_lib/cors');
-const { YNAB_CONFIG } = require('../../_lib/ynab');
+const { handleCors } = require('../../../_lib/cors');
+const { YNAB_CONFIG } = require('../../../_lib/ynab');
 const axios = require('axios');
 
 async function handler(req, res) {
@@ -14,38 +14,23 @@ async function handler(req, res) {
 
   res.setHeader('Cache-Control', 'no-store');
 
-  const { budgetId, resource, since_date } = req.query;
+  const { budgetId } = req.query;
+  if (!budgetId) {
+    return res.status(400).json({ error: 'budgetId is required' });
+  }
 
   try {
-    let url;
-
-    if (budgetId && resource) {
-      // Handle /api/ynab/budgets?budgetId=xxx&resource=accounts
-      const validResources = ['accounts', 'categories', 'transactions', 'months', 'scheduled_transactions'];
-      if (!validResources.includes(resource)) {
-        return res.status(404).json({ error: `Invalid resource: ${resource}` });
-      }
-
-      url = `${YNAB_CONFIG.apiBaseUrl}/budgets/${budgetId}/${resource}`;
-      if (resource === 'transactions' && since_date) {
-        url += `?since_date=${since_date}`;
-      }
-    } else {
-      // Handle /api/ynab/budgets (list all budgets)
-      url = `${YNAB_CONFIG.apiBaseUrl}/budgets`;
-    }
-
-    const response = await axios.get(url, {
+    const response = await axios.get(`${YNAB_CONFIG.apiBaseUrl}/budgets/${budgetId}/scheduled_transactions`, {
       headers: {
         'Authorization': authHeader,
         'Accept': 'application/json'
       },
-      timeout: 15000 // 15 second timeout - accounts for Vercel cold start
+      timeout: 15000
     });
 
     res.json(response.data);
   } catch (error) {
-    console.error('Error fetching budgets:', {
+    console.error('Error fetching scheduled transactions:', {
       message: error.message,
       code: error.code,
       status: error.response?.status,
@@ -53,7 +38,6 @@ async function handler(req, res) {
       isTimeout: error.code === 'ECONNABORTED' || error.message?.includes('timeout')
     });
 
-    // Provide more specific error messages
     if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
       return res.status(504).json({
         error: 'YNAB API request timed out',
@@ -80,7 +64,7 @@ async function handler(req, res) {
     }
 
     res.status(error.response?.status || 500).json({
-      error: 'Unable to fetch budgets',
+      error: 'Unable to fetch scheduled transactions',
       details: error.response?.data?.error?.detail || error.message
     });
   }

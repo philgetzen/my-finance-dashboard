@@ -126,11 +126,11 @@ export const useYNABData = (budgetId = 'last-used', enabled = false, accessToken
     scheduledTransactions: summaryData.scheduledTransactions || [],
     summary: summaryData,
     isLoading: summary.isLoading,
+    isFetching: summary.isFetching,
+    lastFetchedAt: summary.dataUpdatedAt || null,
     isError: summary.isError,
     error: summary.error,
-    refetch: () => {
-      summary.refetch();
-    },
+    refetch: () => summary.refetch(),
   };
 };
 

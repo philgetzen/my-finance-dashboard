@@ -617,6 +617,8 @@ export default function Dashboard() {
     manualAccounts,
     ynabToken,
     isLoading,
+    isFetching,
+    lastFetchedAt,
     error,
     saveYNABToken,
     refetch,
@@ -627,6 +629,7 @@ export default function Dashboard() {
   } = useFinanceData();
   const { privacyMode } = usePrivacy();
   const { isFeatureEnabled } = useDemoMode();
+  const isRefreshing = isLoading || isFetching;
 
   const [showManualModal, setShowManualModal] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -953,7 +956,20 @@ export default function Dashboard() {
               onClick={async () => {
                 try {
                   if (ynabToken) {
-                    await refetch();
+                    console.info('Refreshing YNAB data...');
+                    const result = await refetch();
+                    if (result.error) {
+                      throw result.error;
+                    }
+
+                    const data = result.data || {};
+                    console.info('YNAB refresh complete', {
+                      budgets: data.budgets?.length || 0,
+                      accounts: data.accounts?.length || 0,
+                      transactions: data.transactions?.length || 0,
+                      scheduledTransactions: data.scheduledTransactions?.length || 0,
+                      refreshedAt: new Date().toISOString()
+                    });
                   }
                 } catch (error) {
                   console.error('Error refreshing data:', error);
@@ -961,11 +977,16 @@ export default function Dashboard() {
               }}
               className="flex items-center gap-2 text-sm"
               size="sm"
-              disabled={isLoading}
+              disabled={isRefreshing}
             >
-              <ArrowPathIcon className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-              {isLoading ? 'Refreshing...' : 'Refresh'}
+              <ArrowPathIcon className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              {isRefreshing ? 'Refreshing...' : 'Refresh'}
             </Button>
+            {lastFetchedAt && (
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                Updated {new Date(lastFetchedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+              </span>
+            )}
             <Button
               variant="outline"
               onClick={() => setShowManualModal(true)}
