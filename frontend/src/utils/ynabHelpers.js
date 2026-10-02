@@ -151,8 +151,8 @@ export const normalizeYNABAccountType = (type) => {
   
   // YNAB specific mappings
   if (lowerType === 'otherasset') return 'investment';
-  if (lowerType === 'creditcard') return 'credit';
-  if (lowerType === 'otherliability') return 'loan';
-  
+  if (lowerType === 'creditcard' || lowerType === 'lineofcredit') return 'credit';
+  if (['otherliability', 'autoloan', 'studentloan', 'personalloan', 'medicaldebt', 'otherdebt'].includes(lowerType)) return 'loan';
+
   return lowerType;
 };

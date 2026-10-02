@@ -127,8 +127,9 @@ describe('getMonthBoundaries', () => {
 });
 
 describe('isWithinRange', () => {
-  const start = new Date('2025-08-01');
-  const end = new Date('2026-01-31');
+  // Local bounds, as getDateRange builds them
+  const start = new Date(2025, 7, 1);
+  const end = new Date(2026, 0, 31);
 
   test('returns true for date within range', () => {
     expect(isWithinRange('2025-10-15', start, end)).toBe(true);
@@ -159,12 +160,14 @@ describe('isWithinRange', () => {
 
 describe('getMonthKey', () => {
   test('returns YYYY-MM format', () => {
-    expect(getMonthKey(new Date('2026-01-15'))).toBe('2026-01');
-    expect(getMonthKey(new Date('2025-12-01'))).toBe('2025-12');
+    expect(getMonthKey(new Date(2026, 0, 15))).toBe('2026-01');
+    // Local midnight on the 1st stays in its month in every time zone
+    expect(getMonthKey(new Date(2025, 11, 1))).toBe('2025-12');
   });
 
   test('handles string dates', () => {
     expect(getMonthKey('2026-01-15')).toBe('2026-01');
+    expect(getMonthKey('2025-12-01')).toBe('2025-12');
   });
 });
 

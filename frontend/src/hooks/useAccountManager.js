@@ -158,7 +158,9 @@ export function useAccountManager(ynabAccounts = [], manualAccounts = []) {
       
       const balance = account.balance;
       if (['Credit Card', 'Loan', 'Mortgage'].includes(account.displayType)) {
-        liabilities += Math.abs(balance);
+        // YNAB liabilities are negative (a card carrying a credit is positive);
+        // manual liabilities may be entered either way
+        liabilities += account.source === 'ynab' ? -balance : Math.abs(balance);
       } else {
         assets += balance;
       }

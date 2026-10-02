@@ -6,6 +6,7 @@ import Card from '../ui/Card';
 import { normalizeYNABAccountType } from '../../utils/ynabHelpers';
 import { formatCurrency } from '../../utils/formatters';
 import { useCategoryProcessor } from '../../hooks/useCategoryProcessor';
+import { useCSPSettings } from '../../hooks/useConsciousSpendingPlan';
 import {
   ListBulletIcon,
   CalendarIcon,
@@ -257,6 +258,14 @@ export default function CashFlow() {
     return map;
   }, [categories]);
 
+  // Category mappings decide which categories are investing (not spending)
+  const { categoryMappings, settings: cspPreferences } = useCSPSettings();
+  const classificationOptions = useMemo(() => ({
+    accounts: allAccounts,
+    categories,
+    cspSettings: { categoryMappings, settings: cspPreferences }
+  }), [allAccounts, categories, categoryMappings, cspPreferences]);
+
   const {
     processedCategoryGroups,
     monthHeaders,
@@ -267,7 +276,8 @@ export default function CashFlow() {
     categoryIdToGroupInfoMap,
     investmentAccountIds,
     periodMonths,
-    showActiveOnly
+    showActiveOnly,
+    classificationOptions
   );
 
   // Organize data

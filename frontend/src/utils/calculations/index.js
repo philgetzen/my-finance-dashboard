@@ -55,6 +55,7 @@ export {
 
 // Category utilities
 export {
+  normalizeGroupName,
   mapGroupNameToBucket,
   inferBucketFromKeywords,
   getCategoryBucket,

@@ -228,6 +228,11 @@ const GROUP_NAME_TO_BUCKET = {
   'variable expenses': 'guiltFree',
 };
 
+// Categories that are always investing (matches frontend constants.js)
+const SAVINGS_INVESTMENT_CATEGORIES = [
+  'Investments (Stocks, ETFs, MFs)'
+];
+
 // Default keyword-based mappings for CSP bucket inference (category name only)
 // Matches frontend constants.js DEFAULT_FIXED_COST_KEYWORDS
 const DEFAULT_FIXED_COST_KEYWORDS = [
@@ -294,6 +299,7 @@ function categorizeTransaction(categoryName, categoryGroupName, customMappings =
   if (categoryId && customMappings[categoryId]) return customMappings[categoryId];
   if (categoryName && customMappings[categoryName]) return customMappings[categoryName];
   if (!categoryName) return 'guiltFree';
+  if (SAVINGS_INVESTMENT_CATEGORIES.includes(categoryName)) return 'investments';
 
   const groupBucket = bucketFromGroupName(categoryGroupName);
   if (groupBucket) return groupBucket;

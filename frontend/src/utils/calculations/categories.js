@@ -22,15 +22,35 @@ function normalizeString(str) {
 }
 
 /**
+ * Normalize a YNAB group name for matching. Strips emoji and punctuation so
+ * "🔗 Fixed Costs" matches "fixed costs".
+ * @param {string} groupName - YNAB category group name
+ * @returns {string} - Normalized group name
+ */
+export function normalizeGroupName(groupName) {
+  return (groupName || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9&\s-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
  * Map a category group name to a CSP bucket using known mappings
  * @param {string} groupName - YNAB category group name
  * @returns {string|null} - CSP bucket key or null if no match
  */
 export function mapGroupNameToBucket(groupName) {
-  if (!groupName) return null;
+  const normalized = normalizeGroupName(groupName);
+  if (!normalized) return null;
+  if (GROUP_NAME_TO_BUCKET[normalized]) return GROUP_NAME_TO_BUCKET[normalized];
 
-  const normalized = normalizeString(groupName);
-  return GROUP_NAME_TO_BUCKET[normalized] || null;
+  // Decorated names like "Family Guilt Free Spending" or "Retirement Investments"
+  if (normalized.includes('invest')) return 'investments';
+  if (normalized.includes('guilt')) return 'guiltFree';
+  if (normalized.includes('fixed') || normalized.includes('bills')) return 'fixedCosts';
+  if (normalized.includes('saving')) return 'savings';
+  return null;
 }
 
 /**

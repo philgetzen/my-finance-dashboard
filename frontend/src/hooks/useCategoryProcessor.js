@@ -1,17 +1,25 @@
 import { useMemo } from 'react';
-import { getTransactionAmount } from '../utils/ynabHelpers';
-import { YNAB_INCOME_CATEGORIES, DEBT_PAYMENT_CATEGORIES } from './useTransactionProcessor';
+import { classifyTransactions, toMonthKey } from '../utils/calculations/cashflow';
+
+// Investing moves money into your own accounts. It's shown for reference but
+// isn't counted as an expense.
+export const INVESTING_GROUP_NAME = 'Investing & Saving (not spending)';
 
 /**
  * Process transactions into category groups for the Balance Sheet
+ * Income and spending follow the shared rules in utils/calculations/cashflow.js.
+ * @param {Object} [options] - { accounts, categories, cspSettings } for classification
  */
 export function useCategoryProcessor(
   transactions,
   categoryIdToGroupInfoMap,
   investmentAccountIds,
   periodMonths = 12,
-  showActiveOnly = true
+  showActiveOnly = true,
+  options = {}
 ) {
+  const { accounts = [], categories = null, cspSettings = null } = options;
+
   return useMemo(() => {
     if (!transactions?.length || !categoryIdToGroupInfoMap?.size) {
       return {
@@ -22,22 +30,29 @@ export function useCategoryProcessor(
       };
     }
 
-    // Calculate actual period months
-    const actualPeriodMonths = periodMonths === 999 ? 
-      Math.max(1, Math.ceil((Date.now() - Math.min(...transactions.map(t => 
-        new Date(t.date).getTime()
-      ).filter(d => !isNaN(d)))) / (1000 * 60 * 60 * 24 * 30.4375))) 
-      : periodMonths;
+    const lines = classifyTransactions(transactions, {
+      accounts,
+      categories,
+      cspSettings: cspSettings || {}
+    }).filter(line => ['income', 'spending', 'investing', 'saving', 'uncategorized'].includes(line.kind));
+
+    // Calendar months from the selected start (or first transaction) through this month
+    const today = new Date();
+    const firstDate = lines.reduce((min, line) => (line.date && line.date < min ? line.date : min), toMonthKey(today));
+    const firstMonthIndex = Number(firstDate.slice(0, 4)) * 12 + Number(firstDate.slice(5, 7)) - 1;
+    const currentMonthIndex = today.getFullYear() * 12 + today.getMonth();
+    const monthsOfData = Math.max(1, currentMonthIndex - firstMonthIndex + 1);
+    const actualPeriodMonths = periodMonths === 999 ? monthsOfData : Math.min(periodMonths, monthsOfData);
 
     // Generate month headers
     const monthHeaders = [];
-    const today = new Date();
     for (let i = actualPeriodMonths - 1; i >= 0; i--) {
       const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
-      const monthKey = date.toISOString().slice(0, 7);
+      const monthKey = toMonthKey(date);
       const monthLabel = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
       monthHeaders.push({ key: monthKey, label: monthLabel });
     }
+    const monthKeys = new Set(monthHeaders.map(mh => mh.key));
 
     // Initialize data structures
     const categoryGroupDataMap = {};
@@ -46,62 +61,19 @@ export function useCategoryProcessor(
       return acc;
     }, {});
 
-    // Process single transaction
-    const processSingleTransaction = (txn, accountId) => {
-      // Skip investment accounts
-      if (investmentAccountIds?.has(accountId)) return;
+    // Process single classified line
+    const processSingleTransaction = (txn) => {
+      const monthKey = txn.monthKey;
+      if (!monthKeys.has(monthKey)) return;
 
-      // Skip internal transfers between budget accounts (but keep transfers to/from tracking accounts)
-      // This ensures we capture income transfers from tracking investment accounts
-      const isInternalTransfer = txn.transfer_account_id && 
-        txn.transfer_account_id !== 'null' && 
-        !investmentAccountIds?.has(txn.transfer_account_id);
-      
-      if (isInternalTransfer) return;
-      
-      // Skip reconciliation transactions
-      if (txn.payee_name === 'Reconciliation Balance Adjustment' || 
-          txn.payee_name === 'Starting Balance') return;
-
-      // Validate date
-      if (!txn.date || isNaN(new Date(txn.date).getTime())) return;
-
-      const transactionDate = new Date(txn.date);
-      const monthKey = transactionDate.toISOString().slice(0, 7);
-
-      // Skip if outside period
-      if (!monthHeaders.find(mh => mh.key === monthKey)) return;
-
-      const rawAmount = getTransactionAmount(txn);
+      const rawAmount = txn.amountDollars;
       const groupInfo = categoryIdToGroupInfoMap.get(txn.category_id);
       const categoryName = groupInfo?.categoryName || txn.category_name || 'Uncategorized';
-      let groupName = groupInfo?.groupName;
-
-      // Determine if this is an income transaction
-      // In YNAB, income is typically:
-      // 1. Categorized as "Inflow: Ready to Assign" or similar
-      // 2. Has no category (uncategorized income shows as payee names)
-      // 3. Positive amounts to "Ready to Assign" or "To be Budgeted"
-      const isIncomeGroup = groupName && (
-        groupName.toLowerCase().includes('income') ||
-        groupName.toLowerCase().includes('inflow') ||
-        groupName === 'Inflow' ||
-        groupName === 'Ready to Assign' ||
-        groupName === 'To be Budgeted'
-      );
-      const isIncomeCategory = (
-        !categoryName || // No category often means income
-        categoryName === 'Uncategorized' ||
-        categoryName.toLowerCase().includes('inflow') ||
-        categoryName.toLowerCase().includes('ready to assign') ||
-        categoryName.toLowerCase().includes('to be budgeted') ||
-        categoryName === 'Ready to Assign' ||
-        categoryName === 'To be Budgeted' ||
-        categoryName === 'Deferred Income SubCategory' ||
-        YNAB_INCOME_CATEGORIES.includes(categoryName)
-      );
-      // Income is positive amount with income category or no category at all
-      const isIncome = rawAmount > 0 && (isIncomeGroup || isIncomeCategory);
+      const isIncome = txn.kind === 'income';
+      const isInvesting = txn.kind === 'investing' || txn.kind === 'saving';
+      let groupName = isInvesting
+        ? INVESTING_GROUP_NAME
+        : txn.kind === 'uncategorized' ? 'Uncategorized' : groupInfo?.groupName;
 
       // For income transactions, use payee name to show individual sources
       let displayCategoryName = categoryName;
@@ -158,7 +130,9 @@ export function useCategoryProcessor(
 
       const currentCategory = currentGroup.categories[categoryKey];
 
-      // Accumulate amounts
+      // Accumulate amounts. Income is signed (a clawback reduces it); for
+      // expenses, outflows add and refunds subtract.
+      const countsAsExpense = !isIncome && txn.kind === 'spending';
       if (isIncome) {
         currentCategory.monthlyData[monthKey].income += rawAmount;
         currentCategory.totalIncome += rawAmount;
@@ -166,43 +140,18 @@ export function useCategoryProcessor(
         currentGroup.groupTotalIncome += rawAmount;
         monthlySummaryTotals[monthKey].income += rawAmount;
       } else {
-        // For expenses: negative amounts are outflows, positive amounts are refunds
-        if (rawAmount < 0) {
-          // Normal expense (outflow)
-          const expenseAmount = Math.abs(rawAmount);
-          currentCategory.monthlyData[monthKey].expense += expenseAmount;
-          currentCategory.totalExpense += expenseAmount;
-          currentGroup.groupMonthlyExpense[monthKey] += expenseAmount;
-          currentGroup.groupTotalExpense += expenseAmount;
+        const expenseAmount = -rawAmount;
+        currentCategory.monthlyData[monthKey].expense += expenseAmount;
+        currentCategory.totalExpense += expenseAmount;
+        currentGroup.groupMonthlyExpense[monthKey] += expenseAmount;
+        currentGroup.groupTotalExpense += expenseAmount;
+        if (countsAsExpense) {
           monthlySummaryTotals[monthKey].expenses += expenseAmount;
-        } else if (rawAmount > 0) {
-          // Refund/return - reduces expenses
-          currentCategory.monthlyData[monthKey].expense -= rawAmount;
-          currentCategory.totalExpense -= rawAmount;
-          currentGroup.groupMonthlyExpense[monthKey] -= rawAmount;
-          currentGroup.groupTotalExpense -= rawAmount;
-          monthlySummaryTotals[monthKey].expenses -= rawAmount;
         }
       }
     };
 
-    // Process all transactions
-    transactions.forEach(transaction => {
-      if (transaction.subtransactions?.length > 0) {
-        transaction.subtransactions.forEach(subTxn => {
-          processSingleTransaction({
-            ...subTxn,
-            payee_name: subTxn.payee_name || transaction.payee_name,
-            date: transaction.date,
-            category_id: subTxn.category_id || transaction.category_id,
-            category_name: subTxn.category_name || transaction.category_name,
-            transfer_account_id: subTxn.transfer_account_id || transaction.transfer_account_id
-          }, transaction.account_id);
-        });
-      } else {
-        processSingleTransaction(transaction, transaction.account_id);
-      }
-    });
+    lines.forEach(processSingleTransaction);
 
     // Calculate totals and prepare final data
     let grandTotalIncome = 0;
@@ -224,10 +173,11 @@ export function useCategoryProcessor(
           (Math.abs(cat.totalIncome) >= 0.01 || Math.abs(cat.totalExpense) >= 0.01));
 
         const groupTotalNet = group.groupTotalIncome - group.groupTotalExpense;
+        const isExcludedGroup = group.groupName === INVESTING_GROUP_NAME || group.groupName === 'Uncategorized';
         grandTotalIncome += group.groupTotalIncome;
-        grandTotalExpenses += group.groupTotalExpense;
+        if (!isExcludedGroup) grandTotalExpenses += group.groupTotalExpense;
 
-        const isIncomeGroup = group.groupTotalIncome > 0.01 && 
+        const isIncomeGroup = group.groupTotalIncome > 0.01 &&
           group.groupTotalIncome > group.groupTotalExpense * 0.9; // More lenient check for income groups
 
         return {
@@ -278,10 +228,12 @@ export function useCategoryProcessor(
       monthlySummaryTotals
     };
   }, [
-    transactions, 
-    categoryIdToGroupInfoMap, 
-    investmentAccountIds, 
-    periodMonths, 
-    showActiveOnly
+    transactions,
+    categoryIdToGroupInfoMap,
+    periodMonths,
+    showActiveOnly,
+    accounts,
+    categories,
+    cspSettings
   ]);
 }

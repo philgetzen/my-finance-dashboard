@@ -16,7 +16,9 @@ import YNABConnectionErrorModal from '../ui/YNABConnectionErrorModal';
 import PrivacyCurrency from '../ui/PrivacyCurrency';
 import { getAccountBalance, normalizeYNABAccountType } from '../../utils/ynabHelpers';
 import { formatCurrency, isLiability, getDisplayAccountType, isEffectivelyZero } from '../../utils/formatters';
-import { useTransactionProcessor, getMonthlyRangeData, SAVINGS_INVESTMENT_CATEGORIES } from '../../hooks/useTransactionProcessor';
+import { useTransactionProcessor, getMonthlyRangeData } from '../../hooks/useTransactionProcessor';
+import { useCSPSettings } from '../../hooks/useConsciousSpendingPlan';
+import { summarizeLines, toDateKey, isDebtAccount, parseLocalDate } from '../../utils/calculations/cashflow';
 import { useAccountManager } from '../../hooks/useAccountManager';
 import { useRunwayCalculator } from '../../hooks/useRunwayCalculator';
 import { Link } from 'react-router-dom';
@@ -231,7 +233,7 @@ const HeroMetric = React.memo(({ value, label, trend, change, isPrivacyMode }) =
               trend === 'down' ? 'text-red-300' :
               'text-violet-200'
             }`}>
-              {change > 0 ? '+' : ''}{formatCurrency(change)} this month
+              {change > 0 ? '+' : change < 0 ? '-' : ''}${formatCurrency(change)} this month
             </span>
           </div>
         )}
@@ -252,70 +254,11 @@ const PeriodSummary = React.memo(({
   income,
   expenses,
   savings,
-  monthlyData,
-  dateRange,
+  numMonths,
+  trends,
   isPrivacyMode
 }) => {
   const savingsRate = income > 0 ? ((savings / income) * 100).toFixed(0) : 0;
-
-  // Calculate number of months in the selected period
-  const numMonths = useMemo(() => {
-    if (!monthlyData || !dateRange) return 1;
-    const { startDate, endDate } = dateRange;
-    let count = 0;
-    Object.keys(monthlyData).forEach(monthKey => {
-      const [year, month] = monthKey.split('-').map(Number);
-      const monthDate = new Date(year, month - 1, 15);
-      if (monthDate >= startDate && monthDate <= endDate) {
-        count++;
-      }
-    });
-    return Math.max(count, 1);
-  }, [monthlyData, dateRange]);
-
-  // Calculate period-over-period trends (current period vs equivalent prior period)
-  const trends = useMemo(() => {
-    if (!monthlyData || !dateRange) return null;
-    const { startDate, endDate } = dateRange;
-
-    // Calculate period duration in milliseconds
-    const periodDuration = endDate.getTime() - startDate.getTime();
-
-    // Calculate prior period dates
-    const priorEndDate = new Date(startDate.getTime() - 1); // Day before current period starts
-    const priorStartDate = new Date(priorEndDate.getTime() - periodDuration);
-
-    // Sum current period
-    let currentIncome = 0;
-    let currentExpenses = 0;
-    let priorIncome = 0;
-    let priorExpenses = 0;
-
-    Object.entries(monthlyData).forEach(([monthKey, data]) => {
-      const [year, month] = monthKey.split('-').map(Number);
-      const monthDate = new Date(year, month - 1, 15);
-
-      if (monthDate >= startDate && monthDate <= endDate) {
-        currentIncome += data.income || 0;
-        currentExpenses += data.expenses || 0;
-      } else if (monthDate >= priorStartDate && monthDate <= priorEndDate) {
-        priorIncome += data.income || 0;
-        priorExpenses += data.expenses || 0;
-      }
-    });
-
-    // Need prior period data to calculate change
-    if (priorIncome === 0 && priorExpenses === 0) return null;
-
-    const incomeChange = priorIncome > 0
-      ? ((currentIncome - priorIncome) / priorIncome) * 100
-      : 0;
-    const expenseChange = priorExpenses > 0
-      ? ((currentExpenses - priorExpenses) / priorExpenses) * 100
-      : 0;
-
-    return { incomeChange, expenseChange };
-  }, [monthlyData, dateRange]);
 
   const avgIncome = income / numMonths;
   const avgExpenses = expenses / numMonths;
@@ -585,7 +528,7 @@ const TransactionRow = React.memo(({ transaction, account, isPrivacyMode }) => {
   return (
     <tr className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
       <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
-        {new Date(transaction.date).toLocaleDateString()}
+        {parseLocalDate(transaction.date).toLocaleDateString()}
       </td>
       <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
         {transaction.payee_name || transaction.name || 'Unknown'}
@@ -614,6 +557,7 @@ export default function Dashboard() {
     user,
     accounts: ynabAccounts,
     transactions: ynabTransactions,
+    categories: ynabCategories,
     manualAccounts,
     ynabToken,
     isLoading,
@@ -656,10 +600,12 @@ export default function Dashboard() {
   ), [allAccounts]);
 
   // Process transactions using shared hook
+  const cspSettings = useCSPSettings();
   const { processedTransactions, monthlyData, totals } = useTransactionProcessor(
     ynabTransactions,
     allAccounts,
-    investmentAccountIds
+    investmentAccountIds,
+    { categories: ynabCategories, cspSettings }
   );
 
   // Use account manager to get normalized accounts for runway calculation
@@ -740,9 +686,12 @@ export default function Dashboard() {
       const type = normalizeYNABAccountType(account.type);
       const name = account.name || account.nickname || 'Unknown Account';
 
-      if (isLiability(account) || ['credit', 'loan', 'mortgage'].includes(type)) {
-        liabilities += Math.abs(balance);
-        liabilityAccounts.push({ name, balance: Math.abs(balance) });
+      if (isLiability(account) || ['credit', 'loan', 'mortgage'].includes(type) || isDebtAccount(account)) {
+        // YNAB liabilities are negative (a card carrying a credit is positive);
+        // manual liabilities may be entered either way
+        const owed = account.on_budget !== undefined ? -balance : Math.abs(balance);
+        liabilities += owed;
+        liabilityAccounts.push({ name, balance: owed });
       } else {
         assets += balance;
         if (balance > 0) {
@@ -798,31 +747,53 @@ export default function Dashboard() {
     }));
   }, [monthlyData, chartMonths]);
 
-  // Period summary data - uses selected time period
+  // Period summary data - uses selected time period, compared with the same
+  // days of the prior period (Oct 1-2 vs Sep 1-2, not vs all of September)
   const periodSummaryData = useMemo(() => {
     const { startDate, endDate } = dateRange;
-    let totalIncome = 0;
-    let totalExpenses = 0;
+    const now = new Date();
+    const end = endDate > now ? now : endDate;
+    const firstDate = processedTransactions.reduce(
+      (min, txn) => (txn.date && txn.date < min ? txn.date : min), toDateKey(end)
+    );
+    const startKey = toDateKey(startDate) > firstDate ? toDateKey(startDate) : firstDate;
+    const endKey = toDateKey(end);
 
-    // Sum up all months within the date range
-    Object.entries(monthlyData).forEach(([monthKey, data]) => {
-      const [year, month] = monthKey.split('-').map(Number);
-      const monthDate = new Date(year, month - 1, 15); // Mid-month for comparison
+    const inRange = (from, to) => processedTransactions.filter(txn => txn.date >= from && txn.date <= to);
+    const current = summarizeLines(inRange(startKey, endKey));
 
-      if (monthDate >= startDate && monthDate <= endDate) {
-        totalIncome += data.income || 0;
-        totalExpenses += data.expenses || 0;
+    // Elapsed months, so a partial current month doesn't count as a full one
+    const elapsedDays = (new Date(end.getFullYear(), end.getMonth(), end.getDate()) -
+      new Date(Number(startKey.slice(0, 4)), Number(startKey.slice(5, 7)) - 1, Number(startKey.slice(8, 10)))) /
+      (24 * 60 * 60 * 1000) + 1;
+    const numMonths = Math.max(elapsedDays / 30.4375, 1);
+
+    const shiftMonths = { 'this-month': 1, 'last-3-months': 3, 'last-6-months': 6, 'last-12-months': 12, 'ytd': 12, 'last-year': 12 }[selectedTimePeriod];
+    let trends = null;
+    if (shiftMonths) {
+      const shift = (date) => {
+        const target = new Date(date.getFullYear(), date.getMonth() - shiftMonths, 1);
+        const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+        return toDateKey(new Date(target.getFullYear(), target.getMonth(), Math.min(date.getDate(), lastDay)));
+      };
+      const prior = summarizeLines(inRange(shift(startDate), shift(end)));
+      if (prior.income !== 0 || prior.spending !== 0) {
+        trends = {
+          incomeChange: prior.income > 0 ? ((current.income - prior.income) / prior.income) * 100 : 0,
+          expenseChange: prior.spending > 0 ? ((current.spending - prior.spending) / prior.spending) * 100 : 0
+        };
       }
-    });
-
-    const savings = totalIncome - totalExpenses;
+    }
 
     return {
-      income: totalIncome,
-      expenses: totalExpenses,
-      savings
+      income: current.income,
+      expenses: current.spending,
+      savings: current.income - current.spending,
+      numMonths,
+      trends,
+      byCategory: current.byCategory
     };
-  }, [monthlyData, dateRange]);
+  }, [processedTransactions, dateRange, selectedTimePeriod]);
 
   // This month's summary (for net worth change calculation)
   const thisMonthData = useMemo(() => {
@@ -843,30 +814,11 @@ export default function Dashboard() {
     return thisMonthData.savings;
   }, [thisMonthData]);
 
-  // Top spending categories from transactions - uses selected time period
-  const topSpendingCategories = useMemo(() => {
-    const categoryTotals = {};
-    const { startDate, endDate } = dateRange;
-
-    processedTransactions
-      .filter(txn => {
-        const txnDate = new Date(txn.date);
-        return txnDate >= startDate &&
-               txnDate <= endDate &&
-               (txn.processedAmount || 0) < 0; // Only expenses
-      })
-      .forEach(txn => {
-        const category = txn.category_name || txn.category || 'Uncategorized';
-        // Skip investment categories - these are asset transfers, not spending
-        if (SAVINGS_INVESTMENT_CATEGORIES.includes(category)) return;
-        const amount = Math.abs(txn.processedAmount || 0);
-        categoryTotals[category] = (categoryTotals[category] || 0) + amount;
-      });
-
-    return Object.entries(categoryTotals)
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value);
-  }, [processedTransactions, dateRange]);
+  // Top spending categories - uses selected time period (refunds net out;
+  // investing and uncategorized transactions aren't spending)
+  const topSpendingCategories = useMemo(() => (
+    periodSummaryData.byCategory.map(cat => ({ name: cat.name, value: cat.amount }))
+  ), [periodSummaryData]);
 
   // Net worth over time data - work backwards from current totals using cash flow
   const netWorthHistoryData = useMemo(() => {
@@ -878,31 +830,20 @@ export default function Dashboard() {
     let runningAssets = totalAssets;
     let runningLiabilities = totalLiabilities;
 
-    // Calculate the data points in reverse (from oldest to newest)
-    const reversedData = [...monthsToShow].reverse().map((month, index) => {
-      const netFlow = month.income - month.expenses;
-
-      // For months before the current one, subtract the net flow
-      // (since we're working backwards from current totals)
-      if (index < monthsToShow.length - 1) {
-        // Approximate: positive net flow increases assets, negative reduces them
-        // This is a simplification since we don't have actual historical balance data
-        if (netFlow > 0) {
-          runningAssets -= netFlow;
-        } else {
-          // Negative flow could mean paying down debt or reducing assets
-          runningAssets -= netFlow * 0.3; // 30% from assets
-          runningLiabilities += Math.abs(netFlow) * 0.7; // 70% reduced debt
-        }
-      }
-
-      return {
+    // Walk backwards from the current month. Each point is that month's
+    // ending net worth; the previous month ended lower by this month's net
+    // cash flow. Investing moves money between your own accounts, so it
+    // doesn't change net worth. This ignores market gains, so it's approximate.
+    const reversedData = [...monthsToShow].reverse().map(month => {
+      const point = {
         month: month.monthName.split(' ')[0],
         fullMonth: month.monthName,
         assets: Math.max(0, runningAssets),
         liabilities: Math.max(0, runningLiabilities),
         netWorth: runningAssets - runningLiabilities
       };
+      runningAssets -= month.income - month.expenses;
+      return point;
     });
 
     // Reverse back to chronological order
@@ -1018,8 +959,8 @@ export default function Dashboard() {
             income={periodSummaryData.income}
             expenses={periodSummaryData.expenses}
             savings={periodSummaryData.savings}
-            monthlyData={monthlyData}
-            dateRange={dateRange}
+            numMonths={periodSummaryData.numMonths}
+            trends={periodSummaryData.trends}
             isPrivacyMode={privacyMode}
           />
           <TopCategories
@@ -1366,7 +1307,7 @@ export default function Dashboard() {
                       return (
                         <tr key={`${txn.id || txn.transaction_id}-${index}`} className="hover:bg-gray-50 dark:hover:bg-gray-800">
                           <td className="px-3 py-2 text-sm text-gray-900 dark:text-white whitespace-nowrap">
-                            {new Date(txn.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            {parseLocalDate(txn.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                           </td>
                           <td className="px-3 py-2 text-sm text-gray-900 dark:text-white truncate max-w-[150px]">
                             {txn.payee_name || txn.name || 'Unknown'}

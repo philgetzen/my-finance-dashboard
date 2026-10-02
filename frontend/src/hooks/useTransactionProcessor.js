@@ -1,146 +1,126 @@
 import { useMemo } from 'react';
-import { getTransactionAmount } from '../utils/ynabHelpers';
 import {
   INCOME_CATEGORIES,
   DEBT_PAYMENT_CATEGORIES,
   SAVINGS_INVESTMENT_CATEGORIES,
-  isIncomeCategory,
-  shouldSkipTransaction,
 } from '../utils/calculations/constants';
+import { classifyTransactions, summarizeLines, toMonthKey } from '../utils/calculations/cashflow';
 
 // Re-export for backward compatibility (aliased to match old name)
 export const YNAB_INCOME_CATEGORIES = INCOME_CATEGORIES;
 export { DEBT_PAYMENT_CATEGORIES, SAVINGS_INVESTMENT_CATEGORIES };
 
+// Line kinds that represent cash flow worth showing
+const CASH_FLOW_KINDS = new Set(['income', 'spending', 'investing', 'saving', 'uncategorized']);
+
 /**
  * Custom hook for processing transaction data
- * Centralizes all transaction processing logic to avoid duplication
+ * Centralizes all transaction processing logic to avoid duplication.
+ *
+ * Income and spending follow the shared rules in utils/calculations/cashflow.js:
+ * investing is tracked separately (it is not spending), debt payments count as
+ * spending, tracking-account activity and uncategorized transactions are not
+ * counted, and refunds reduce spending.
+ *
+ * @param {Array} transactions - YNAB transactions
+ * @param {Array} accounts - Accounts (needs id, type, on_budget)
+ * @param {Set} _investmentAccountIds - Unused; investment accounts are detected from `accounts`
+ * @param {Object} [options] - { categories, cspSettings } for CSP bucket mappings and exclusions
  */
-export function useTransactionProcessor(transactions, accounts, investmentAccountIds) {
+export function useTransactionProcessor(transactions, accounts, _investmentAccountIds, options = {}) {
+  const { categories = null, cspSettings = null } = options;
+  const {
+    categoryMappings,
+    excludedPayees,
+    excludedCategories,
+    excludedExpenseCategories,
+    settings
+  } = cspSettings || {};
+
   return useMemo(() => {
     if (!transactions?.length) {
       return {
         processedTransactions: [],
         monthlyData: {},
-        totals: { income: 0, expenses: 0, net: 0 }
+        totals: { income: 0, expenses: 0, net: 0, investing: 0 }
       };
     }
+
+    const lines = classifyTransactions(transactions, {
+      accounts: accounts || [],
+      categories,
+      cspSettings: { categoryMappings, excludedPayees, excludedCategories, excludedExpenseCategories, settings }
+    });
+
+    const processedTransactions = lines
+      .filter(line => CASH_FLOW_KINDS.has(line.kind))
+      .map(line => ({
+        ...line,
+        processedAmount: line.amountDollars,
+        isIncome: line.kind === 'income'
+      }));
+
+    // Group by month, then summarize each month
+    const linesByMonth = new Map();
+    processedTransactions.forEach(line => {
+      if (!linesByMonth.has(line.monthKey)) linesByMonth.set(line.monthKey, []);
+      linesByMonth.get(line.monthKey).push(line);
+    });
 
     const monthlyData = {};
     let totalIncome = 0;
     let totalExpenses = 0;
-    
-    // Process each transaction
-    const processTransaction = (txn, accountId) => {
-      // Skip investment account transactions
-      if (investmentAccountIds?.has(accountId)) return null;
-      
-      // Skip internal transfers between budget accounts (but keep transfers to/from tracking/investment accounts)
-      // This matches YNAB's Income vs Expense report behavior
-      const isInternalTransfer = txn.transfer_account_id &&
-        txn.transfer_account_id !== 'null' &&
-        !investmentAccountIds?.has(txn.transfer_account_id);
+    let totalInvesting = 0;
 
-      if (isInternalTransfer) {
-        return null;
-      }
-      
-      // Skip reconciliation transactions
-      if (shouldSkipTransaction(txn)) {
-        return null;
-      }
-
-      const amount = getTransactionAmount(txn);
-      const date = new Date(txn.date);
-      const monthKey = date.toISOString().slice(0, 7);
-      
-      // Initialize month data if needed
-      if (!monthlyData[monthKey]) {
-        monthlyData[monthKey] = { income: 0, expenses: 0, net: 0 };
-      }
-      
-      // Categorize as income or expense
-      const isIncome = isIncomeCategory(txn.category_name);
-      
-      if (isIncome) {
-        monthlyData[monthKey].income += amount;
-        totalIncome += amount;
-      } else if (amount < 0) {
-        // Normal expense (outflow)
-        monthlyData[monthKey].expenses += Math.abs(amount);
-        totalExpenses += Math.abs(amount);
-      } else if (amount > 0) {
-        // Refund/return - reduces expenses (matches Cash Flow tab logic)
-        monthlyData[monthKey].expenses -= amount;
-        totalExpenses -= amount;
-      }
-      
-      return {
-        ...txn,
-        processedAmount: amount,
-        isIncome,
-        monthKey
+    linesByMonth.forEach((monthLines, monthKey) => {
+      const summary = summarizeLines(monthLines);
+      monthlyData[monthKey] = {
+        income: summary.income,
+        expenses: summary.spending,
+        investing: summary.investing + summary.saving,
+        uncategorized: summary.uncategorized.outflow,
+        net: summary.net
       };
-    };
-    
-    // Process all transactions including subtransactions
-    const processedTransactions = [];
-    
-    transactions.forEach(transaction => {
-      if (transaction.subtransactions?.length > 0) {
-        transaction.subtransactions.forEach(subTxn => {
-          const processed = processTransaction({
-            ...subTxn,
-            payee_name: subTxn.payee_name || transaction.payee_name,
-            date: transaction.date,
-            category_id: subTxn.category_id || transaction.category_id,
-            category_name: subTxn.category_name || transaction.category_name,
-            transfer_account_id: subTxn.transfer_account_id || transaction.transfer_account_id
-          }, transaction.account_id);
-          
-          if (processed) processedTransactions.push(processed);
-        });
-      } else {
-        const processed = processTransaction(transaction, transaction.account_id);
-        if (processed) processedTransactions.push(processed);
-      }
+      totalIncome += summary.income;
+      totalExpenses += summary.spending;
+      totalInvesting += summary.investing + summary.saving;
     });
-    
-    // Calculate net for each month
-    Object.keys(monthlyData).forEach(monthKey => {
-      monthlyData[monthKey].net = monthlyData[monthKey].income - monthlyData[monthKey].expenses;
-    });
-    
+
     return {
       processedTransactions,
       monthlyData,
       totals: {
         income: totalIncome,
         expenses: totalExpenses,
-        net: totalIncome - totalExpenses
+        net: totalIncome - totalExpenses,
+        investing: totalInvesting
       }
     };
-  }, [transactions, accounts, investmentAccountIds]);
+  }, [transactions, accounts, categories, categoryMappings, excludedPayees, excludedCategories, excludedExpenseCategories, settings]);
 }
 
 /**
  * Get monthly summary data for a specific time range
+ * @param {Object} monthlyData - Map of 'YYYY-MM' -> { income, expenses, net }
+ * @param {number} months - Number of months, ending with the current month
+ * @param {Object} [options] - { completeOnly: true } to end with last month instead
  */
-export function getMonthlyRangeData(monthlyData, months = 6) {
+export function getMonthlyRangeData(monthlyData, months = 6, { completeOnly = false } = {}) {
   const result = [];
   const today = new Date();
-  
-  for (let i = months - 1; i >= 0; i--) {
+  const offset = completeOnly ? 1 : 0;
+
+  for (let i = months - 1 + offset; i >= offset; i--) {
     const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
-    const monthKey = date.toISOString().slice(0, 7);
+    const monthKey = toMonthKey(date);
     const monthName = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-    
+
     result.push({
       monthKey,
       monthName,
       ...(monthlyData[monthKey] || { income: 0, expenses: 0, net: 0 })
     });
   }
-  
+
   return result;
 }

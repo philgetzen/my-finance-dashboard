@@ -26,8 +26,7 @@ export function filterByDateRange(transactions, startDate, endDate = null) {
   if (!transactions?.length) return [];
 
   return transactions.filter(txn => {
-    const txnDate = new Date(txn.date);
-    return isWithinRange(txnDate, startDate, endDate);
+    return isWithinRange(txn.date, startDate, endDate);
   });
 }
 
