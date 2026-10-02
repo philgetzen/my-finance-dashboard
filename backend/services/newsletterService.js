@@ -11,7 +11,9 @@ const { calculateAllTrends } = require('../newsletter/trends');
 const { generateNewsletterHtml, generateSubject } = require('../newsletter/template');
 const { sendNewsletter, getRecipients, validateConfig: validateEmailConfig } = require('./emailService');
 const { generateAnalysis, validateConfig: validateAiConfig, getAnalysisPrompt } = require('./aiAnalysisService');
-const { formatDate, getNextSaturday9am } = require('../newsletter/helpers');
+const { getNextSaturday9am } = require('../newsletter/helpers');
+const { todayKey, formatKey } = require('../newsletter/cashflow');
+const { snapshotDateKey } = require('../newsletter/trends');
 
 // YNAB API configuration
 const YNAB_API_BASE_URL = 'https://api.ynab.com/v1';
@@ -136,28 +138,27 @@ async function fetchYnabData(accessToken) {
  * @param {number} limit - Number of snapshots to retrieve
  * @returns {Promise<Array>} - Historical snapshots
  */
-async function getHistoricalSnapshots(userId, limit = 52) {
+async function getHistoricalSnapshots(userId, limit = 60) {
   const db = getDb();
 
+  // Single-field query sorted in code: older snapshots stored weekEnding as a
+  // display string ("September 26, 2026"), which doesn't sort chronologically
+  let snapshotsQuery;
   try {
-    const snapshotsQuery = await db.collection('newsletter_snapshots')
+    snapshotsQuery = await db.collection('newsletter_snapshots')
       .where('userId', '==', userId)
-      .orderBy('weekEnding', 'desc')
-      .limit(limit)
       .get();
-
-    return snapshotsQuery.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   } catch (error) {
-    // Handle missing Firestore index gracefully
-    if (error.code === 9 || error.message?.includes('index')) {
-      logger.warn('Newsletter snapshots index not yet created - returning empty snapshots', {
-        userId,
-        indexUrl: error.message?.match(/https:\/\/[^\s]+/)?.[0]
-      });
-      return [];
-    }
-    throw error;
+    // Trend comparisons degrade gracefully without history
+    logger.warn('Failed to load newsletter snapshots', { userId, error: error.message });
+    return [];
   }
+
+  return snapshotsQuery.docs
+    .map(doc => ({ id: doc.id, ...doc.data() }))
+    .filter(snapshot => snapshotDateKey(snapshot))
+    .sort((a, b) => snapshotDateKey(b).localeCompare(snapshotDateKey(a)))
+    .slice(0, limit);
 }
 
 /**
@@ -220,19 +221,20 @@ async function getNewsletterSettings(userId) {
  */
 async function saveSnapshot(userId, metrics, trends) {
   const db = getDb();
-  const now = new Date();
+  const today = metrics.today;
 
   const snapshot = {
     userId,
-    weekEnding: formatDate(now),
-    month: now.toISOString().slice(0, 7),
-    year: now.getFullYear(),
-    createdAt: now.toISOString(),
+    dateKey: today,
+    weekEnding: formatWeekEnding(today),
+    month: today.slice(0, 7),
+    year: Number(today.slice(0, 4)),
+    createdAt: new Date().toISOString(),
 
     // Core metrics
     netWorth: metrics.netWorth?.total || 0,
     cashReserves: metrics.runway?.cashReserves || 0,
-    runwayMonths: metrics.runway?.pureRunwayMonths || 0,
+    runwayMonths: isFinite(metrics.runway?.netRunwayMonths) ? metrics.runway.netRunwayMonths : null,
     buckets: {
       fixedCosts: metrics.csp?.buckets?.fixedCosts?.percentage || 0,
       investments: metrics.csp?.buckets?.investments?.percentage || 0,
@@ -240,16 +242,17 @@ async function saveSnapshot(userId, metrics, trends) {
       guiltFree: metrics.csp?.buckets?.guiltFree?.percentage || 0
     },
 
-    // Monthly tracking
-    monthlyIncome: metrics.csp?.monthlyIncome || 0,
+    // Monthly tracking (averages of complete months)
+    monthlyIncome: metrics.runway?.avgMonthlyIncome || 0,
     monthlyExpenses: metrics.runway?.avgMonthlyExpenses || 0,
+    monthlyInvesting: metrics.runway?.avgMonthlyInvesting || 0,
     monthlySavingsRate: trends?.monthOverMonth?.currentMonth?.savingsRate || 0,
 
     // Annual tracking
     ytdSavings: trends?.annualProgress?.ytd?.savings || 0,
     ytdInvestmentContributions: trends?.annualProgress?.ytd?.investments || 0,
 
-    // Top category spending
+    // Month-to-date spending by category
     categorySpending: (metrics.topCategories || [])
       .slice(0, 10)
       .reduce((acc, cat) => {
@@ -262,6 +265,26 @@ async function saveSnapshot(userId, metrics, trends) {
   logger.info('Snapshot saved', { userId, snapshotId: docRef.id });
 
   return docRef.id;
+}
+
+/**
+ * Display date for the newsletter header (e.g., "September 26, 2026")
+ * @param {string} today - 'YYYY-MM-DD'
+ */
+function formatWeekEnding(today) {
+  return formatKey(today, { month: 'long', day: 'numeric', year: 'numeric' });
+}
+
+/**
+ * Calculate metrics and trends for a user's budget
+ * @returns {Object} - { metrics, trends }
+ */
+function calculateNewsletterData(ynabData, cspSettings, newsletterSettings, snapshots) {
+  const timeZone = newsletterSettings.timezone || process.env.NEWSLETTER_TIMEZONE || 'America/Los_Angeles';
+  const today = todayKey(timeZone);
+  const metrics = calculateAllMetrics(ynabData, { periodMonths: 6, cspSettings, today, timeZone });
+  const trends = calculateAllTrends(metrics, snapshots, newsletterSettings.goals);
+  return { metrics, trends };
 }
 
 /**
@@ -367,13 +390,11 @@ async function generateAndSend(userId, options = {}) {
       getHistoricalSnapshots(userId)
     ]);
 
-    // Step 4: Calculate metrics
+    // Step 4: Calculate metrics and trends
     let metrics;
+    let trends;
     try {
-      metrics = calculateAllMetrics(ynabData, {
-        periodMonths: 6,
-        cspSettings
-      });
+      ({ metrics, trends } = calculateNewsletterData(ynabData, cspSettings, newsletterSettings, snapshots));
     } catch (metricsError) {
       logger.error('Metrics calculation failed', { userId, error: metricsError.message, stage: 'calculateMetrics' });
       errors.push({ stage: 'calculateMetrics', error: metricsError.message });
@@ -382,28 +403,12 @@ async function generateAndSend(userId, options = {}) {
 
     logger.info('Metrics calculated', {
       userId,
+      today: metrics.today,
       netWorth: metrics.netWorth?.total,
-      runway: metrics.runway?.pureRunwayMonths
+      runway: metrics.runway?.netRunwayMonths,
+      weeklySpending: trends.weekly?.currentWeek?.spending,
+      uncategorized: trends.weekly?.currentWeek?.uncategorized?.count
     });
-
-    // Step 5: Calculate trends
-    let trends;
-    try {
-      trends = calculateAllTrends(
-        ynabData.transactions,
-        metrics,
-        snapshots,
-        newsletterSettings.goals,
-        metrics.investmentAccountIds,
-        cspSettings
-      );
-    } catch (trendsError) {
-      logger.error('Trends calculation failed', { userId, error: trendsError.message, stage: 'calculateTrends' });
-      errors.push({ stage: 'calculateTrends', error: trendsError.message });
-      throw trendsError;
-    }
-
-    logger.info('Trends calculated', { userId });
 
     // Step 6: Generate AI analysis
     let aiAnalysis = null;
@@ -429,7 +434,7 @@ async function generateAndSend(userId, options = {}) {
     }
 
     // Step 7: Generate HTML
-    const weekEnding = formatDate(new Date());
+    const weekEnding = formatWeekEnding(metrics.today);
     const html = generateNewsletterHtml({
       metrics,
       trends,
@@ -545,8 +550,7 @@ async function generatePreview(userId) {
     getHistoricalSnapshots(userId)
   ]);
 
-  const metrics = calculateAllMetrics(ynabData, { periodMonths: 6, cspSettings });
-  const trends = calculateAllTrends(ynabData.transactions, metrics, snapshots, newsletterSettings.goals, metrics.investmentAccountIds, cspSettings);
+  const { metrics, trends } = calculateNewsletterData(ynabData, cspSettings, newsletterSettings, snapshots);
 
   // Generate AI analysis for preview
   let aiAnalysis = null;
@@ -557,7 +561,7 @@ async function generatePreview(userId) {
     logger.warn('AI analysis failed for preview', { error: error.message });
   }
 
-  const weekEnding = formatDate(new Date());
+  const weekEnding = formatWeekEnding(metrics.today);
   return generateNewsletterHtml({ metrics, trends, aiAnalysis, weekEnding });
 }
 
@@ -575,8 +579,7 @@ async function buildAIPrompt(userId) {
     getHistoricalSnapshots(userId)
   ]);
 
-  const metrics = calculateAllMetrics(ynabData, { periodMonths: 6, cspSettings });
-  const trends = calculateAllTrends(ynabData.transactions, metrics, snapshots, newsletterSettings.goals, metrics.investmentAccountIds, cspSettings);
+  const { metrics, trends } = calculateNewsletterData(ynabData, cspSettings, newsletterSettings, snapshots);
 
   return getAnalysisPrompt({ metrics, trends });
 }

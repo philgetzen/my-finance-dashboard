@@ -1,28 +1,72 @@
 /**
  * Newsletter Trends Calculator
- * Month-over-Month, Year-over-Year, and Annual Progress calculations
- * Uses YNAB historical data (available back to November 2018)
+ * Weekly, Month-over-Month, Year-over-Year, and Annual Progress calculations
+ * Uses the classified ledger from cashflow.js (YNAB history back to November 2018)
  */
 
 const {
-  getMonthKey,
-  getStartOfMonth,
-  getEndOfMonth,
-  getStartOfYear,
-  getSameMonthLastYear,
-  getTransactionsForMonth,
-  getTransactionsForRange,
-  aggregateByCategory,
-  getTopCategories,
-  processTransactions,
-  formatCurrency,
-  formatPercent,
-  getTransactionAmount,
-  isIncomeCategory,
-  shouldExcludeTransaction
-} = require('./helpers');
+  addDays,
+  daysBetween,
+  dayOfWeek,
+  startOfWeek,
+  monthStart,
+  monthEnd,
+  sameDayInMonth,
+  isLastDayOfMonth,
+  formatKey,
+  summarize
+} = require('./cashflow');
 
-const { isTrueExpense } = require('./metrics');
+function round1(value) {
+  return Math.round(value * 10) / 10;
+}
+
+function savingsRate(summary) {
+  return summary.income > 0 ? ((summary.income - summary.spending) / summary.income) * 100 : 0;
+}
+
+function percentChange(current, previous) {
+  return previous > 0 ? ((current - previous) / previous) * 100 : 0;
+}
+
+/**
+ * Compare spending by category between two summaries
+ * @returns {Array} - [{ category, current, previous, change, changePercent }]
+ */
+function compareCategories(currentSummary, previousSummary) {
+  const current = new Map(currentSummary.byCategory.map(c => [c.name, c.amount]));
+  const previous = new Map(previousSummary.byCategory.map(c => [c.name, c.amount]));
+  const names = new Set([...current.keys(), ...previous.keys()]);
+
+  return Array.from(names).map(category => {
+    const currentAmount = current.get(category) || 0;
+    const previousAmount = previous.get(category) || 0;
+    const change = currentAmount - previousAmount;
+    const changePercent = previousAmount > 0
+      ? (change / previousAmount) * 100
+      : (currentAmount > 0 ? 100 : 0);
+
+    return { category, current: currentAmount, previous: previousAmount, change, changePercent: Math.round(changePercent) };
+  });
+}
+
+/**
+ * Compare the month-to-date with the same days of another month.
+ * On the last day of the month, compares full months.
+ */
+function comparisonRange(today, monthsBack) {
+  const start = monthStart(today, -monthsBack);
+  const end = isLastDayOfMonth(today) ? monthEnd(today, -monthsBack) : sameDayInMonth(today, -monthsBack);
+  return { start, end };
+}
+
+function periodName(start, end, isPartialMonth) {
+  const month = formatKey(start, { month: 'long' });
+  const year = start.slice(0, 4);
+  return isPartialMonth
+    ? `${month} 1-${Number(end.slice(8, 10))}, ${year}`
+    : `${month} ${year}`;
+}
 
 // ============================================
 // Month-over-Month Trends
@@ -30,129 +74,52 @@ const { isTrueExpense } = require('./metrics');
 
 /**
  * Calculate month-over-month trends
- * @param {Array} transactions - All YNAB transactions
- * @param {Object} currentMetrics - Current month's metrics
- * @param {Set} investmentAccountIds - Set of investment account IDs to exclude
+ * @param {Object} ledger - Output of buildLedger
+ * @param {string} today - 'YYYY-MM-DD'
  * @returns {Object} - MoM comparison data
  */
-function calculateMonthOverMonth(transactions, currentMetrics, investmentAccountIds = new Set()) {
-  const now = new Date();
-  const currentMonthStart = getStartOfMonth(now);
+function calculateMonthOverMonth(ledger, today) {
+  const currentStart = monthStart(today);
+  const previous = comparisonRange(today, 1);
+  const isPartialMonth = !isLastDayOfMonth(today);
 
-  // For fair comparison, use same number of days in both months
-  // e.g., Jan 1-12 vs Dec 1-12 (not Jan 1-12 vs Dec 1-31)
-  const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const lastMonthSameDay = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
-  lastMonthSameDay.setHours(23, 59, 59, 999);
+  const current = summarize(ledger.lines, currentStart, today);
+  const prior = summarize(ledger.lines, previous.start, previous.end);
 
-  // Get transactions for the same date range in both months
-  const currentMonthTxns = getTransactionsForRange(transactions, currentMonthStart, now);
-  const lastMonthTxns = getTransactionsForRange(transactions, lastMonthStart, lastMonthSameDay);
+  const currentSavingsRate = savingsRate(current);
+  const previousSavingsRate = savingsRate(prior);
 
-  // Process each month (excluding investment accounts)
-  const current = processTransactions(currentMonthTxns, investmentAccountIds);
-  const previous = processTransactions(lastMonthTxns, investmentAccountIds);
-
-  const currentTotals = current.totals;
-  const previousTotals = previous.totals;
-
-  // Calculate changes
-  const incomeChange = currentTotals.income - previousTotals.income;
-  const expenseChange = currentTotals.expenses - previousTotals.expenses;
-  const netChange = currentTotals.net - previousTotals.net;
-
-  const incomeChangePercent = previousTotals.income > 0
-    ? (incomeChange / previousTotals.income) * 100
-    : 0;
-  const expenseChangePercent = previousTotals.expenses > 0
-    ? (expenseChange / previousTotals.expenses) * 100
-    : 0;
-
-  // Savings rate calculation
-  const currentSavingsRate = currentTotals.income > 0
-    ? ((currentTotals.income - currentTotals.expenses) / currentTotals.income) * 100
-    : 0;
-  const previousSavingsRate = previousTotals.income > 0
-    ? ((previousTotals.income - previousTotals.expenses) / previousTotals.income) * 100
-    : 0;
-  const savingsRateChange = currentSavingsRate - previousSavingsRate;
-
-  // Category comparison
-  const currentCategories = aggregateByCategory(currentMonthTxns);
-  const previousCategories = aggregateByCategory(lastMonthTxns);
-
-  const categoryChanges = [];
-  const allCategories = new Set([
-    ...Object.keys(currentCategories),
-    ...Object.keys(previousCategories)
-  ]);
-
-  allCategories.forEach(category => {
-    const currentAmount = currentCategories[category] || 0;
-    const previousAmount = previousCategories[category] || 0;
-    const change = currentAmount - previousAmount;
-    const changePercent = previousAmount > 0
-      ? (change / previousAmount) * 100
-      : (currentAmount > 0 ? 100 : 0);
-
-    if (Math.abs(change) > 10) { // Only include meaningful changes
-      categoryChanges.push({
-        category,
-        current: currentAmount,
-        previous: previousAmount,
-        change,
-        changePercent: Math.round(changePercent)
-      });
-    }
-  });
-
-  // Sort by absolute change
-  categoryChanges.sort((a, b) => Math.abs(b.change) - Math.abs(a.change));
-
-  // Determine if we're comparing partial months
-  const dayOfMonth = now.getDate();
-  const isPartialMonth = dayOfMonth < 28;
-
-  // Build display names showing the actual date range being compared
-  const currentMonthName = currentMonthStart.toLocaleDateString('en-US', { month: 'long' });
-  const lastMonthName = lastMonthStart.toLocaleDateString('en-US', { month: 'long' });
-  const currentYear = now.getFullYear();
-  const lastYear = lastMonthStart.getFullYear();
-
-  let currentPeriodName, lastPeriodName;
-  if (isPartialMonth) {
-    currentPeriodName = `${currentMonthName} 1-${dayOfMonth}, ${currentYear}`;
-    lastPeriodName = `${lastMonthName} 1-${dayOfMonth}, ${lastYear}`;
-  } else {
-    currentPeriodName = `${currentMonthName} ${currentYear}`;
-    lastPeriodName = `${lastMonthName} ${lastYear}`;
-  }
+  const categoryChanges = compareCategories(current, prior)
+    .filter(c => Math.abs(c.change) > 10)
+    .sort((a, b) => Math.abs(b.change) - Math.abs(a.change));
 
   return {
     available: true,
     isPartialMonth,
-    daysCompared: dayOfMonth,
+    daysCompared: Number(today.slice(8, 10)),
     currentMonth: {
-      name: currentPeriodName,
-      income: currentTotals.income,
-      expenses: currentTotals.expenses,
-      net: currentTotals.net,
-      savingsRate: Math.round(currentSavingsRate * 10) / 10
+      name: periodName(currentStart, today, isPartialMonth),
+      income: current.income,
+      expenses: current.spending,
+      investing: current.investing,
+      net: current.net,
+      savingsRate: round1(currentSavingsRate)
     },
     previousMonth: {
-      name: lastPeriodName,
-      income: previousTotals.income,
-      expenses: previousTotals.expenses,
-      net: previousTotals.net,
-      savingsRate: Math.round(previousSavingsRate * 10) / 10
+      name: periodName(previous.start, previous.end, isPartialMonth),
+      income: prior.income,
+      expenses: prior.spending,
+      investing: prior.investing,
+      net: prior.net,
+      savingsRate: round1(previousSavingsRate)
     },
     changes: {
-      income: incomeChange,
-      incomePercent: Math.round(incomeChangePercent * 10) / 10,
-      expenses: expenseChange,
-      expensesPercent: Math.round(expenseChangePercent * 10) / 10,
-      net: netChange,
-      savingsRate: Math.round(savingsRateChange * 10) / 10
+      income: current.income - prior.income,
+      incomePercent: round1(percentChange(current.income, prior.income)),
+      expenses: current.spending - prior.spending,
+      expensesPercent: round1(percentChange(current.spending, prior.spending)),
+      net: current.net - prior.net,
+      savingsRate: round1(currentSavingsRate - previousSavingsRate) // percentage points
     },
     topCategoryChanges: categoryChanges.slice(0, 5)
   };
@@ -163,34 +130,49 @@ function calculateMonthOverMonth(transactions, currentMetrics, investmentAccount
 // ============================================
 
 /**
+ * Pick the snapshot closest to a target date
+ * @param {Array} snapshots - Newsletter snapshots
+ * @param {string} targetKey - 'YYYY-MM-DD'
+ * @param {number} maxDistanceDays - Ignore snapshots further away than this
+ */
+function findSnapshotNear(snapshots, targetKey, maxDistanceDays) {
+  let best = null;
+  let bestDistance = Infinity;
+
+  snapshots.forEach(snapshot => {
+    const key = snapshotDateKey(snapshot);
+    if (!key) return;
+    const distance = Math.abs(daysBetween(targetKey, key));
+    if (distance < bestDistance) {
+      best = snapshot;
+      bestDistance = distance;
+    }
+  });
+
+  return bestDistance <= maxDistanceDays ? best : null;
+}
+
+/** Calendar date a snapshot was taken ('YYYY-MM-DD') */
+function snapshotDateKey(snapshot) {
+  if (snapshot?.dateKey) return snapshot.dateKey;
+  if (snapshot?.createdAt) return String(snapshot.createdAt).slice(0, 10);
+  return null;
+}
+
+/**
  * Calculate year-over-year comparison
- * Uses YNAB transaction history (available back to November 2018)
- * @param {Array} transactions - All YNAB transactions
- * @param {Object} currentMetrics - Current metrics
+ * @param {Object} ledger - Output of buildLedger
+ * @param {string} today - 'YYYY-MM-DD'
+ * @param {Object} currentMetrics - Current metrics (for net worth)
  * @param {Array} snapshots - Historical newsletter snapshots (for net worth YoY)
- * @param {Set} investmentAccountIds - Set of investment account IDs to exclude
  * @returns {Object} - YoY comparison data
  */
-function calculateYearOverYear(transactions, currentMetrics, snapshots = [], investmentAccountIds = new Set()) {
-  const now = new Date();
-  const currentMonthStart = getStartOfMonth(now);
+function calculateYearOverYear(ledger, today, currentMetrics, snapshots = []) {
+  const currentStart = monthStart(today);
+  const lastYear = comparisonRange(today, 12);
+  const isPartialMonth = !isLastDayOfMonth(today);
 
-  // Use same date range for fair comparison (e.g., Jan 1-12 this year vs Jan 1-12 last year)
-  const lastYearStart = new Date(now.getFullYear() - 1, now.getMonth(), 1);
-  const lastYearSameDay = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
-  lastYearSameDay.setHours(23, 59, 59, 999);
-
-  // Get transactions for the same date range in both years
-  const currentMonthTxns = getTransactionsForRange(transactions, currentMonthStart, now);
-  const lastYearMonthTxns = getTransactionsForRange(transactions, lastYearStart, lastYearSameDay);
-
-  // Check if we have data from last year
-  const hasLastYearData = lastYearMonthTxns.length > 0;
-
-  // Calculate how many days we're comparing
-  const daysInComparison = now.getDate();
-  const isPartialMonth = daysInComparison < 28;
-
+  const hasLastYearData = ledger.lines.some(line => line.date >= lastYear.start && line.date <= lastYear.end);
   if (!hasLastYearData) {
     return {
       available: false,
@@ -198,75 +180,29 @@ function calculateYearOverYear(transactions, currentMetrics, snapshots = [], inv
     };
   }
 
-  // Process transactions (excluding investment accounts)
-  const currentData = processTransactions(currentMonthTxns, investmentAccountIds);
-  const lastYearData = processTransactions(lastYearMonthTxns, investmentAccountIds);
+  const current = summarize(ledger.lines, currentStart, today);
+  const prior = summarize(ledger.lines, lastYear.start, lastYear.end);
 
-  const currentTotals = currentData.totals;
-  const lastYearTotals = lastYearData.totals;
+  const categoryComparison = compareCategories(current, prior)
+    .filter(c => c.current > 50 || c.previous > 50)
+    .map(({ previous, ...rest }) => ({ ...rest, lastYear: previous }))
+    .sort((a, b) => Math.abs(b.changePercent) - Math.abs(a.changePercent));
 
-  // Spending comparison
-  const spendingChange = currentTotals.expenses - lastYearTotals.expenses;
-  const spendingChangePercent = lastYearTotals.expenses > 0
-    ? (spendingChange / lastYearTotals.expenses) * 100
-    : 0;
-
-  // Income comparison
-  const incomeChange = currentTotals.income - lastYearTotals.income;
-  const incomeChangePercent = lastYearTotals.income > 0
-    ? (incomeChange / lastYearTotals.income) * 100
-    : 0;
-
-  // Category YoY comparison
-  const currentCategories = aggregateByCategory(currentMonthTxns);
-  const lastYearCategories = aggregateByCategory(lastYearMonthTxns);
-
-  const categoryComparison = [];
-  const allCategories = new Set([
-    ...Object.keys(currentCategories),
-    ...Object.keys(lastYearCategories)
-  ]);
-
-  allCategories.forEach(category => {
-    const currentAmount = currentCategories[category] || 0;
-    const lastYearAmount = lastYearCategories[category] || 0;
-    const change = currentAmount - lastYearAmount;
-    const changePercent = lastYearAmount > 0
-      ? (change / lastYearAmount) * 100
-      : (currentAmount > 0 ? 100 : 0);
-
-    if (currentAmount > 50 || lastYearAmount > 50) { // Only include meaningful categories
-      categoryComparison.push({
-        category,
-        current: currentAmount,
-        lastYear: lastYearAmount,
-        change,
-        changePercent: Math.round(changePercent)
-      });
-    }
-  });
-
-  categoryComparison.sort((a, b) => Math.abs(b.changePercent) - Math.abs(a.changePercent));
-
-  // Net worth YoY (requires snapshots)
+  // Net worth YoY (requires a snapshot from about a year ago)
   let netWorthYoY = { available: false };
   if (snapshots?.length > 0 && currentMetrics?.netWorth) {
-    // Find snapshot from same month last year
-    const lastYearMonthKey = getMonthKey(lastYearStart);
-    const lastYearSnapshot = snapshots.find(s => s.month === lastYearMonthKey);
+    const yearAgoSnapshot = findSnapshotNear(snapshots, addDays(today, -365), 21);
 
-    if (lastYearSnapshot?.netWorth) {
-      const netWorthChange = currentMetrics.netWorth.total - lastYearSnapshot.netWorth;
-      const netWorthChangePercent = lastYearSnapshot.netWorth !== 0
-        ? (netWorthChange / Math.abs(lastYearSnapshot.netWorth)) * 100
-        : 0;
-
+    if (yearAgoSnapshot && typeof yearAgoSnapshot.netWorth === 'number') {
+      const netWorthChange = currentMetrics.netWorth.total - yearAgoSnapshot.netWorth;
       netWorthYoY = {
         available: true,
         current: currentMetrics.netWorth.total,
-        lastYear: lastYearSnapshot.netWorth,
+        lastYear: yearAgoSnapshot.netWorth,
         change: netWorthChange,
-        changePercent: Math.round(netWorthChangePercent * 10) / 10
+        changePercent: yearAgoSnapshot.netWorth !== 0
+          ? round1((netWorthChange / Math.abs(yearAgoSnapshot.netWorth)) * 100)
+          : 0
       };
     } else {
       netWorthYoY = {
@@ -276,55 +212,37 @@ function calculateYearOverYear(transactions, currentMetrics, snapshots = [], inv
     }
   }
 
-  // Seasonal note
+  const monthIndex = Number(today.slice(5, 7)) - 1;
   let seasonalNote = '';
-
-  // Add seasonal context based on month
-  if (now.getMonth() === 0) { // January
+  if (monthIndex === 0) {
     seasonalNote = 'January spending typically drops 15-20% from December holiday spending.';
-  } else if (now.getMonth() === 11) { // December
+  } else if (monthIndex === 11) {
     seasonalNote = 'December often sees increased spending due to holidays and gift-giving.';
-  } else if (now.getMonth() >= 5 && now.getMonth() <= 7) { // Summer
+  } else if (monthIndex >= 5 && monthIndex <= 7) {
     seasonalNote = 'Summer months often see higher travel and entertainment expenses.';
-  }
-
-  // Format date range for display
-  const monthName = currentMonthStart.toLocaleDateString('en-US', { month: 'long' });
-  const currentYear = now.getFullYear();
-  const lastYear = now.getFullYear() - 1;
-  const dayOfMonth = now.getDate();
-
-  // Build display names showing the actual date range being compared
-  let currentPeriodName, lastYearPeriodName;
-  if (isPartialMonth) {
-    currentPeriodName = `${monthName} 1-${dayOfMonth}, ${currentYear}`;
-    lastYearPeriodName = `${monthName} 1-${dayOfMonth}, ${lastYear}`;
-  } else {
-    currentPeriodName = `${monthName} ${currentYear}`;
-    lastYearPeriodName = `${monthName} ${lastYear}`;
   }
 
   return {
     available: true,
     isPartialMonth,
-    daysCompared: dayOfMonth,
+    daysCompared: Number(today.slice(8, 10)),
     currentMonth: {
-      name: currentPeriodName,
-      spending: currentTotals.expenses,
-      income: currentTotals.income
+      name: periodName(currentStart, today, isPartialMonth),
+      spending: current.spending,
+      income: current.income
     },
     lastYearMonth: {
-      name: lastYearPeriodName,
-      spending: lastYearTotals.expenses,
-      income: lastYearTotals.income
+      name: periodName(lastYear.start, lastYear.end, isPartialMonth),
+      spending: prior.spending,
+      income: prior.income
     },
     spending: {
-      change: spendingChange,
-      changePercent: Math.round(spendingChangePercent * 10) / 10
+      change: current.spending - prior.spending,
+      changePercent: round1(percentChange(current.spending, prior.spending))
     },
     income: {
-      change: incomeChange,
-      changePercent: Math.round(incomeChangePercent * 10) / 10
+      change: current.income - prior.income,
+      changePercent: round1(percentChange(current.income, prior.income))
     },
     categoryComparison: categoryComparison.slice(0, 5),
     netWorth: netWorthYoY,
@@ -338,145 +256,116 @@ function calculateYearOverYear(transactions, currentMetrics, snapshots = [], inv
 
 /**
  * Calculate year-to-date progress and annual projections
- * @param {Array} transactions - All YNAB transactions
+ * @param {Object} ledger - Output of buildLedger
+ * @param {string} today - 'YYYY-MM-DD'
  * @param {Object} currentMetrics - Current metrics including net worth
  * @param {Array} snapshots - Historical newsletter snapshots
  * @param {Object} goals - User's annual goals (optional)
- * @param {Set} investmentAccountIds - Set of investment account IDs to exclude
  * @returns {Object} - Annual progress data
  */
-function calculateAnnualProgress(transactions, currentMetrics, snapshots = [], goals = {}, investmentAccountIds = new Set()) {
-  const now = new Date();
-  const startOfYear = getStartOfYear(now);
-  const currentMonth = getStartOfMonth(now);
-
-  // Calculate how far into the year we are
-  const dayOfYear = Math.floor((now - startOfYear) / (24 * 60 * 60 * 1000)) + 1;
-  const daysInYear = (new Date(now.getFullYear(), 11, 31) - startOfYear) / (24 * 60 * 60 * 1000) + 1;
+function calculateAnnualProgress(ledger, today, currentMetrics, snapshots = [], goals = {}) {
+  const year = Number(today.slice(0, 4));
+  const startOfYear = `${year}-01-01`;
+  const dayOfYear = daysBetween(startOfYear, today) + 1;
+  const daysInYear = daysBetween(startOfYear, `${year + 1}-01-01`);
   const yearProgress = dayOfYear / daysInYear;
-  const monthsCompleted = now.getMonth() + (now.getDate() / 30);
+  const monthIndex = Number(today.slice(5, 7)) - 1;
+  const monthsCompleted = monthIndex + Number(today.slice(8, 10)) /
+    new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
 
-  // Get YTD transactions
-  const ytdTransactions = getTransactionsForRange(transactions, startOfYear, now);
-  const ytdData = processTransactions(ytdTransactions, investmentAccountIds);
-
-  const ytdIncome = ytdData.totals.income;
-  const ytdExpenses = ytdData.totals.expenses;
+  const ytd = summarize(ledger.lines, startOfYear, today);
+  const ytdIncome = ytd.income;
+  const ytdExpenses = ytd.spending;
   const ytdSavings = ytdIncome - ytdExpenses;
-
-  // Savings rate
-  const ytdSavingsRate = ytdIncome > 0 ? (ytdSavings / ytdIncome) * 100 : 0;
+  const ytdSavingsRate = savingsRate(ytd);
   const targetSavingsRate = goals.savingsRate || 25;
-  const savingsRateOnTrack = ytdSavingsRate >= targetSavingsRate;
 
-  // Investment contributions (from CSP data if available)
-  const ytdInvestments = currentMetrics?.csp?.buckets?.investments?.total || 0;
+  // Actual contributions to investments this calendar year
+  const ytdInvestments = ytd.investing;
   const annualInvestmentGoal = goals.investmentContributions || 24000;
   const investmentProgress = (ytdInvestments / annualInvestmentGoal) * 100;
   const expectedInvestmentProgress = yearProgress * 100;
-  const investmentsOnTrack = investmentProgress >= expectedInvestmentProgress * 0.9; // Allow 10% buffer
 
-  // Project annual totals
-  const projectedAnnualIncome = ytdIncome / yearProgress;
-  const projectedAnnualExpenses = ytdExpenses / yearProgress;
-  const projectedAnnualSavings = ytdSavings / yearProgress;
-  const projectedInvestments = ytdInvestments / yearProgress;
-
-  // Net worth progress (compare to start of year snapshot)
+  // Net worth progress vs the first newsletter of the year
   let netWorthProgress = { available: false };
   if (currentMetrics?.netWorth && snapshots?.length > 0) {
-    // Find snapshot from January or earliest this year
-    const yearStartKey = `${now.getFullYear()}-01`;
-    const startOfYearSnapshot = snapshots.find(s => s.month === yearStartKey) ||
-      snapshots.find(s => s.year === now.getFullYear());
+    const startOfYearSnapshot = snapshots
+      .filter(s => (snapshotDateKey(s) || '').startsWith(`${year}-`) && typeof s.netWorth === 'number')
+      .sort((a, b) => snapshotDateKey(a).localeCompare(snapshotDateKey(b)))[0];
 
-    if (startOfYearSnapshot?.netWorth !== undefined) {
+    if (startOfYearSnapshot) {
       const startingNetWorth = startOfYearSnapshot.netWorth;
       const currentNetWorth = currentMetrics.netWorth.total;
       const netWorthGrowth = currentNetWorth - startingNetWorth;
-      const netWorthGrowthPercent = startingNetWorth !== 0
-        ? (netWorthGrowth / Math.abs(startingNetWorth)) * 100
-        : 0;
-
-      // Project full year growth
-      const projectedAnnualGrowth = netWorthGrowth / yearProgress;
-      const projectedYearEndNetWorth = startingNetWorth + projectedAnnualGrowth;
+      // Project from the time actually elapsed since that snapshot
+      const elapsedDays = Math.max(daysBetween(snapshotDateKey(startOfYearSnapshot), today), 1);
+      const remainingDays = daysBetween(today, `${year}-12-31`);
+      const projectedYearEndNetWorth = currentNetWorth + (netWorthGrowth / elapsedDays) * remainingDays;
 
       netWorthProgress = {
         available: true,
+        since: snapshotDateKey(startOfYearSnapshot),
         startOfYear: startingNetWorth,
         current: currentNetWorth,
         growth: netWorthGrowth,
-        growthPercent: Math.round(netWorthGrowthPercent * 10) / 10,
+        growthPercent: startingNetWorth !== 0 ? round1((netWorthGrowth / Math.abs(startingNetWorth)) * 100) : 0,
         projectedYearEnd: Math.round(projectedYearEndNetWorth),
-        projectedAnnualGrowth: Math.round(projectedAnnualGrowth)
+        projectedAnnualGrowth: Math.round(projectedYearEndNetWorth - startingNetWorth)
       };
     }
   }
 
-  // Compare to last year's full year performance
+  // Compare to the same point last year
   let vsLastYear = { available: false };
-  const lastYear = now.getFullYear() - 1;
-  const lastYearStart = new Date(lastYear, 0, 1);
-  const lastYearEnd = new Date(lastYear, 11, 31, 23, 59, 59);
-  const lastYearSamePoint = new Date(lastYear, now.getMonth(), now.getDate());
-
-  const lastYearYtdTxns = getTransactionsForRange(transactions, lastYearStart, lastYearSamePoint);
-  if (lastYearYtdTxns.length > 0) {
-    const lastYearYtd = processTransactions(lastYearYtdTxns, investmentAccountIds);
-    const lastYearYtdSavings = lastYearYtd.totals.income - lastYearYtd.totals.expenses;
-    const lastYearYtdSavingsRate = lastYearYtd.totals.income > 0
-      ? (lastYearYtdSavings / lastYearYtd.totals.income) * 100
-      : 0;
+  const lastYearStart = `${year - 1}-01-01`;
+  const lastYearSamePoint = sameDayInMonth(today, -12);
+  if (ledger.lines.some(line => line.date >= lastYearStart && line.date <= lastYearSamePoint)) {
+    const lastYearYtd = summarize(ledger.lines, lastYearStart, lastYearSamePoint);
+    const lastYearYtdSavingsRate = savingsRate(lastYearYtd);
 
     vsLastYear = {
       available: true,
-      lastYearYtdSavingsRate: Math.round(lastYearYtdSavingsRate * 10) / 10,
-      savingsRateImprovement: Math.round((ytdSavingsRate - lastYearYtdSavingsRate) * 10) / 10,
-      lastYearYtdExpenses: lastYearYtd.totals.expenses,
-      expenseChange: ytdExpenses - lastYearYtd.totals.expenses,
-      expenseChangePercent: lastYearYtd.totals.expenses > 0
-        ? Math.round(((ytdExpenses - lastYearYtd.totals.expenses) / lastYearYtd.totals.expenses) * 100)
-        : 0
+      lastYearYtdSavingsRate: round1(lastYearYtdSavingsRate),
+      savingsRateImprovement: round1(ytdSavingsRate - lastYearYtdSavingsRate),
+      lastYearYtdExpenses: lastYearYtd.spending,
+      expenseChange: ytdExpenses - lastYearYtd.spending,
+      expenseChangePercent: Math.round(percentChange(ytdExpenses, lastYearYtd.spending))
     };
   }
 
   return {
     available: true,
     yearProgress: Math.round(yearProgress * 100),
-    monthsCompleted: Math.round(monthsCompleted * 10) / 10,
+    monthsCompleted: round1(monthsCompleted),
 
-    // YTD Actuals
     ytd: {
       income: ytdIncome,
       expenses: ytdExpenses,
       savings: ytdSavings,
-      savingsRate: Math.round(ytdSavingsRate * 10) / 10,
+      savingsRate: round1(ytdSavingsRate),
       investments: ytdInvestments
     },
 
-    // Goals & Progress
     goals: {
       savingsRate: {
         target: targetSavingsRate,
-        actual: Math.round(ytdSavingsRate * 10) / 10,
-        onTrack: savingsRateOnTrack
+        actual: round1(ytdSavingsRate),
+        onTrack: ytdSavingsRate >= targetSavingsRate
       },
       investments: {
         target: annualInvestmentGoal,
         actual: ytdInvestments,
         progress: Math.round(investmentProgress),
         expectedProgress: Math.round(expectedInvestmentProgress),
-        onTrack: investmentsOnTrack
+        onTrack: investmentProgress >= expectedInvestmentProgress * 0.9 // Allow 10% buffer
       }
     },
 
-    // Projections
     projections: {
-      annualIncome: Math.round(projectedAnnualIncome),
-      annualExpenses: Math.round(projectedAnnualExpenses),
-      annualSavings: Math.round(projectedAnnualSavings),
-      annualInvestments: Math.round(projectedInvestments)
+      annualIncome: Math.round(ytdIncome / yearProgress),
+      annualExpenses: Math.round(ytdExpenses / yearProgress),
+      annualSavings: Math.round(ytdSavings / yearProgress),
+      annualInvestments: Math.round(ytdInvestments / yearProgress)
     },
 
     netWorthProgress,
@@ -489,95 +378,48 @@ function calculateAnnualProgress(transactions, currentMetrics, snapshots = [], g
 // ============================================
 
 /**
- * Calculate true expenses for a set of transactions (excluding investments/savings)
- * @param {Array} transactions - Transactions to process
- * @param {Set} investmentAccountIds - Account IDs to exclude
- * @param {Object} cspSettings - CSP settings for categorization
- * @returns {number} - Total true expenses
- */
-function calculateTrueExpenses(transactions, investmentAccountIds = new Set(), cspSettings = {}) {
-  let totalExpenses = 0;
-
-  transactions.forEach(txn => {
-    // Skip investment account transactions
-    if (investmentAccountIds.has(txn.account_id)) return;
-    // Skip excluded transactions (transfers, reconciliation, etc.)
-    if (shouldExcludeTransaction(txn)) return;
-    // Skip income
-    if (isIncomeCategory(txn.category_name)) return;
-
-    const amount = getTransactionAmount(txn);
-    // Only count negative amounts (outflows) that are true expenses
-    if (amount < 0 && isTrueExpense(txn.category_name, txn.category_group_name, cspSettings, txn.category_id)) {
-      totalExpenses += Math.abs(amount);
-    }
-  });
-
-  return totalExpenses;
-}
-
-/**
- * Calculate week-over-week trends
- * @param {Array} transactions - All YNAB transactions
- * @param {Set} investmentAccountIds - Set of investment account IDs to exclude
- * @param {Object} cspSettings - CSP settings for categorization
+ * Calculate week-over-week trends (weeks run Sunday-Saturday)
+ * @param {Object} ledger - Output of buildLedger
+ * @param {string} today - 'YYYY-MM-DD'
  * @returns {Object} - Weekly comparison data
  */
-function calculateWeeklyTrends(transactions, investmentAccountIds = new Set(), cspSettings = {}) {
-  const now = new Date();
+function calculateWeeklyTrends(ledger, today) {
+  const currentWeekStart = startOfWeek(today);
+  const lastWeekStart = addDays(currentWeekStart, -7);
+  const lastWeekEnd = addDays(currentWeekStart, -1);
 
-  // Get start of current week (Sunday)
-  const currentWeekStart = new Date(now);
-  currentWeekStart.setDate(now.getDate() - now.getDay());
-  currentWeekStart.setHours(0, 0, 0, 0);
+  const currentWeek = summarize(ledger.lines, currentWeekStart, today);
+  const lastWeek = summarize(ledger.lines, lastWeekStart, lastWeekEnd);
 
-  // Get start of last week
-  const lastWeekStart = new Date(currentWeekStart);
-  lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+  // Six full weeks before the current one
+  const history = summarize(ledger.lines, addDays(currentWeekStart, -42), lastWeekEnd);
+  const sixWeekAverage = history.spending / 6;
 
-  const lastWeekEnd = new Date(currentWeekStart);
-  lastWeekEnd.setMilliseconds(-1);
-
-  // Get transactions for each week
-  const currentWeekTxns = getTransactionsForRange(transactions, currentWeekStart, now);
-  const lastWeekTxns = getTransactionsForRange(transactions, lastWeekStart, lastWeekEnd);
-
-  // Calculate true expenses (excluding investments and savings)
-  const currentWeekExpenses = calculateTrueExpenses(currentWeekTxns, investmentAccountIds, cspSettings);
-  const lastWeekExpenses = calculateTrueExpenses(lastWeekTxns, investmentAccountIds, cspSettings);
-
-  // Calculate 6-week average of true expenses (excluding current partial week)
-  const sixWeeksAgo = new Date(lastWeekStart);
-  sixWeeksAgo.setDate(sixWeeksAgo.getDate() - (5 * 7)); // 5 more weeks back from last week start
-  const historicalTxns = getTransactionsForRange(transactions, sixWeeksAgo, lastWeekEnd);
-  const historicalExpenses = calculateTrueExpenses(historicalTxns, investmentAccountIds, cspSettings);
-  const sixWeekAverage = historicalExpenses / 6;
-
-  // Days elapsed in current week
-  const daysInCurrentWeek = Math.ceil((now - currentWeekStart) / (24 * 60 * 60 * 1000));
-  const fullWeekDays = 7;
-
-  // Pro-rate current week if partial
-  const proRateFactor = daysInCurrentWeek < fullWeekDays ? fullWeekDays / daysInCurrentWeek : 1;
+  const daysElapsed = dayOfWeek(today) + 1;
+  const proRateFactor = daysElapsed < 7 ? 7 / daysElapsed : 1;
 
   return {
+    weekStart: currentWeekStart,
+    weekEnd: addDays(currentWeekStart, 6),
     currentWeek: {
-      spending: currentWeekExpenses,
-      projectedWeekly: currentWeekExpenses * proRateFactor,
-      daysElapsed: daysInCurrentWeek,
-      topCategories: getTopCategories(aggregateByCategory(currentWeekTxns), 5)
+      spending: currentWeek.spending,
+      projectedWeekly: currentWeek.spending * proRateFactor,
+      daysElapsed,
+      investing: currentWeek.investing,
+      uncategorized: currentWeek.uncategorized,
+      topCategories: currentWeek.byCategory.slice(0, 5)
     },
     lastWeek: {
-      spending: lastWeekExpenses,
-      topCategories: getTopCategories(aggregateByCategory(lastWeekTxns), 5)
+      spending: lastWeek.spending,
+      topCategories: lastWeek.byCategory.slice(0, 5)
     },
     change: {
-      amount: currentWeekExpenses - lastWeekExpenses,
-      percent: lastWeekExpenses > 0
-        ? Math.round(((currentWeekExpenses - lastWeekExpenses) / lastWeekExpenses) * 100)
+      amount: currentWeek.spending - lastWeek.spending,
+      percent: lastWeek.spending > 0
+        ? Math.round(((currentWeek.spending - lastWeek.spending) / lastWeek.spending) * 100)
         : 0
     },
-    sixWeekAverage // Average weekly true expenses over past 6 weeks
+    sixWeekAverage // Average weekly spending over the past 6 full weeks
   };
 }
 
@@ -587,20 +429,19 @@ function calculateWeeklyTrends(transactions, investmentAccountIds = new Set(), c
 
 /**
  * Calculate all trend data for the newsletter
- * @param {Array} transactions - All YNAB transactions
- * @param {Object} currentMetrics - Current metrics from metrics.js
+ * @param {Object} metrics - Output of calculateAllMetrics (provides ledger and today)
  * @param {Array} snapshots - Historical newsletter snapshots
  * @param {Object} goals - User's financial goals
- * @param {Set} investmentAccountIds - Set of investment account IDs to exclude
- * @param {Object} cspSettings - CSP settings for categorization
  * @returns {Object} - All trend data
  */
-function calculateAllTrends(transactions, currentMetrics, snapshots = [], goals = {}, investmentAccountIds = new Set(), cspSettings = {}) {
+function calculateAllTrends(metrics, snapshots = [], goals = {}) {
+  const { ledger, today } = metrics;
+
   return {
-    weekly: calculateWeeklyTrends(transactions, investmentAccountIds, cspSettings),
-    monthOverMonth: calculateMonthOverMonth(transactions, currentMetrics, investmentAccountIds),
-    yearOverYear: calculateYearOverYear(transactions, currentMetrics, snapshots, investmentAccountIds),
-    annualProgress: calculateAnnualProgress(transactions, currentMetrics, snapshots, goals, investmentAccountIds),
+    weekly: calculateWeeklyTrends(ledger, today),
+    monthOverMonth: calculateMonthOverMonth(ledger, today),
+    yearOverYear: calculateYearOverYear(ledger, today, metrics, snapshots),
+    annualProgress: calculateAnnualProgress(ledger, today, metrics, snapshots, goals || {}),
     calculatedAt: new Date().toISOString()
   };
 }
@@ -610,5 +451,7 @@ module.exports = {
   calculateYearOverYear,
   calculateAnnualProgress,
   calculateWeeklyTrends,
-  calculateAllTrends
+  calculateAllTrends,
+  findSnapshotNear,
+  snapshotDateKey
 };

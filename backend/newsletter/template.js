@@ -4,7 +4,8 @@
  * Uses table-based layout with inline styles for Gmail compatibility
  */
 
-const { formatCurrency, formatDateShort } = require('./helpers');
+const { formatCurrency } = require('./helpers');
+const { formatKey, startOfWeek, addDays, todayKey } = require('./cashflow');
 
 /**
  * Convert basic markdown to HTML for email
@@ -53,20 +54,25 @@ function markdownToHtml(text) {
 
 /**
  * Get week date range string
+ * @param {string} weekStart - Sunday of the week ('YYYY-MM-DD')
  * @returns {string} - Formatted date range like "Jan 15 - Jan 21"
  */
-function getWeekDateRange() {
-  const now = new Date();
-  // Get start of current week (Sunday)
-  const weekStart = new Date(now);
-  weekStart.setDate(now.getDate() - now.getDay());
-  weekStart.setHours(0, 0, 0, 0);
+function getWeekDateRange(weekStart) {
+  const start = weekStart || startOfWeek(todayKey(process.env.NEWSLETTER_TIMEZONE));
+  const end = addDays(start, 6);
+  const short = { month: 'short', day: 'numeric' };
+  return `${formatKey(start, short)} - ${formatKey(end, short)}`;
+}
 
-  // Week end is Saturday
-  const weekEnd = new Date(weekStart);
-  weekEnd.setDate(weekStart.getDate() + 6);
-
-  return `${formatDateShort(weekStart)} - ${formatDateShort(weekEnd)}`;
+/**
+ * Escape text from YNAB (payee and category names) for HTML
+ */
+function escapeHtml(text) {
+  return String(text ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 /**
@@ -159,6 +165,10 @@ function generateNewsletterHtml(data) {
   const alertedCategories = categoriesWithAlerts.filter(c => c.isAlert);
   const hasAlerts = alertedCategories.length > 0;
 
+  // Transactions still waiting for a category aren't counted as spending
+  const uncategorized = weekly.currentWeek?.uncategorized || { count: 0, outflow: 0, inflow: 0, items: [] };
+  const hasUncategorized = uncategorized.count > 0;
+
   return `
 <!DOCTYPE html>
 <html lang="en">
@@ -191,7 +201,7 @@ function generateNewsletterHtml(data) {
                 <tr>
                   <td style="vertical-align: top;">
                     <div style="font-size: 13px; font-weight: 600; color: #6366F1; text-transform: uppercase; letter-spacing: 1px; margin: 0;">This Week's Spending</div>
-                    <div style="font-size: 12px; color: #888; margin-top: 4px;">${getWeekDateRange()}</div>
+                    <div style="font-size: 12px; color: #888; margin-top: 4px;">${getWeekDateRange(weekly.weekStart)}</div>
                   </td>
                   <td align="right" style="vertical-align: top;">
                     <span style="display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; letter-spacing: 0.5px; background-color: ${burnStatus.bgColor}; color: ${burnStatus.color};">
@@ -240,6 +250,20 @@ function generateNewsletterHtml(data) {
                   ` : ''}
                 </div>
               `}
+
+              ${hasUncategorized ? `
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top: 16px;">
+                  <tr>
+                    <td style="padding: 12px 16px; background-color: #FEF3C7; border-radius: 8px; font-size: 13px; color: #92400E;">
+                      &#9888; ${uncategorized.count} uncategorized ${uncategorized.count === 1 ? 'transaction' : 'transactions'}
+                      (${formatCurrency(uncategorized.outflow)} out${uncategorized.inflow > 0 ? `, ${formatCurrency(uncategorized.inflow)} in` : ''})
+                      ${uncategorized.count === 1 ? "isn't" : "aren't"} counted above. Categorize ${uncategorized.count === 1 ? 'it' : 'them'} in YNAB.
+                      ${uncategorized.items.length > 0 ? `<div style="margin-top: 6px; color: #78350F;">${uncategorized.items.map(item =>
+                        `${escapeHtml(item.payee || 'No payee')}: ${formatCurrency(item.amount)}`).join(' &middot; ')}</div>` : ''}
+                    </td>
+                  </tr>
+                </table>
+              ` : ''}
             </td>
           </tr>
 
@@ -277,11 +301,17 @@ function generateNewsletterHtml(data) {
                 <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid #f0f0f0;">
                   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                     <tr>
-                      <td style="padding: 8px 0; font-size: 14px; color: #666;">Monthly Net Cash Flow</td>
+                      <td style="padding: 8px 0; font-size: 14px; color: #666;">Monthly Net Cash Flow${runway.monthsAveraged ? ` (${runway.monthsAveraged}-mo avg)` : ''}</td>
                       <td align="right" style="padding: 8px 0; font-size: 14px; font-weight: 500; color: ${(runway.avgMonthlyNet || 0) >= 0 ? '#10B981' : '#EF4444'};">
                         ${(runway.avgMonthlyNet || 0) >= 0 ? '+' : ''}${formatCurrency(runway.avgMonthlyNet || 0)}
                       </td>
                     </tr>
+                    ${(runway.avgMonthlyInvesting || 0) > 0 ? `
+                    <tr>
+                      <td style="padding: 8px 0; font-size: 14px; color: #666;">Monthly Investing (not counted as spending)</td>
+                      <td align="right" style="padding: 8px 0; font-size: 14px; font-weight: 500;">${formatCurrency(runway.avgMonthlyInvesting)}</td>
+                    </tr>
+                    ` : ''}
                     <tr>
                       <td style="padding: 8px 0; font-size: 14px; color: #666;">Cash Reserves</td>
                       <td align="right" style="padding: 8px 0; font-size: 14px; font-weight: 500;">${formatCurrency(runway.cashReserves || 0)}</td>
@@ -333,7 +363,7 @@ function generateNewsletterHtml(data) {
                     <tr>
                       <td style="padding: 10px 0; font-size: 14px; vertical-align: middle;">
                         ${cat.isAlert ? '<span style="color: #EF4444; font-size: 14px; margin-right: 8px;">&#9650;</span>' : ''}
-                        <span>${cat.name}</span>
+                        <span>${escapeHtml(cat.name)}</span>
                       </td>
                       <td align="right" style="padding: 10px 0; vertical-align: middle; white-space: nowrap;">
                         <span style="font-weight: 600; font-size: 14px;">${formatCurrency(cat.amount)}</span>
@@ -347,7 +377,7 @@ function generateNewsletterHtml(data) {
                   </table>
                 `).join('') : `
                   <div style="color: #666; font-style: italic; padding: 16px 0;">
-                    No spending categories recorded this month
+                    No spending recorded this week
                   </div>
                 `}
               </div>
