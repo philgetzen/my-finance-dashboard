@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -258,7 +258,6 @@ const PeriodSummary = React.memo(({
   trends,
   isPrivacyMode
 }) => {
-  const savingsRate = income > 0 ? ((savings / income) * 100).toFixed(0) : 0;
 
   const avgIncome = income / numMonths;
   const avgExpenses = expenses / numMonths;
@@ -568,22 +567,14 @@ export default function Dashboard() {
     refetch,
     showYNABErrorModal,
     setShowYNABErrorModal,
-    ynabError,
-    isDemoMode
+    ynabError
   } = useFinanceData();
   const { privacyMode } = usePrivacy();
   const { isFeatureEnabled } = useDemoMode();
   const isRefreshing = isLoading || isFetching;
 
   const [showManualModal, setShowManualModal] = useState(false);
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [selectedTimePeriod, setSelectedTimePeriod] = useState('last-6-months');
-
-  useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
 
   // Combine accounts efficiently
   const allAccounts = useMemo(() => [
@@ -601,7 +592,7 @@ export default function Dashboard() {
 
   // Process transactions using shared hook
   const cspSettings = useCSPSettings();
-  const { processedTransactions, monthlyData, totals } = useTransactionProcessor(
+  const { processedTransactions, monthlyData } = useTransactionProcessor(
     ynabTransactions,
     allAccounts,
     investmentAccountIds,

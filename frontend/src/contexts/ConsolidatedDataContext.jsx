@@ -26,7 +26,7 @@ export const PrivacyProvider = ({ children }) => {
       if (stored !== null && stored !== 'undefined' && stored !== '') {
         return stored === 'true';
       }
-    } catch (e) {
+    } catch {
       // If error, clear the invalid value
       localStorage.removeItem('privacyMode');
     }
@@ -77,7 +77,7 @@ export const FinanceDataProvider = ({ children }) => {
       if (stored !== null && stored !== 'undefined' && stored !== '') {
         return stored === 'true';
       }
-    } catch (e) {
+    } catch {
       // If parsing fails, clear the invalid value
       localStorage.removeItem('darkMode');
     }
@@ -532,10 +532,6 @@ export const FinanceDataProvider = ({ children }) => {
   const getCurrentTransactions = useCallback(() => {
     return isDemoMode ? demoData.transactions : [];
   }, [isDemoMode, demoData.transactions]);
-
-  const getCurrentYNABData = useCallback(() => {
-    return isDemoMode ? demoData.ynabData : ynabData;
-  }, [isDemoMode, demoData.ynabData, ynabData]);
 
   const getCurrentAccountSummary = useCallback(() => {
     return isDemoMode ? demoData.accountSummary : null;

@@ -120,7 +120,7 @@ describe('getMonthBoundaries', () => {
 
   test('handles leap year February', () => {
     const date = new Date('2024-02-15');
-    const { first, last } = getMonthBoundaries(date);
+    const { last } = getMonthBoundaries(date);
 
     expect(last.getDate()).toBe(29); // 2024 is a leap year
   });

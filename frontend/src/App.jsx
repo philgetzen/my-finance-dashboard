@@ -63,7 +63,7 @@ export default function App() {
           </FinanceDataProvider>
         </PrivacyProvider>
       </ErrorBoundary>
-      {process.env.NODE_ENV === 'development' && (
+      {import.meta.env.DEV && (
         <ReactQueryDevtools initialIsOpen={false} />
       )}
     </QueryClientProvider>
@@ -72,7 +72,7 @@ export default function App() {
 
 // Login wrapper component
 function LoginWrapper() {
-  const { user, loading, isDemoMode } = useFinanceData();
+  const { loading, isDemoMode } = useFinanceData();
 
   if (loading) {
     return <PageLoader />;

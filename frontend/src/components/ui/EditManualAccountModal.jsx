@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useFinanceData } from '../../contexts/ConsolidatedDataContext';
 import { DemoModeWarning } from './DemoModeIndicator';
-import { useDemoMode } from '../../hooks/useDemoMode';
 import Button from './Button';
 import {
   XMarkIcon,
@@ -10,7 +9,6 @@ import {
 
 export default function EditManualAccountModal({ user, account, show, onClose, onAccountUpdated }) {
   const { updateManualAccount, deleteManualAccount } = useFinanceData();
-  const { isFeatureEnabled, getDisabledMessage } = useDemoMode();
   const [formData, setFormData] = useState({
     name: '',
     type: 'checking',

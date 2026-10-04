@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { ChevronDownIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
-import { MatchIndicator, formatCurrency, amountsMatch } from './DebugDrawer';
+import { MatchIndicator } from './DebugDrawer';
+import { formatCurrency, amountsMatch } from './format';
 
 /**
  * Category View - Detailed category-by-category comparison
@@ -12,8 +13,8 @@ export default function CategoryView({ data = {}, isLoading }) {
   const [showOnlyMismatches, setShowOnlyMismatches] = useState(false);
 
   const { app = {}, ynab = {} } = data;
-  const appCategories = app.categories || {};
-  const ynabCategories = ynab.categories || {};
+  const appCategories = useMemo(() => app.categories || {}, [app.categories]);
+  const ynabCategories = useMemo(() => ynab.categories || {}, [ynab.categories]);
 
   // Merge and sort categories
   const sortedCategories = useMemo(() => {
@@ -154,7 +155,7 @@ export default function CategoryView({ data = {}, isLoading }) {
  * Individual category row with expandable details
  */
 function CategoryRow({ category, isExpanded, onToggle, appCategoryData }) {
-  const { name, appTotal, ynabTotal, appCount, discrepancy, isMatch, bucket } = category;
+  const { name, appTotal, ynabTotal, appCount, isMatch, bucket } = category;
   const diff = ynabTotal !== undefined ? appTotal - ynabTotal : 0;
 
   return (

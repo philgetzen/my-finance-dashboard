@@ -183,28 +183,9 @@ export default function DebugDrawer({
 /**
  * Status indicator for match/mismatch
  */
-export function MatchIndicator({ isMatch, tolerance = 0.01 }) {
+export function MatchIndicator({ isMatch }) {
   if (isMatch) {
     return <CheckCircleIcon className="h-4 w-4 text-green-500" title="Match" />;
   }
   return <ExclamationTriangleIcon className="h-4 w-4 text-yellow-500" title="Mismatch" />;
-}
-
-/**
- * Format currency for display
- */
-export function formatCurrency(amount) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount || 0);
-}
-
-/**
- * Check if two amounts match within tolerance
- */
-export function amountsMatch(a, b, tolerance = 0.01) {
-  return Math.abs((a || 0) - (b || 0)) <= tolerance;
 }

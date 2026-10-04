@@ -232,11 +232,6 @@ export default function InvestmentAllocation() {
     return holdings.filter(holding => holding.account === selectedAccount);
   }, [selectedAccount, holdings]);
 
-  // Calculate filtered total for accurate percentages
-  const filteredTotalValue = useMemo(() => {
-    return filteredHoldings.reduce((sum, holding) => sum + holding.value, 0);
-  }, [filteredHoldings]);
-
   // Group holdings by selected criteria
   const groupedData = useMemo(() => {
     // Only include holdings that are properly configured (not Unknown for type/sector grouping)

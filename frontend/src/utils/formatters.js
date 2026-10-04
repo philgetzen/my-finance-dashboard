@@ -49,7 +49,7 @@ export const normalizeAmount = (amount) => {
 export const signPrefix = (amount) => (amount < 0 && !isEffectivelyZero(amount) ? '-' : '');
 
 // Currency formatting - privacy handled via CSS blur, not text conversion
-export const formatCurrency = (amount, isPrivacyMode = false) => {
+export const formatCurrency = (amount) => {
   // Always format numbers normally - privacy is handled via CSS blur effects
   return Math.abs(amount || 0).toLocaleString('en-US', {
     minimumFractionDigits: 2,
