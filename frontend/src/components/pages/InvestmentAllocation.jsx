@@ -3,6 +3,7 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { useFinanceData, usePrivacy } from '../../contexts/ConsolidatedDataContext';
 import { formatCurrency, formatPercent } from '../../utils/formatters';
 import { getAccountBalance, normalizeYNABAccountType } from '../../utils/ynabHelpers';
+import { isHomeValueAccount } from '../../utils/calculations/cashflow';
 import Button from '../ui/Button';
 import PageTransition from '../ui/PageTransition';
 import AddHoldingModal from '../ui/AddHoldingModal';
@@ -107,8 +108,12 @@ export default function InvestmentAllocation() {
   // Generate holdings from YNAB investment accounts
   const holdings = useMemo(() => {
     const allAccounts = [...(ynabAccounts || []), ...(manualAccounts || [])];
+    // YNAB marks closed accounts with `closed`; manual accounts may use `closed_on`.
+    // Home value accounts share YNAB's otherAsset type but aren't investments.
     const investmentAccounts = allAccounts.filter(acc =>
-      normalizeYNABAccountType(acc.type) === 'investment' && !acc.closed_on
+      normalizeYNABAccountType(acc.type) === 'investment' &&
+      !acc.closed && !acc.closed_on &&
+      !isHomeValueAccount(acc)
     );
 
     let holdingsList = [];

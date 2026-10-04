@@ -204,9 +204,9 @@ function calculateCSPBuckets(monthlyHistory = []) {
       bucketTotals[key] += month.summary.bucketTotals[key] || 0;
     });
     month.summary.byCategory.forEach(cat => {
-      const existing = categoryTotals.get(cat.name) || { name: cat.name, amount: 0, bucket: cat.bucket };
+      const existing = categoryTotals.get(cat.key) || { name: cat.name, amount: 0, bucket: cat.bucket };
       existing.amount += cat.amount;
-      categoryTotals.set(cat.name, existing);
+      categoryTotals.set(cat.key, existing);
     });
   });
 
@@ -347,8 +347,8 @@ function calculateBurnRate(monthlyHistory = [], monthToDate = null) {
 // ============================================
 
 function compareToAverage(current, averages) {
-  return current.slice(0, 10).map(({ name, amount }) => {
-    const average = averages.get(name) || 0;
+  return current.slice(0, 10).map(({ key, name, amount }) => {
+    const average = averages.get(key) || 0;
     const vsAverage = average > 0 ? ((amount - average) / average) * 100 : 0;
 
     return {
@@ -375,12 +375,12 @@ function getTopSpendingCategories(monthToDate, monthlyHistory = []) {
   const totals = new Map();
   validMonths.forEach(month => {
     month.summary.byCategory.forEach(cat => {
-      totals.set(cat.name, (totals.get(cat.name) || 0) + cat.amount);
+      totals.set(cat.key, (totals.get(cat.key) || 0) + cat.amount);
     });
   });
 
   const averages = new Map();
-  totals.forEach((total, name) => averages.set(name, total / numMonths));
+  totals.forEach((total, key) => averages.set(key, total / numMonths));
 
   return compareToAverage(monthToDate.byCategory, averages);
 }
@@ -398,7 +398,7 @@ function getWeeklyTopCategories(ledger, today) {
   const history = summarize(ledger.lines, addDays(weekStart, -42), addDays(weekStart, -1));
 
   const averages = new Map();
-  history.byCategory.forEach(cat => averages.set(cat.name, cat.amount / 6));
+  history.byCategory.forEach(cat => averages.set(cat.key, cat.amount / 6));
 
   return compareToAverage(thisWeek.byCategory, averages);
 }

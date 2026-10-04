@@ -8,9 +8,9 @@ import {
   ChartBarIcon,
   SparklesIcon,
   AdjustmentsHorizontalIcon,
+  ReceiptPercentIcon,
 } from '@heroicons/react/24/outline';
 import { usePrivacy } from '../../contexts/ConsolidatedDataContext';
-import { formatCurrency } from '../../utils/formatters';
 import { EXPENSE_BUCKETS } from '../../hooks/useIncomeScenario';
 import Card from './Card';
 import PrivacyCurrency from './PrivacyCurrency';
@@ -95,6 +95,60 @@ function CurrencyInput({ label, icon: Icon, value, onChange, description, isPriv
 }
 
 /**
+ * Percentage input for the take-home rate
+ */
+function PercentInput({ label, icon: Icon, value, onChange, description }) {
+  const [localValue, setLocalValue] = useState(String(value));
+  const [isFocused, setIsFocused] = useState(false);
+
+  useEffect(() => {
+    if (!isFocused) setLocalValue(String(value));
+  }, [value, isFocused]);
+
+  const handleChange = (e) => {
+    const rawValue = e.target.value.replace(/[^0-9]/g, '').slice(0, 3);
+    setLocalValue(rawValue);
+    if (rawValue) onChange(parseInt(rawValue, 10));
+  };
+
+  return (
+    <div className="flex-1 min-w-[140px]">
+      <div className="flex items-center gap-2 mb-2">
+        <Icon className="h-4 w-4 text-violet-500" />
+        <span className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+          {label}
+        </span>
+      </div>
+      <div className="relative">
+        <input
+          type="text"
+          inputMode="numeric"
+          value={localValue}
+          onChange={handleChange}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => {
+            // Show the clamped value the scenario actually uses (1-100)
+            setIsFocused(false);
+            setLocalValue(String(value));
+          }}
+          className="w-full pl-3 pr-7 py-2.5 text-sm font-medium
+                     bg-gray-50 dark:bg-gray-800
+                     border border-gray-200 dark:border-gray-700 rounded-lg
+                     focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent
+                     text-gray-900 dark:text-white"
+        />
+        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 text-sm">
+          %
+        </span>
+      </div>
+      {description && (
+        <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">{description}</p>
+      )}
+    </div>
+  );
+}
+
+/**
  * Inline collapsible panel for income scenario planning
  * Designed to sit between summary cards and charts on Runway page
  */
@@ -111,6 +165,8 @@ export default function IncomeScenarioPanel({
   setBonus,
   stock,
   setStock,
+  takeHomeRate = 70,
+  setTakeHomeRate = () => {},
   // Computed values
   scenarioMonthlyIncome,
   historicalAvgIncome,
@@ -255,6 +311,13 @@ export default function IncomeScenarioPanel({
                     description="RSU/Options value"
                     isPrivacyMode={privacyMode}
                   />
+                  <PercentInput
+                    label="Take-Home"
+                    icon={ReceiptPercentIcon}
+                    value={takeHomeRate}
+                    onChange={setTakeHomeRate}
+                    description="Blended share left after taxes and pre-tax deductions"
+                  />
                 </div>
               </div>
 
@@ -343,7 +406,7 @@ export default function IncomeScenarioPanel({
                   </div>
                   <div>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                      Scenario Income
+                      Scenario Take-Home
                     </p>
                     <div className="flex items-baseline gap-2">
                       <PrivacyCurrency

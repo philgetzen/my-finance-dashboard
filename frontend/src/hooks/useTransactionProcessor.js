@@ -74,9 +74,17 @@ export function useTransactionProcessor(transactions, accounts, _investmentAccou
 
     linesByMonth.forEach((monthLines, monthKey) => {
       const summary = summarizeLines(monthLines);
+      const byBucket = { fixedCosts: 0, savings: 0, guiltFree: 0 };
+      summary.byCategory.forEach(cat => {
+        // Spending lines are fixedCosts, savings or guiltFree; a null bucket
+        // (no category info) defaults to guilt-free like everywhere else
+        const bucket = cat.bucket in byBucket ? cat.bucket : 'guiltFree';
+        byBucket[bucket] += cat.amount;
+      });
       monthlyData[monthKey] = {
         income: summary.income,
         expenses: summary.spending,
+        expensesByBucket: byBucket,
         investing: summary.investing + summary.saving,
         uncategorized: summary.uncategorized.outflow,
         net: summary.net

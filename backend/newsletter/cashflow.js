@@ -478,12 +478,15 @@ function buildLedger(data = {}, cspSettings = {}) {
     useKeywordFallback: cspSettings.useKeywordFallback ?? false
   };
 
+  const labels = categoryLabels(categoriesById);
+
   const lines = flattenTransactions(transactions).map(line => {
     const categoryInfo = categoriesById.get(line.categoryId);
     const { kind, bucket } = classifyLine(line, ctx);
     return {
       ...line,
       categoryName: categoryInfo?.name || line.categoryName,
+      categoryLabel: labels.get(line.categoryId) || categoryInfo?.name || line.categoryName,
       groupName: categoryInfo?.groupName || '',
       kind,
       bucket
@@ -491,6 +494,25 @@ function buildLedger(data = {}, cspSettings = {}) {
   });
 
   return { lines, accountsById, categoriesById };
+}
+
+/**
+ * Display label for each category. Categories that share a name get their
+ * group appended, e.g. "Gifts (Savings)". Computed from the whole budget so
+ * every summary and every month uses the same label.
+ * @param {Map} categoriesById - id -> { name, groupName }
+ * @returns {Map} - id -> label
+ */
+function categoryLabels(categoriesById) {
+  const counts = new Map();
+  categoriesById.forEach(({ name }) => counts.set(name, (counts.get(name) || 0) + 1));
+
+  const labels = new Map();
+  categoriesById.forEach(({ name, groupName }, id) => {
+    const group = (groupName || '').replace(/[^\p{L}\p{N}&\s-]/gu, '').trim();
+    labels.set(id, counts.get(name) > 1 && group ? `${name} (${group})` : name);
+  });
+  return labels;
 }
 
 function toSet(value) {
@@ -509,8 +531,8 @@ function toSet(value) {
 function summarize(lines, start, end) {
   let income = 0;
   let excludedIncome = 0;
+  // Keyed by category ID: two categories can share a name in different groups
   const spendingByCategory = new Map();
-  const bucketByCategory = new Map();
   let investing = 0;
   let saving = 0;
   const uncategorized = { count: 0, outflow: 0, inflow: 0, items: [] };
@@ -526,9 +548,11 @@ function summarize(lines, start, end) {
         excludedIncome += line.amount;
         break;
       case 'spending': {
-        const name = line.categoryName || 'Uncategorized';
-        spendingByCategory.set(name, (spendingByCategory.get(name) || 0) - line.amount);
-        bucketByCategory.set(name, line.bucket);
+        const key = line.categoryId || `name:${line.categoryName}`;
+        const entry = spendingByCategory.get(key) ||
+          { name: line.categoryLabel || line.categoryName || 'Uncategorized', bucket: line.bucket, amount: 0 };
+        entry.amount -= line.amount;
+        spendingByCategory.set(key, entry);
         break;
       }
       case 'investing':
@@ -551,10 +575,9 @@ function summarize(lines, start, end) {
   const byCategory = [];
   const bucketTotals = { fixedCosts: 0, investments: 0, savings: 0, guiltFree: 0 };
   let spending = 0;
-  spendingByCategory.forEach((amount, name) => {
+  spendingByCategory.forEach(({ name, bucket = 'guiltFree', amount }, key) => {
     if (amount <= 0) return;
-    const bucket = bucketByCategory.get(name) || 'guiltFree';
-    byCategory.push({ name, amount, bucket });
+    byCategory.push({ key, name, amount, bucket });
     bucketTotals[bucket] = (bucketTotals[bucket] || 0) + amount;
     spending += amount;
   });

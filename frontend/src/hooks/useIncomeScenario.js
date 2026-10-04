@@ -6,21 +6,24 @@ import { useFinanceData } from '../contexts/ConsolidatedDataContext';
 // LocalStorage key for demo mode
 const INCOME_SCENARIO_KEY = 'income_scenario';
 
-// CSP bucket configuration
+// Spending categories that can be cut in a scenario. Investing isn't
+// spending, so it never counts toward burn and has no toggle.
 export const EXPENSE_BUCKETS = {
   fixedCosts: { label: 'Fixed Costs', description: 'Rent, utilities, insurance' },
-  investments: { label: 'Investments', description: '401k, IRA, brokerage' },
-  savings: { label: 'Savings', description: 'Emergency fund, goals' },
+  savings: { label: 'Savings Goals', description: 'Purchases from sinking funds' },
   guiltFree: { label: 'Guilt-Free', description: 'Discretionary spending' }
 };
 
 // Default expense buckets (all included)
 const DEFAULT_EXPENSE_BUCKETS = {
   fixedCosts: true,
-  investments: true,
   savings: true,
   guiltFree: true
 };
+
+// Share of gross pay that reaches your accounts after taxes and pre-tax
+// deductions (401k, benefits). Historical income in YNAB is take-home pay.
+export const DEFAULT_TAKE_HOME_RATE = 70;
 
 // Default scenario state
 const DEFAULT_SCENARIO = {
@@ -28,13 +31,20 @@ const DEFAULT_SCENARIO = {
   salary: { annual: 0 },
   bonus: { annual: 0, frequency: 'annual' },
   stock: { annualValue: 0 },
+  takeHomeRate: DEFAULT_TAKE_HOME_RATE,
   expenseBuckets: DEFAULT_EXPENSE_BUCKETS
 };
 
+function takeHomeShare(scenario) {
+  return (scenario?.takeHomeRate ?? DEFAULT_TAKE_HOME_RATE) / 100;
+}
+
 /**
- * Calculate monthly income from scenario values
+ * Calculate monthly take-home income from scenario values.
+ * Salary, bonus and stock are entered gross; spending is paid from take-home
+ * pay, so the gross total is scaled by the take-home rate.
  * @param {Object} scenario - The income scenario object
- * @returns {number} Monthly income
+ * @returns {number} Monthly take-home income
  */
 export function calculateScenarioMonthlyIncome(scenario) {
   if (!scenario) return 0;
@@ -43,7 +53,7 @@ export function calculateScenarioMonthlyIncome(scenario) {
   const bonusAnnual = scenario.bonus?.annual || 0;
   const stockAnnual = scenario.stock?.annualValue || 0;
 
-  return (salaryAnnual + bonusAnnual + stockAnnual) / 12;
+  return ((salaryAnnual + bonusAnnual + stockAnnual) * takeHomeShare(scenario)) / 12;
 }
 
 /**
@@ -101,9 +111,10 @@ export function useIncomeScenario(historicalAvgIncome = 0) {
   }, [scenario.expenseBuckets]);
 
   // Check if any expense buckets have been modified from default
+  // (ignores keys from older saved scenarios, like the removed investments toggle)
   const hasExpenseFilters = useMemo(() => {
     const buckets = scenario.expenseBuckets || DEFAULT_EXPENSE_BUCKETS;
-    return Object.values(buckets).some(v => v === false);
+    return Object.keys(EXPENSE_BUCKETS).some(key => buckets[key] === false);
   }, [scenario.expenseBuckets]);
 
   // ===============================
@@ -152,6 +163,14 @@ export function useIncomeScenario(historicalAvgIncome = 0) {
     }));
   }, []);
 
+  const setTakeHomeRate = useCallback((percent) => {
+    const value = Number.isFinite(percent) ? percent : DEFAULT_TAKE_HOME_RATE;
+    setScenario(prev => ({
+      ...prev,
+      takeHomeRate: Math.min(100, Math.max(1, value))
+    }));
+  }, []);
+
   // Toggle an expense bucket on/off
   const toggleExpenseBucket = useCallback((bucketKey) => {
     setScenario(prev => ({
@@ -173,11 +192,10 @@ export function useIncomeScenario(historicalAvgIncome = 0) {
 
   // Reset to historical values (pre-fill with historical average)
   const resetToCurrent = useCallback(() => {
-    // Estimate annual from monthly historical average
-    const estimatedAnnual = Math.round(historicalAvgIncome * 12);
     setScenario(prev => ({
       ...prev,
-      salary: { annual: estimatedAnnual },
+      // Historical income is take-home; convert back to the gross salary that produces it
+      salary: { annual: Math.round((historicalAvgIncome * 12) / takeHomeShare(prev)) },
       bonus: { annual: 0, frequency: 'annual' },
       stock: { annualValue: 0 }
     }));
@@ -301,6 +319,8 @@ export function useIncomeScenario(historicalAvgIncome = 0) {
     setBonus,
     stock: scenario.stock?.annualValue || 0,
     setStock,
+    takeHomeRate: scenario.takeHomeRate ?? DEFAULT_TAKE_HOME_RATE,
+    setTakeHomeRate,
 
     // Computed values
     scenarioMonthlyIncome,

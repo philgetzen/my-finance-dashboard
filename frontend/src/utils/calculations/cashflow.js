@@ -261,11 +261,36 @@ export function createClassifier({ accounts = [], categories = null, cspSettings
 }
 
 /**
+ * Display label for each category. Categories that share a name get their
+ * group appended, e.g. "Gifts (Savings)". Computed from the whole budget so
+ * every summary and every month uses the same label.
+ * @param {Object} categories - YNAB categories response ({ category_groups })
+ * @returns {Map} - id -> label
+ */
+export function categoryLabels(categories) {
+  const all = [];
+  (categories?.category_groups || []).forEach(group => {
+    (group.categories || []).forEach(cat => all.push({ id: cat.id, name: cat.name, groupName: group.name }));
+  });
+
+  const counts = new Map();
+  all.forEach(({ name }) => counts.set(name, (counts.get(name) || 0) + 1));
+
+  const labels = new Map();
+  all.forEach(({ id, name, groupName }) => {
+    const group = (groupName || '').replace(/[^\p{L}\p{N}&\s-]/gu, '').trim();
+    labels.set(id, counts.get(name) > 1 && group ? `${name} (${group})` : name);
+  });
+  return labels;
+}
+
+/**
  * Flatten and classify transactions
  * @returns {Array} - Lines with kind, bucket, groupName, amountDollars, and monthKey added
  */
 export function classifyTransactions(transactions, options = {}) {
   const classify = createClassifier(options);
+  const labels = categoryLabels(options.categories);
   return flattenLines(transactions).map(line => {
     const { kind, bucket, groupName } = classify(line);
     return {
@@ -273,6 +298,7 @@ export function classifyTransactions(transactions, options = {}) {
       kind,
       bucket,
       groupName,
+      categoryLabel: labels.get(line.category_id) || line.category_name,
       amountDollars: (line.amount || 0) / 1000,
       monthKey: String(line.date || '').slice(0, 7)
     };
@@ -290,6 +316,7 @@ export function summarizeLines(lines) {
   let investing = 0;
   let saving = 0;
   const uncategorized = { count: 0, outflow: 0, inflow: 0 };
+  // Keyed by category ID: two categories can share a name in different groups
   const spendingByCategory = new Map();
 
   lines.forEach(line => {
@@ -299,10 +326,11 @@ export function summarizeLines(lines) {
         income += amount;
         break;
       case 'spending': {
-        const name = line.category_name || 'Uncategorized';
-        const entry = spendingByCategory.get(name) || { name, amount: 0, bucket: line.bucket };
+        const key = line.category_id || `name:${line.category_name}`;
+        const entry = spendingByCategory.get(key) ||
+          { name: line.categoryLabel || line.category_name || 'Uncategorized', amount: 0, bucket: line.bucket };
         entry.amount -= amount;
-        spendingByCategory.set(name, entry);
+        spendingByCategory.set(key, entry);
         break;
       }
       case 'investing':

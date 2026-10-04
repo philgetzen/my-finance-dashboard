@@ -7,8 +7,8 @@ import { useFinanceData, usePrivacy } from '../../contexts/ConsolidatedDataConte
 import { useAccountManager } from '../../hooks/useAccountManager';
 import { useTransactionProcessor } from '../../hooks/useTransactionProcessor';
 import { useRunwayCalculator } from '../../hooks/useRunwayCalculator';
-import { useIncomeScenario } from '../../hooks/useIncomeScenario';
-import { useCSPSettings, useConsciousSpendingPlan } from '../../hooks/useConsciousSpendingPlan';
+import { useIncomeScenario, EXPENSE_BUCKETS } from '../../hooks/useIncomeScenario';
+import { useCSPSettings } from '../../hooks/useConsciousSpendingPlan';
 import { formatCurrency } from '../../utils/formatters';
 import PageTransition from '../ui/PageTransition';
 import Card from '../ui/Card';
@@ -146,31 +146,18 @@ export default function Runway() {
     { categories: ynabCategories, cspSettings }
   );
 
-  // Calculate CSP data to get expense breakdown by bucket
-  const cspData = useConsciousSpendingPlan(
-    ynabTransactions,
-    ynabCategories,
-    ynabAccounts,
-    selectedPeriod,
-    cspSettings
-  );
-
   // First calculate baseline runway (without scenario) to get historical values
   const baselineRunway = useRunwayCalculator(allAccounts, monthlyData, selectedPeriod);
 
   // Initialize income scenario hook with historical average income
   const incomeScenario = useIncomeScenario(baselineRunway.historicalAvgMonthlyIncome);
 
-  // Calculate monthly expense amounts by bucket
-  const bucketExpenses = useMemo(() => {
-    if (!cspData?.buckets) return {};
-    return {
-      fixedCosts: cspData.buckets.fixedCosts?.amount || 0,
-      investments: cspData.buckets.investments?.amount || 0,
-      savings: cspData.buckets.savings?.amount || 0,
-      guiltFree: cspData.buckets.guiltFree?.amount || 0,
-    };
-  }, [cspData?.buckets]);
+  // Monthly spending by bucket, from the same months as the baseline burn,
+  // so all buckets selected adds up to exactly the baseline
+  const bucketExpenses = useMemo(
+    () => baselineRunway.historicalAvgMonthlyByBucket || {},
+    [baselineRunway.historicalAvgMonthlyByBucket]
+  );
 
   // Calculate scenario expenses based on bucket selection
   const scenarioMonthlyExpenses = useMemo(() => {
@@ -179,12 +166,10 @@ export default function Runway() {
     }
     // Sum only the selected buckets
     const expenseBuckets = incomeScenario.expenseBuckets;
-    let total = 0;
-    if (expenseBuckets.fixedCosts) total += bucketExpenses.fixedCosts || 0;
-    if (expenseBuckets.investments) total += bucketExpenses.investments || 0;
-    if (expenseBuckets.savings) total += bucketExpenses.savings || 0;
-    if (expenseBuckets.guiltFree) total += bucketExpenses.guiltFree || 0;
-    return total;
+    return Object.keys(EXPENSE_BUCKETS).reduce(
+      (total, key) => total + ((expenseBuckets[key] ?? true) ? (bucketExpenses[key] || 0) : 0),
+      0
+    );
   }, [incomeScenario.hasExpenseFilters, incomeScenario.expenseBuckets, bucketExpenses, baselineRunway.historicalAvgMonthlyExpenses]);
 
   // Build scenario options for runway calculator
@@ -261,7 +246,7 @@ export default function Runway() {
                     </div>
                     <div>
                       <p className="font-medium text-gray-700 dark:text-gray-300 mb-1">Averaging Period</p>
-                      <p>Income and expenses are averaged over the selected period ({selectedPeriod} months) for more stable projections</p>
+                      <p>Income and expenses are averaged over the last {selectedPeriod} complete months for more stable projections</p>
                     </div>
                   </div>
                 </div>
@@ -395,6 +380,8 @@ export default function Runway() {
           setBonus={incomeScenario.setBonus}
           stock={incomeScenario.stock}
           setStock={incomeScenario.setStock}
+          takeHomeRate={incomeScenario.takeHomeRate}
+          setTakeHomeRate={incomeScenario.setTakeHomeRate}
           scenarioMonthlyIncome={incomeScenario.scenarioMonthlyIncome}
           historicalAvgIncome={incomeScenario.historicalAvgIncome}
           incomeDelta={incomeScenario.incomeDelta}

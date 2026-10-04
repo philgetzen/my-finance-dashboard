@@ -34,13 +34,14 @@ function percentChange(current, previous) {
  * @returns {Array} - [{ category, current, previous, change, changePercent }]
  */
 function compareCategories(currentSummary, previousSummary) {
-  const current = new Map(currentSummary.byCategory.map(c => [c.name, c.amount]));
-  const previous = new Map(previousSummary.byCategory.map(c => [c.name, c.amount]));
-  const names = new Set([...current.keys(), ...previous.keys()]);
+  const current = new Map(currentSummary.byCategory.map(c => [c.key, c]));
+  const previous = new Map(previousSummary.byCategory.map(c => [c.key, c]));
+  const keys = new Set([...current.keys(), ...previous.keys()]);
 
-  return Array.from(names).map(category => {
-    const currentAmount = current.get(category) || 0;
-    const previousAmount = previous.get(category) || 0;
+  return Array.from(keys).map(key => {
+    const category = (current.get(key) || previous.get(key)).name;
+    const currentAmount = current.get(key)?.amount || 0;
+    const previousAmount = previous.get(key)?.amount || 0;
     const change = currentAmount - previousAmount;
     const changePercent = previousAmount > 0
       ? (change / previousAmount) * 100

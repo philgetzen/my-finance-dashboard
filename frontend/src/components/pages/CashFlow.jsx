@@ -4,7 +4,7 @@ import { usePrivacy } from '../../contexts/ConsolidatedDataContext';
 import PageTransition from '../ui/PageTransition';
 import Card from '../ui/Card';
 import { normalizeYNABAccountType } from '../../utils/ynabHelpers';
-import { formatCurrency } from '../../utils/formatters';
+import { formatCurrency, signPrefix } from '../../utils/formatters';
 import { useCategoryProcessor } from '../../hooks/useCategoryProcessor';
 import { useCSPSettings } from '../../hooks/useConsciousSpendingPlan';
 import {
@@ -27,7 +27,7 @@ const MetricCard = ({ title, value, subtitle, icon: Icon, colorClass, privacyMod
     <div>
       <p className="text-sm text-gray-500 dark:text-gray-400">{title}</p>
       <p className={`text-xl font-bold text-gray-900 dark:text-white ${privacyMode ? 'privacy-blur' : ''}`}>
-        ${formatCurrency(value)}
+        {signPrefix(value)}${formatCurrency(value)}
       </p>
       {subtitle && (
         <p className={`text-xs text-gray-500 dark:text-gray-400 ${privacyMode ? 'privacy-blur' : ''}`}>
@@ -67,19 +67,19 @@ const CategoryRow = React.memo(({ item, monthHeaders, privacyMode, isIncome, dep
               : 'text-gray-600 dark:text-gray-400'
             } ${privacyMode ? 'privacy-blur' : ''}`}
           >
-            {isEmpty ? '-' : formatCurrency(val)}
+            {isEmpty ? '-' : `${signPrefix(val)}${formatCurrency(val)}`}
           </td>
         );
       })}
       <td className={`py-2.5 px-2 text-right text-sm tabular-nums font-medium ${
         isIncome ? 'text-green-600 dark:text-green-400' : 'text-gray-700 dark:text-gray-300'
       } ${privacyMode ? 'privacy-blur' : ''}`}>
-        {formatCurrency(avgValue)}
+        {signPrefix(avgValue)}{formatCurrency(avgValue)}
       </td>
       <td className={`py-2.5 px-4 text-right text-sm tabular-nums font-semibold ${
         isIncome ? 'text-green-600 dark:text-green-400' : 'text-gray-900 dark:text-white'
       } ${privacyMode ? 'privacy-blur' : ''}`}>
-        {formatCurrency(displayValue)}
+        {signPrefix(displayValue)}{formatCurrency(displayValue)}
       </td>
     </tr>
   );
@@ -135,19 +135,19 @@ const GroupHeaderRow = React.memo(({ group, monthHeaders, privacyMode, isIncome,
               : 'text-gray-700 dark:text-gray-300'
             } ${privacyMode ? 'privacy-blur' : ''}`}
           >
-            {isEmpty ? '-' : formatCurrency(val)}
+            {isEmpty ? '-' : `${signPrefix(val)}${formatCurrency(val)}`}
           </td>
         );
       })}
       <td className={`py-3 px-2 text-right text-sm tabular-nums font-semibold ${
         isIncome ? 'text-green-700 dark:text-green-400' : 'text-gray-700 dark:text-gray-300'
       } ${privacyMode ? 'privacy-blur' : ''}`}>
-        {formatCurrency(avgValue)}
+        {signPrefix(avgValue)}{formatCurrency(avgValue)}
       </td>
       <td className={`py-3 px-4 text-right text-sm tabular-nums font-bold ${
         isIncome ? 'text-green-700 dark:text-green-400' : 'text-gray-800 dark:text-gray-200'
       } ${privacyMode ? 'privacy-blur' : ''}`}>
-        {formatCurrency(totalValue)}
+        {signPrefix(totalValue)}{formatCurrency(totalValue)}
       </td>
     </tr>
   );
@@ -186,15 +186,15 @@ const SummaryRow = ({ label, monthHeaders, monthlyData, avgValue, totalValue, co
           key={month.key}
           className={`py-3 px-2 text-right text-sm tabular-nums ${isBold ? 'font-bold' : 'font-semibold'} ${colorClass} ${privacyMode ? 'privacy-blur' : ''}`}
         >
-          {formatCurrency(val)}
+          {signPrefix(val)}{formatCurrency(val)}
         </td>
       );
     })}
     <td className={`py-3 px-2 text-right text-sm tabular-nums ${isBold ? 'font-bold' : 'font-semibold'} ${colorClass} ${privacyMode ? 'privacy-blur' : ''}`}>
-      {formatCurrency(avgValue)}
+      {signPrefix(avgValue)}{formatCurrency(avgValue)}
     </td>
     <td className={`py-3 px-4 text-right text-sm tabular-nums ${isBold ? 'font-bold' : 'font-semibold'} ${colorClass} ${privacyMode ? 'privacy-blur' : ''}`}>
-      {formatCurrency(totalValue)}
+      {signPrefix(totalValue)}{formatCurrency(totalValue)}
     </td>
   </tr>
 );
@@ -448,7 +448,7 @@ export default function CashFlow() {
           <MetricCard
             title="Total Income"
             value={grandTotals.income}
-            subtitle={`$${formatCurrency(grandTotals.income / numMonths)} avg/mo`}
+            subtitle={`${signPrefix(grandTotals.income)}$${formatCurrency(grandTotals.income / numMonths)} avg/mo`}
             icon={ArrowTrendingUpIcon}
             colorClass="bg-green-500"
             privacyMode={privacyMode}
@@ -456,7 +456,7 @@ export default function CashFlow() {
           <MetricCard
             title="Total Expenses"
             value={grandTotals.expenses}
-            subtitle={`$${formatCurrency(grandTotals.expenses / numMonths)} avg/mo`}
+            subtitle={`${signPrefix(grandTotals.expenses)}$${formatCurrency(grandTotals.expenses / numMonths)} avg/mo`}
             icon={ArrowTrendingDownIcon}
             colorClass="bg-red-500"
             privacyMode={privacyMode}
@@ -464,7 +464,7 @@ export default function CashFlow() {
           <MetricCard
             title="Net Savings"
             value={grandTotals.net}
-            subtitle={`$${formatCurrency(grandTotals.net / numMonths)} avg/mo`}
+            subtitle={`${signPrefix(grandTotals.net)}$${formatCurrency(grandTotals.net / numMonths)} avg/mo`}
             icon={BanknotesIcon}
             colorClass={grandTotals.net >= 0 ? 'bg-blue-500' : 'bg-orange-500'}
             privacyMode={privacyMode}

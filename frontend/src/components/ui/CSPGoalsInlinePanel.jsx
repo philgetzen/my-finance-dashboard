@@ -13,7 +13,7 @@ import {
   CurrencyDollarIcon,
 } from '@heroicons/react/24/outline';
 import { usePrivacy } from '../../contexts/ConsolidatedDataContext';
-import { formatCurrency } from '../../utils/formatters';
+import { formatCurrency, signPrefix } from '../../utils/formatters';
 import { CSP_BUCKETS, CSP_TARGETS } from '../../hooks/useConsciousSpendingPlan';
 import { calculateCSPScore } from '../../hooks/useCSPGoals';
 import Card from './Card';
@@ -393,7 +393,7 @@ export default function CSPGoalsInlinePanel({
                         </span>
                         {delta !== 0 && (
                           <span className={`font-medium ${delta > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                            {delta > 0 ? '+' : ''}{formatCurrency(delta)}
+                            {delta > 0 ? '+' : signPrefix(delta)}{formatCurrency(delta)}
                           </span>
                         )}
                       </div>

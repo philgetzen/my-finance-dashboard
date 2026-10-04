@@ -791,8 +791,9 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
 
             // Track as investment spending
             const transferCatName = `Transfer: ${transferToAccount?.name || 'Investment Account'}`;
-            if (!categoryTotals.has(transferCatName)) {
-              categoryTotals.set(transferCatName, {
+            const transferKey = `transfer-${txn.transfer_account_id}`;
+            if (!categoryTotals.has(transferKey)) {
+              categoryTotals.set(transferKey, {
                 id: `transfer-${txn.transfer_account_id}`,
                 name: transferCatName,
                 bucket: 'investments',
@@ -803,7 +804,7 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
                 monthlyAmounts: {}
               });
             }
-            const catData = categoryTotals.get(transferCatName);
+            const catData = categoryTotals.get(transferKey);
             catData.amount += expenseAmount;
             catData.transactionCount++;
             if (!catData.monthlyAmounts[monthKey]) {
@@ -1027,12 +1028,13 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
         settings.useKeywordFallback
       );
 
-      // Track by category (always, for UI purposes - both expenses and positive amounts)
-      const catKey = categoryInfo.name || 'Uncategorized';
+      // Track by category ID (always, for UI purposes - both expenses and positive amounts).
+      // Keying by name would merge same-named categories from different groups.
+      const catKey = txn.category_id || 'uncategorized';
       if (!categoryTotals.has(catKey)) {
         categoryTotals.set(catKey, {
           id: txn.category_id,
-          name: catKey,
+          name: categoryInfo.name || 'Uncategorized',
           bucket,
           amount: 0,
           excludedAmount: 0,
@@ -1296,7 +1298,7 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
         const totalForPeriod = monthlyContribution * numMonths;
 
         // Add this savings category with MONTHLY CONTRIBUTION (not accumulated balance)
-        categoryTotals.set(categoryName, {
+        categoryTotals.set(categoryId, {
           id: categoryId,
           name: categoryName,
           bucket: 'savings',
@@ -1487,7 +1489,7 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
             }
 
             // Get transaction data if it exists
-            const txnData = categoryTotals.get(cat.name);
+            const txnData = categoryTotals.get(cat.id);
             const amount = txnData?.amount || 0;
             const excludedAmount = txnData?.excludedAmount || 0;
             const transactionCount = txnData?.transactionCount || 0;
