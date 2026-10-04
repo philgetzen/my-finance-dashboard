@@ -150,16 +150,68 @@ function buildAnalysisPrompt(data) {
   `.trim();
 }
 
+// Current Sonnet writes the analysis; current Haiku is the fallback
+const PRIMARY_MODEL = 'claude-sonnet-5-5';
+const FALLBACK_MODEL = 'claude-haiku-4-5';
+
 /**
- * Generate AI analysis using Claude
- * @param {Object} data - Financial data (metrics + trends)
- * @param {Object} options - Options (model, maxTokens)
+ * Text of a Messages API response. Sonnet 5.5 thinks before answering, so the
+ * response can start with a thinking block; read text blocks by type.
+ * @param {Object} response - Messages API response
+ * @returns {string}
+ */
+function responseText(response) {
+  return (response.content || [])
+    .filter(block => block.type === 'text')
+    .map(block => block.text)
+    .join('')
+    .trim();
+}
+
+/**
+ * Ask one model for the analysis
+ * @param {string} model - Model ID
+ * @param {string} prompt - Analysis prompt
+ * @param {number} maxTokens - Output ceiling (thinking counts toward it)
  * @returns {Promise<Object>} - { analysis, usage, model }
+ */
+async function requestAnalysis(model, prompt, maxTokens) {
+  const isPrimary = model === PRIMARY_MODEL;
+
+  const response = await anthropic.messages.create(
+    {
+      model,
+      max_tokens: maxTokens,
+      messages: [{ role: 'user', content: prompt }],
+      // Low effort keeps Sonnet's thinking short for a 150-word summary, and
+      // server-side fallback retries a policy decline on another model.
+      // Haiku 4.5 accepts neither setting.
+      ...(isPrimary && { output_config: { effort: 'low' }, fallbacks: 'default' })
+    },
+    isPrimary ? { headers: { 'anthropic-beta': 'server-side-fallback-2026-07-01' } } : undefined
+  );
+
+  if (response.stop_reason === 'refusal') {
+    throw new Error(`${model} declined the request (${response.stop_details?.category || 'no category'})`);
+  }
+
+  const analysis = responseText(response);
+  if (!analysis) {
+    throw new Error(`${model} returned no text (stop_reason: ${response.stop_reason})`);
+  }
+
+  return { analysis, usage: response.usage, model: response.model || model };
+}
+
+/**
+ * Generate AI analysis using Claude, falling back to Haiku and then to the template
+ * @param {Object} data - Financial data (metrics + trends)
+ * @param {Object} options - Options (maxTokens, fallbackToTemplate)
+ * @returns {Promise<Object>} - { analysis, usage, model, fallback }
  */
 async function generateAnalysis(data, options = {}) {
   const {
-    model = 'claude-sonnet-4-20250514',
-    maxTokens = 1000,
+    maxTokens = 16000,
     fallbackToTemplate = true
   } = options;
 
@@ -178,74 +230,36 @@ async function generateAnalysis(data, options = {}) {
   }
 
   const prompt = buildAnalysisPrompt(data);
+  let lastError;
 
-  try {
-    const response = await anthropic.messages.create({
-      model,
-      max_tokens: maxTokens,
-      messages: [
-        {
-          role: 'user',
-          content: prompt
-        }
-      ]
-    });
+  for (const model of [PRIMARY_MODEL, FALLBACK_MODEL]) {
+    try {
+      const result = await requestAnalysis(model, prompt, maxTokens);
 
-    const analysis = response.content[0]?.text || '';
+      logger.info('AI analysis generated', {
+        model: result.model,
+        inputTokens: result.usage?.input_tokens,
+        outputTokens: result.usage?.output_tokens
+      });
 
-    logger.info('AI analysis generated', {
-      model,
-      inputTokens: response.usage?.input_tokens,
-      outputTokens: response.usage?.output_tokens
-    });
-
-    return {
-      analysis,
-      usage: response.usage,
-      model,
-      fallback: false
-    };
-  } catch (error) {
-    logger.error('AI analysis failed', { error: error.message, model });
-
-    // Try fallback to Haiku if Sonnet fails
-    if (model !== 'claude-3-haiku-20240307' && fallbackToTemplate) {
-      logger.info('Retrying with Haiku model');
-      try {
-        const response = await anthropic.messages.create({
-          model: 'claude-3-haiku-20240307',
-          max_tokens: maxTokens,
-          messages: [
-            {
-              role: 'user',
-              content: prompt
-            }
-          ]
-        });
-
-        return {
-          analysis: response.content[0]?.text || '',
-          usage: response.usage,
-          model: 'claude-3-haiku-20240307',
-          fallback: true
-        };
-      } catch (haikuError) {
-        logger.error('Haiku fallback also failed', { error: haikuError.message });
-      }
+      return { ...result, fallback: result.model !== PRIMARY_MODEL };
+    } catch (error) {
+      lastError = error;
+      logger.error('AI analysis failed', { model, error: error.message });
     }
-
-    // Final fallback to template
-    if (fallbackToTemplate) {
-      return {
-        analysis: generateTemplateAnalysis(data),
-        usage: null,
-        model: 'template-fallback',
-        fallback: true
-      };
-    }
-
-    throw error;
   }
+
+  // Final fallback to template
+  if (fallbackToTemplate) {
+    return {
+      analysis: generateTemplateAnalysis(data),
+      usage: null,
+      model: 'template-fallback',
+      fallback: true
+    };
+  }
+
+  throw lastError;
 }
 
 /**
