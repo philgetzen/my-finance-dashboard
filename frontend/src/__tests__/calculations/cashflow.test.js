@@ -26,6 +26,7 @@ const accounts = [
   { id: 'schwab', name: 'Schwab Investor Checking Phil', type: 'checking', on_budget: true, balance: 0 },
   { id: 'card', name: 'Chase Sapphire Reserve', type: 'creditCard', on_budget: true, balance: -1000000 },
   { id: 'brokerage', name: 'Brokerage', type: 'otherAsset', on_budget: false, balance: 100000000 },
+  { id: 'vanguard', name: 'Vanguard Roth IRA', type: 'otherAsset', on_budget: false, balance: 0 },
   { id: 'home', name: '8331 Home Value', type: 'otherAsset', on_budget: false, balance: 900000000 },
   { id: 'mortgage', name: '8331 Mortgage', type: 'mortgage', on_budget: false, balance: -500000000 }
 ];
@@ -88,11 +89,32 @@ describe('cash-flow classification', () => {
 
   test('a contribution paid from the budget and imported by the brokerage counts once', () => {
     const lines = classify([
-      tx('2026-04-01', 'schwab', -7000, { category_id: 'roth' }),
-      tx('2026-04-03', 'brokerage', 7000, { payee_name: 'Contribution' })
+      tx('2026-04-01', 'schwab', -7000, { category_id: 'roth', payee_name: 'Vanguard' }),
+      tx('2026-04-03', 'vanguard', 7000, { payee_name: 'Contribution' }),
+      tx('2026-05-01', 'chk', -500, { transfer_account_id: 'brokerage' }),
+      tx('2026-05-02', 'brokerage', 500, { payee_name: 'Contribution' })
     ]);
-    expect(lines.map(l => l.kind)).toEqual(['investing', 'ignored']);
-    expect(summarizeLines(lines).investing).toBe(7000);
+    expect(lines.map(l => l.kind)).toEqual(['investing', 'ignored', 'investing', 'ignored']);
+    expect(summarizeLines(lines).investing).toBe(7500);
+  });
+
+  test('equal contributions to different accounts, or more than 5 days apart, both count', () => {
+    const lines = classify([
+      tx('2026-10-01', 'chk', -500, { category_id: 'roth', payee_name: 'Vanguard' }),
+      tx('2026-10-03', 'brokerage', 500, { payee_name: 'Contribution' }),
+      tx('2026-11-01', 'chk', -700, { category_id: 'roth', payee_name: 'Vanguard' }),
+      tx('2026-11-09', 'vanguard', 700, { payee_name: 'Contribution' })
+    ]);
+    expect(lines.every(l => l.kind === 'investing')).toBe(true);
+    expect(summarizeLines(lines).investing).toBe(2400);
+  });
+
+  test('a brokerage payment in a CSP-excluded category is ignored', () => {
+    const lines = classifyTransactions(
+      [tx('2026-09-04', 'chk', -250, { category_id: 'fun', payee_name: 'Vanguard' })],
+      { accounts, categories, cspSettings: { excludedExpenseCategories: ['fun'] } }
+    );
+    expect(lines[0].kind).toBe('ignored');
   });
 
   test('stock-sale proceeds in an investment category are a withdrawal, not negative investing', () => {

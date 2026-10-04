@@ -419,7 +419,7 @@ function classifyLine(line, ctx) {
 
   if (SYSTEM_PAYEES.has(line.payee)) return { kind: 'ignored', bucket: null };
 
-  if (isPayrollContribution(line, account)) return { kind: 'investing', bucket: 'investments' };
+  if (isPayrollContribution(line, account)) return { kind: 'investing', bucket: 'investments', payroll: true };
 
   // Tracking accounts: market moves, home value updates, loan adjustments.
   // Money entering them from the budget is captured on the budget side.
@@ -428,7 +428,11 @@ function classifyLine(line, ctx) {
   const categoryInfo = ctx.categoriesById.get(line.categoryId);
   const groupName = categoryInfo?.groupName || '';
 
-  if (isBrokeragePayment(line)) return { kind: 'investing', bucket: 'investments' };
+  if (isBrokeragePayment(line)) {
+    return ctx.excludedExpenseCategories.has(line.categoryId)
+      ? { kind: 'ignored', bucket: null }
+      : { kind: 'investing', bucket: 'investments' };
+  }
 
   if (line.transferAccountId) {
     const counterpart = ctx.accountsById.get(line.transferAccountId);
@@ -518,37 +522,47 @@ function buildLedger(data = {}, cspSettings = {}) {
 
   const lines = flattenTransactions(transactions).map(line => {
     const categoryInfo = categoriesById.get(line.categoryId);
-    const { kind, bucket } = classifyLine(line, ctx);
+    const { kind, bucket, payroll = false } = classifyLine(line, ctx);
     return {
       ...line,
       categoryName: categoryInfo?.name || line.categoryName,
       categoryLabel: labels.get(line.categoryId) || categoryInfo?.name || line.categoryName,
       groupName: categoryInfo?.groupName || '',
       kind,
-      bucket
+      bucket,
+      payroll
     };
   });
 
-  dropDuplicateContributions(lines);
+  dropDuplicateContributions(lines, accountsById);
 
   return { lines, accountsById, categoriesById };
 }
 
 /**
- * A contribution paid from a budget account in an investment category can also
- * show up as a "Contribution" in the brokerage import. Count it once: drop the
- * brokerage side when a budget-side payment of the same amount is within 5 days.
+ * A contribution paid from a budget account can also show up as a
+ * "Contribution" in the brokerage import. Count it once: drop the brokerage
+ * side when a payment of the same amount went to that account within 5 days.
+ * A transfer names its account; a payment to a payee matches an account whose
+ * name contains the payee's first word ("Vanguard" -> "Vanguard IRA").
  */
-function dropDuplicateContributions(lines) {
-  const budgetSide = lines.filter(line => line.kind === 'investing' && line.amount < 0);
+function dropDuplicateContributions(lines, accountsById) {
+  const budgetSide = lines.filter(line => line.kind === 'investing' && !line.payroll);
   if (budgetSide.length === 0) return;
   const used = new Set();
 
+  const paidTo = (paid, accountId) => {
+    if (paid.transferAccountId) return paid.transferAccountId === accountId;
+    const firstWord = (paid.payee || '').toLowerCase().match(/[a-z0-9]{3,}/)?.[0];
+    return Boolean(firstWord) && accountName(accountsById.get(accountId)).includes(firstWord);
+  };
+
   lines.forEach(line => {
-    if (line.kind !== 'investing' || line.amount <= 0) return;
+    if (!line.payroll || line.kind !== 'investing') return;
     const match = budgetSide.find(paid => !used.has(paid) &&
       paid.amount === -line.amount &&
-      Math.abs(daysBetween(paid.date, line.date)) <= 5);
+      Math.abs(daysBetween(paid.date, line.date)) <= 5 &&
+      paidTo(paid, line.accountId));
     if (match) {
       used.add(match);
       line.kind = 'ignored';
@@ -619,7 +633,7 @@ function summarize(lines, start, end) {
       case 'investing':
         // Budget-side contributions are outflows; payroll contributions are
         // inflows to the investment account
-        investing += Math.abs(line.amount);
+        investing += line.payroll ? line.amount : -line.amount;
         break;
       case 'saving':
         saving -= line.amount;
@@ -646,6 +660,7 @@ function summarize(lines, start, end) {
   });
   byCategory.sort((a, b) => b.amount - a.amount);
 
+  investing = Math.max(0, investing);
   saving = Math.max(0, saving);
   bucketTotals.investments += investing;
   bucketTotals.savings += saving;

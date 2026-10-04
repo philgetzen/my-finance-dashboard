@@ -7,7 +7,6 @@
 const {
   addDays,
   daysBetween,
-  dayOfWeek,
   reportWeek,
   monthStart,
   monthEnd,
@@ -396,16 +395,11 @@ function calculateWeeklyTrends(ledger, today) {
   const history = summarize(ledger.lines, addDays(currentWeekStart, -42), lastWeekEnd);
   const sixWeekAverage = history.spending / 6;
 
-  const daysElapsed = dayOfWeek(currentWeekEnd) + 1;
-  const proRateFactor = daysElapsed < 7 ? 7 / daysElapsed : 1;
-
   return {
     weekStart: currentWeekStart,
     weekEnd: currentWeekEnd,
     currentWeek: {
       spending: currentWeek.spending,
-      projectedWeekly: currentWeek.spending * proRateFactor,
-      daysElapsed,
       investing: currentWeek.investing,
       uncategorized: currentWeek.uncategorized,
       topCategories: currentWeek.byCategory.slice(0, 5)

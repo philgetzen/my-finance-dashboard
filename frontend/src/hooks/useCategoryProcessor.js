@@ -72,7 +72,7 @@ export function useCategoryProcessor(
       const isIncome = txn.kind === 'income';
       const isInvesting = txn.kind === 'investing' || txn.kind === 'saving';
       // A payroll contribution is an inflow to the investment account itself
-      const isPayrollContribution = txn.kind === 'investing' && txn.amountDollars > 0;
+      const isPayrollContribution = txn.kind === 'investing' && txn.payroll;
       const rawAmount = isPayrollContribution ? -txn.amountDollars : txn.amountDollars;
       const categoryName = isPayrollContribution
         ? `${accountNames.get(txn.account_id) || 'Payroll'} contributions`
