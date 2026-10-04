@@ -37,13 +37,18 @@ CI (`.github/workflows/tests.yml`) runs backend tests, then frontend lint, tests
 ### Frontend
 - `src/App.jsx` holds the routes. Pages are in `src/components/pages/`: Dashboard (`/`), Accounts, CashFlow (`/spending`), InvestmentAllocation (`/investments`), Runway, ConsciousSpendingPlan (`/conscious-spending`).
 - `src/contexts/ConsolidatedDataContext.jsx` is the single data provider. Components read it through `useFinanceData()` and `usePrivacy()`. It also handles demo mode, which uses `src/lib/mockData.js`.
-- `src/lib/ynabApi.js` calls the API at `VITE_API_BASE_URL` (empty in production, so same origin; `http://localhost:5001` in development) and refreshes the YNAB token on a 401.
+- API calls use `VITE_API_BASE_URL`: empty in production (same origin), `http://localhost:5001` locally. It must be set: `src/lib/ynabApi.js` falls back to localhost, but the direct `fetch` calls in `ConsolidatedDataContext.jsx`, `AuthenticationPage.jsx` and `YNABConnectionCard.jsx` don't. `ynabApi.js` also refreshes the YNAB token on a 401.
 - Page math lives in hooks (`src/hooks/`: `useTransactionProcessor`, `useCategoryProcessor`, `useConsciousSpendingPlan`, `useRunwayCalculator`, `useIncomeScenario`) and in `src/utils/calculations/`.
 - Use the existing card and layout patterns and Tailwind classes. Use `import.meta.env.DEV` / `PROD`, not `process.env`.
 
 ### API routes
-Most routes exist twice: as a Vercel function in `api/` (production) and as an Express handler in `backend/index.js` (local development). When you change one, change the other. Express has no `manual_holdings` routes, and it exposes the newsletter as `/api/newsletter/send`, `/preview`, `/logs`, `/status` and `/config`.
-- `api/ynab/`: OAuth (`auth`, `token`, `save_token`, `refresh_token`, `disconnect`) and YNAB data. `budgets/index.js` proxies `?budgetId=&resource=accounts|transactions|categories|months`.
+Most routes exist twice: as a Vercel function in `api/` (production) and as an Express handler in `backend/index.js` (local development). When you change one, change the other. Where they differ:
+- Only `api/` has `manual_holdings`.
+- Only Express has the per-resource paths (`/api/ynab/budgets/:budgetId/accounts` and so on), `/api/debug/env` and `/api/debug/auth-url`.
+- Express exposes the newsletter as `/api/newsletter/send`, `/preview`, `/preview-prompt`, `/logs`, `/status` and `/config`, with no auth check. The debug routes return the YNAB client ID and redirect URI. Treat the Express server as local-only.
+
+The production routes in `api/`:
+- `api/ynab/`: OAuth (`auth`, `token`, `save_token`, `refresh_token`, `disconnect`) and YNAB data. `budgets/index.js` lists budgets, or proxies `?budgetId=&resource=accounts|transactions|categories|months|scheduled_transactions` (plus `since_date` for transactions).
 - `api/manual_accounts/`, `api/manual_holdings/`, `api/import-altruist-holdings.js`: manual data
 - `api/newsletter.js`: the weekly email. `?action=cron` (Vercel cron, Saturdays 17:00 UTC), `?action=preview&user_id=`, or POST to send. Every action needs `Authorization: Bearer $CRON_SECRET`.
 
@@ -58,8 +63,8 @@ Most routes exist twice: as a Vercel function in `api/` (production) and as an E
 
 ## Configuration
 
-- **Frontend** (`frontend/.env`): `VITE_API_BASE_URL` and the `VITE_FIREBASE_*` keys
-- **API and backend** (Vercel env vars, or `backend/.env` locally):
+- **Frontend** (`frontend/.env`, from `frontend/.env.example`): `VITE_API_BASE_URL` and the `VITE_FIREBASE_*` keys
+- **API and backend** (Vercel env vars, or `backend/.env` from `backend/.env.example` locally):
   - Firebase Admin credentials: `FIREBASE_PROJECT_ID`, `FIREBASE_PRIVATE_KEY`, `FIREBASE_CLIENT_EMAIL` and the related fields. The local backend can use `backend/firebaseServiceAccount.json` instead.
   - YNAB OAuth: `YNAB_CLIENT_ID`, `YNAB_CLIENT_SECRET`, `YNAB_REDIRECT_URI`
   - Newsletter: `ANTHROPIC_API_KEY`, `RESEND_API_KEY`, `NEWSLETTER_FROM_EMAIL`, `NEWSLETTER_RECIPIENTS`, `NEWSLETTER_TIMEZONE`, `FRONTEND_URL`, `CRON_SECRET`

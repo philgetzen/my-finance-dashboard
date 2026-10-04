@@ -35,7 +35,7 @@ The dashboard and the newsletter use the same rules for what counts as income, s
 
 ### Prerequisites
 
-- Node.js 20 or later
+- Node.js 22 or later
 - A Firebase project with Google sign-in and Firestore enabled
 - A YNAB account and a YNAB OAuth app (optional; demo mode works without one)
 
@@ -56,9 +56,9 @@ The dashboard and the newsletter use the same rules for what counts as income, s
 
 ### Environment Variables
 
-The frontend needs the `VITE_FIREBASE_*` keys from your Firebase project. `VITE_API_BASE_URL` points it at the API; it defaults to `http://localhost:5001`.
+Copy `frontend/.env.example` to `frontend/.env` and fill in the `VITE_FIREBASE_*` keys from your Firebase project. Keep `VITE_API_BASE_URL=http://localhost:5001`; the frontend needs it set to reach the local backend.
 
-The backend needs Firebase Admin credentials, either as `FIREBASE_*` variables or a `backend/firebaseServiceAccount.json` file, plus `YNAB_CLIENT_ID`, `YNAB_CLIENT_SECRET` and `YNAB_REDIRECT_URI`. The newsletter also needs `ANTHROPIC_API_KEY`, `RESEND_API_KEY`, `NEWSLETTER_FROM_EMAIL` and `NEWSLETTER_RECIPIENTS`. See `.env.example` and `backend/.env.example`.
+Copy `backend/.env.example` to `backend/.env`. The backend needs Firebase Admin credentials, either as `FIREBASE_*` variables or a `backend/firebaseServiceAccount.json` file, plus `YNAB_CLIENT_ID`, `YNAB_CLIENT_SECRET` and `YNAB_REDIRECT_URI`. The newsletter also needs `ANTHROPIC_API_KEY`, `RESEND_API_KEY`, `NEWSLETTER_FROM_EMAIL` and `NEWSLETTER_RECIPIENTS`.
 
 ## Testing
 
