@@ -117,6 +117,20 @@ const SYSTEM_PAYEES = new Set([
 
 const isIncomeCategory = name => INCOME_CATEGORIES.includes(name);
 
+// Payroll deductions (401(k), stock purchase plans) never pass through a budget
+// account. Brokerage imports record them as a "Contribution" inflow in the
+// investment account. Mirrors backend/newsletter/cashflow.js.
+const CONTRIBUTION_PAYEE = /contribution/i;
+
+function isPayrollContribution(line, account) {
+  const transferAccountId = line.transfer_account_id && line.transfer_account_id !== 'null';
+  return (line.amount || 0) > 0 && !transferAccountId &&
+    isInvestmentAccount(account) && CONTRIBUTION_PAYEE.test(line.payee_name || '');
+}
+
+// Money sent to your own brokerage is investing whatever category it carries
+const BROKERAGE_PAYEE = /\b(vanguard|altruist)\b/i;
+
 function isUncategorized(line) {
   return !line.category_id ||
     line.category_name === 'Uncategorized' ||
@@ -210,6 +224,8 @@ export function createClassifier({ accounts = [], categories = null, cspSettings
 
     if (SYSTEM_PAYEES.has(line.payee_name)) return result('ignored');
 
+    if (isPayrollContribution(line, account)) return { ...result('investing', 'investments'), payroll: true };
+
     // Tracking accounts: market moves, home value updates, loan adjustments.
     // Money entering them from the budget is captured on the budget side.
     if (account && !isOnBudget(account)) return result('ignored');
@@ -217,6 +233,10 @@ export function createClassifier({ accounts = [], categories = null, cspSettings
     const transferAccountId = line.transfer_account_id && line.transfer_account_id !== 'null'
       ? line.transfer_account_id
       : null;
+
+    if (amount < 0 && !transferAccountId && BROKERAGE_PAYEE.test(line.payee_name || '')) {
+      return excludedExpenseCategories.has(line.category_id) ? result('ignored') : result('investing', 'investments');
+    }
 
     if (transferAccountId) {
       const counterpart = accountsById.get(transferAccountId);
@@ -253,9 +273,10 @@ export function createClassifier({ accounts = [], categories = null, cspSettings
     if (excludedExpenseCategories.has(line.category_id)) return result('ignored');
 
     // An outflow in an investment category (e.g. paying an untracked brokerage)
-    // is investing. Everything else that leaves to a payee is spending.
+    // is investing. An inflow there (e.g. stock-sale proceeds) is a withdrawal,
+    // not income. Everything else that leaves to a payee is spending.
     const bucket = bucketFor();
-    if (bucket === 'investments') return result('investing', bucket);
+    if (bucket === 'investments') return amount < 0 ? result('investing', bucket) : result('transfer');
     return result('spending', bucket);
   };
 }
@@ -291,17 +312,57 @@ export function categoryLabels(categories) {
 export function classifyTransactions(transactions, options = {}) {
   const classify = createClassifier(options);
   const labels = categoryLabels(options.categories);
-  return flattenLines(transactions).map(line => {
-    const { kind, bucket, groupName } = classify(line);
+  const accountsById = new Map((options.accounts || []).map(acc => [acc.id, acc]));
+  const lines = flattenLines(transactions).map(line => {
+    const { kind, bucket, groupName, payroll = false } = classify(line);
     return {
       ...line,
       kind,
       bucket,
       groupName,
+      payroll,
       categoryLabel: labels.get(line.category_id) || line.category_name,
       amountDollars: (line.amount || 0) / 1000,
       monthKey: String(line.date || '').slice(0, 7)
     };
+  });
+  dropDuplicateContributions(lines, accountsById);
+  return lines;
+}
+
+const daysApart = (a, b) => Math.round(Math.abs(parseLocalDate(a) - parseLocalDate(b)) / 86400000);
+
+/**
+ * A contribution paid from a budget account can also show up as a
+ * "Contribution" in the brokerage import. Count it once: drop the brokerage
+ * side when a payment of the same amount went to that account within 5 days.
+ * A transfer names its account; a payment to a payee matches an account whose
+ * name contains the payee's first word ("Vanguard" -> "Vanguard IRA").
+ */
+function dropDuplicateContributions(lines, accountsById) {
+  const budgetSide = lines.filter(line => line.kind === 'investing' && !line.payroll);
+  if (budgetSide.length === 0) return;
+  const used = new Set();
+
+  const paidTo = (paid, accountId) => {
+    const transferAccountId = paid.transfer_account_id && paid.transfer_account_id !== 'null'
+      ? paid.transfer_account_id
+      : null;
+    if (transferAccountId) return transferAccountId === accountId;
+    const firstWord = (paid.payee_name || '').toLowerCase().match(/[a-z0-9]{3,}/)?.[0];
+    return Boolean(firstWord) && accountName(accountsById.get(accountId)).includes(firstWord);
+  };
+
+  lines.forEach(line => {
+    if (!line.payroll || line.kind !== 'investing') return;
+    const match = budgetSide.find(paid => !used.has(paid) &&
+      paid.amount === -line.amount && daysApart(paid.date, line.date) <= 5 &&
+      paidTo(paid, line.account_id));
+    if (match) {
+      used.add(match);
+      line.kind = 'ignored';
+      line.bucket = null;
+    }
   });
 }
 
@@ -334,7 +395,9 @@ export function summarizeLines(lines) {
         break;
       }
       case 'investing':
-        investing -= amount;
+        // Budget-side contributions are outflows; payroll contributions are
+        // inflows to the investment account
+        investing += line.payroll ? amount : -amount;
         break;
       case 'saving':
         saving -= amount;

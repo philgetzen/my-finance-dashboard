@@ -7,8 +7,7 @@
 const {
   addDays,
   daysBetween,
-  dayOfWeek,
-  startOfWeek,
+  reportWeek,
   monthStart,
   monthEnd,
   sameDayInMonth,
@@ -385,27 +384,22 @@ function calculateAnnualProgress(ledger, today, currentMetrics, snapshots = [], 
  * @returns {Object} - Weekly comparison data
  */
 function calculateWeeklyTrends(ledger, today) {
-  const currentWeekStart = startOfWeek(today);
+  const { start: currentWeekStart, end: currentWeekEnd } = reportWeek(today);
   const lastWeekStart = addDays(currentWeekStart, -7);
   const lastWeekEnd = addDays(currentWeekStart, -1);
 
-  const currentWeek = summarize(ledger.lines, currentWeekStart, today);
+  const currentWeek = summarize(ledger.lines, currentWeekStart, currentWeekEnd);
   const lastWeek = summarize(ledger.lines, lastWeekStart, lastWeekEnd);
 
   // Six full weeks before the current one
   const history = summarize(ledger.lines, addDays(currentWeekStart, -42), lastWeekEnd);
   const sixWeekAverage = history.spending / 6;
 
-  const daysElapsed = dayOfWeek(today) + 1;
-  const proRateFactor = daysElapsed < 7 ? 7 / daysElapsed : 1;
-
   return {
     weekStart: currentWeekStart,
-    weekEnd: addDays(currentWeekStart, 6),
+    weekEnd: currentWeekEnd,
     currentWeek: {
       spending: currentWeek.spending,
-      projectedWeekly: currentWeek.spending * proRateFactor,
-      daysElapsed,
       investing: currentWeek.investing,
       uncategorized: currentWeek.uncategorized,
       topCategories: currentWeek.byCategory.slice(0, 5)
