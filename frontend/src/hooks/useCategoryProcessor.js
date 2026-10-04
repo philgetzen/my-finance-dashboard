@@ -36,6 +36,8 @@ export function useCategoryProcessor(
       cspSettings: cspSettings || {}
     }).filter(line => ['income', 'spending', 'investing', 'saving', 'uncategorized'].includes(line.kind));
 
+    const accountNames = new Map(accounts.map(acc => [acc.id, acc.name]));
+
     // Calendar months from the selected start (or first transaction) through this month
     const today = new Date();
     const firstDate = lines.reduce((min, line) => (line.date && line.date < min ? line.date : min), toMonthKey(today));
@@ -66,11 +68,15 @@ export function useCategoryProcessor(
       const monthKey = txn.monthKey;
       if (!monthKeys.has(monthKey)) return;
 
-      const rawAmount = txn.amountDollars;
       const groupInfo = categoryIdToGroupInfoMap.get(txn.category_id);
-      const categoryName = groupInfo?.categoryName || txn.category_name || 'Uncategorized';
       const isIncome = txn.kind === 'income';
       const isInvesting = txn.kind === 'investing' || txn.kind === 'saving';
+      // A payroll contribution is an inflow to the investment account itself
+      const isPayrollContribution = txn.kind === 'investing' && txn.amountDollars > 0;
+      const rawAmount = isPayrollContribution ? -txn.amountDollars : txn.amountDollars;
+      const categoryName = isPayrollContribution
+        ? `${accountNames.get(txn.account_id) || 'Payroll'} contributions`
+        : groupInfo?.categoryName || txn.category_name || (isInvesting && txn.payee_name) || 'Uncategorized';
       let groupName = isInvesting
         ? INVESTING_GROUP_NAME
         : txn.kind === 'uncategorized' ? 'Uncategorized' : groupInfo?.groupName;

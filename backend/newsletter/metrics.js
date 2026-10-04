@@ -10,7 +10,7 @@
 const {
   todayKey,
   addDays,
-  startOfWeek,
+  reportWeek,
   monthStart,
   completeMonths,
   formatKey,
@@ -387,14 +387,14 @@ function getTopSpendingCategories(monthToDate, monthlyHistory = []) {
 
 /**
  * This week's spending by category vs the category's average over the prior 6 weeks
- * Weeks run Sunday-Saturday (matches template and trends)
+ * Uses the same Sunday-Saturday report week as trends
  * @param {Object} ledger - Output of buildLedger
  * @param {string} today - 'YYYY-MM-DD'
  * @returns {Array} - Top categories with weekly comparison
  */
 function getWeeklyTopCategories(ledger, today) {
-  const weekStart = startOfWeek(today);
-  const thisWeek = summarize(ledger.lines, weekStart, today);
+  const { start: weekStart, end: weekEnd } = reportWeek(today);
+  const thisWeek = summarize(ledger.lines, weekStart, weekEnd);
   const history = summarize(ledger.lines, addDays(weekStart, -42), addDays(weekStart, -1));
 
   const averages = new Map();

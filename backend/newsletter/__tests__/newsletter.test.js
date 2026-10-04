@@ -16,6 +16,7 @@ const accounts = [
   { id: 'schwab', name: 'Schwab Investor Checking Phil', type: 'checking', on_budget: true, balance: 20000000 },
   { id: 'card', name: 'Chase Sapphire Reserve', type: 'creditCard', on_budget: true, balance: -2000000 },
   { id: 'brokerage', name: "Phillip Getzen's Individual", type: 'otherAsset', on_budget: false, balance: 500000000 },
+  { id: 'k401', name: 'APPLE 401(K) PLAN', type: 'otherAsset', on_budget: false, balance: 0 },
   { id: 'home', name: '8331 Home Value', type: 'otherAsset', on_budget: false, balance: 1200000000 },
   { id: 'mortgage', name: '8331 Mortgage', type: 'mortgage', on_budget: false, balance: -600000000 },
   { id: 'loan', name: 'Kia Loan', type: 'autoLoan', on_budget: true, balance: -20000000 }
@@ -135,6 +136,57 @@ describe('cash-flow classification', () => {
       txn('2026-09-01', 'checking', 20000, { transfer_account_id: 'brokerage', category_id: 'rta', payee_name: 'Transfer : Brokerage' })
     ]);
     assert.equal(lines[0].kind, 'transfer');
+  });
+
+  test('payroll contributions recorded in the investment account are investing', () => {
+    // Oct 3, 2026 newsletter: 401(k) and SIP deductions never touch a budget
+    // account, so YTD investing showed $0
+    const lines = classify([
+      txn('2026-09-11', 'k401', 1375.84, { payee_name: 'Contribution' }),
+      txn('2026-09-11', 'k401', 42.10, { payee_name: 'Dividend' }),
+      txn('2026-09-11', 'k401', -1375.84, { payee_name: 'Vanguard Target 2050 Buy' }),
+      txn('2026-09-11', 'home', 5000, { payee_name: 'Contribution' })
+    ]);
+    assert.deepEqual(lines.map(l => l.kind), ['investing', 'ignored', 'ignored', 'ignored']);
+    assert.equal(cashflow.summarize(lines, '2026-09-01', '2026-09-30').investing, 1375.84);
+  });
+
+  test('payments to Vanguard or Altruist are investing in any category, even uncategorized', () => {
+    const lines = classify([
+      spend('2026-09-04', 500, 'trip', 'schwab'),
+      txn('2026-09-11', 'checking', -2500, { payee_name: 'ALTRUIST FINANCIAL ACH' }),
+      txn('2026-09-12', 'checking', 800, { category_id: 'rta', payee_name: 'Vanguard' })
+    ].map((t, i) => (i === 0 ? { ...t, payee_name: 'Vanguard' } : t)));
+    assert.deepEqual(lines.map(l => l.kind), ['investing', 'investing', 'income']);
+    assert.equal(cashflow.summarize(lines, '2026-09-01', '2026-09-30').investing, 3000);
+  });
+
+  test('Poppins nanny payroll stays spending', () => {
+    const lines = classify([
+      txn('2026-09-11', 'checking', -1500, { category_id: 'nanny', payee_name: 'Poppins Payroll' })
+    ]);
+    assert.deepEqual(lines.map(l => [l.kind, l.bucket]), [['spending', 'fixedCosts']]);
+  });
+
+  test('a contribution paid from the budget and imported by the brokerage counts once', () => {
+    const lines = classify([
+      spend('2026-04-01', 7000, 'invest', 'schwab'),
+      txn('2026-04-03', 'brokerage', 7000, { payee_name: 'Contribution' })
+    ]);
+    assert.deepEqual(lines.map(l => l.kind), ['investing', 'ignored']);
+    assert.equal(cashflow.summarize(lines, '2026-04-01', '2026-04-30').investing, 7000);
+  });
+
+  test('stock-sale proceeds in an investment category are a withdrawal, not negative investing', () => {
+    // Netting the sale against contributions zeroed out a year of investing
+    const lines = classify([
+      txn('2026-03-01', 'k401', 2000, { payee_name: 'Contribution' }),
+      txn('2026-03-05', 'schwab', 30000, { category_id: 'invest', payee_name: 'Stock Sale' })
+    ]);
+    assert.deepEqual(lines.map(l => l.kind), ['investing', 'transfer']);
+    const summary = cashflow.summarize(lines, '2026-01-01', '2026-12-31');
+    assert.equal(summary.investing, 2000);
+    assert.equal(summary.income, 0);
   });
 
   test('categorized debt payments are spending whether the loan is on or off budget', () => {
@@ -275,6 +327,13 @@ describe('calendar math', () => {
     );
   });
 
+  test('the report week is the current week on Saturday, otherwise the last full week', () => {
+    assert.deepEqual(cashflow.reportWeek('2026-10-03'), { start: '2026-09-27', end: '2026-10-03' });
+    // Oct 4, 2026 ad hoc run: a Sunday showed an empty Oct 4 - Oct 10 week
+    assert.deepEqual(cashflow.reportWeek('2026-10-04'), { start: '2026-09-27', end: '2026-10-03' });
+    assert.deepEqual(cashflow.reportWeek('2026-10-07'), { start: '2026-09-27', end: '2026-10-03' });
+  });
+
   test('today is taken in the newsletter timezone', () => {
     // 2026-10-03 02:00 UTC is still Friday Oct 2 in Los Angeles
     assert.equal(cashflow.todayKey('America/Los_Angeles', new Date('2026-10-03T02:00:00Z')), '2026-10-02');
@@ -323,6 +382,25 @@ describe('newsletter metrics', () => {
     const { trends } = run(transactions);
 
     assert.equal(trends.annualProgress.ytd.investments, 4000);
+  });
+
+  test('YTD investments include payroll contributions', () => {
+    const transactions = steadyBudget();
+    ['2026-01-09', '2026-01-23', '2026-02-06'].forEach(date =>
+      transactions.push(txn(date, 'k401', 1375.84, { payee_name: 'Contribution' })));
+    const { trends } = run(transactions);
+
+    assert.equal(Math.round(trends.annualProgress.ytd.investments * 100) / 100, 4127.52);
+  });
+
+  test('an ad hoc run on Sunday reports the week that just ended', () => {
+    const transactions = [spend('2026-09-29', 300, 'dining'), spend('2026-10-04', 50, 'dining')];
+    const { metrics, trends } = run(transactions, { today: '2026-10-04' });
+
+    assert.equal(trends.weekly.weekStart, '2026-09-27');
+    assert.equal(trends.weekly.weekEnd, '2026-10-03');
+    assert.equal(trends.weekly.currentWeek.spending, 300);
+    assert.deepEqual(metrics.weeklyTopCategories.map(c => [c.name, c.amount]), [['Dining Out', 300]]);
   });
 
   test('weekly top categories compare against the 6 prior full weeks', () => {

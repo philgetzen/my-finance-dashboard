@@ -5,7 +5,7 @@
  */
 
 const { formatCurrency } = require('./helpers');
-const { formatKey, startOfWeek, addDays, todayKey } = require('./cashflow');
+const { formatKey, reportWeek, addDays, todayKey } = require('./cashflow');
 
 /**
  * Convert basic markdown to HTML for email
@@ -58,7 +58,7 @@ function markdownToHtml(text) {
  * @returns {string} - Formatted date range like "Jan 15 - Jan 21"
  */
 function getWeekDateRange(weekStart) {
-  const start = weekStart || startOfWeek(todayKey(process.env.NEWSLETTER_TIMEZONE));
+  const start = weekStart || reportWeek(todayKey(process.env.NEWSLETTER_TIMEZONE)).start;
   const end = addDays(start, 6);
   const short = { month: 'short', day: 'numeric' };
   return `${formatKey(start, short)} - ${formatKey(end, short)}`;

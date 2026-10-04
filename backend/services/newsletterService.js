@@ -12,7 +12,7 @@ const { generateNewsletterHtml, generateSubject } = require('../newsletter/templ
 const { sendNewsletter, getRecipients, validateConfig: validateEmailConfig } = require('./emailService');
 const { generateAnalysis, validateConfig: validateAiConfig, getAnalysisPrompt } = require('./aiAnalysisService');
 const { getNextSaturday9am } = require('../newsletter/helpers');
-const { todayKey, formatKey } = require('../newsletter/cashflow');
+const { todayKey, formatKey, reportWeek } = require('../newsletter/cashflow');
 const { snapshotDateKey } = require('../newsletter/trends');
 
 // YNAB API configuration
@@ -268,11 +268,12 @@ async function saveSnapshot(userId, metrics, trends) {
 }
 
 /**
- * Display date for the newsletter header (e.g., "September 26, 2026")
+ * Display date for the newsletter header: the Saturday that ends the report
+ * week (e.g., "September 26, 2026")
  * @param {string} today - 'YYYY-MM-DD'
  */
 function formatWeekEnding(today) {
-  return formatKey(today, { month: 'long', day: 'numeric', year: 'numeric' });
+  return formatKey(reportWeek(today).end, { month: 'long', day: 'numeric', year: 'numeric' });
 }
 
 /**
