@@ -1,4 +1,4 @@
-const { test, describe } = require('node:test');
+const { test, describe, before } = require('node:test');
 const assert = require('node:assert/strict');
 
 const cashflow = require('../cashflow');
@@ -6,6 +6,11 @@ const { calculateAllMetrics } = require('../metrics');
 const { calculateAllTrends } = require('../trends');
 const { generateNewsletterHtml } = require('../template');
 const { generateTemplateAnalysis } = require('../../services/aiAnalysisService');
+
+let shared;
+before(async () => {
+  shared = await cashflow.loadSharedRules();
+});
 
 // --------------------------------------------
 // Fixture: accounts and categories shaped like the YNAB API
@@ -251,7 +256,7 @@ describe('cash-flow classification', () => {
         ]
       })
     ]);
-    assert.deepEqual(lines.map(l => [l.categoryName, l.amount, l.date]), [
+    assert.deepEqual(lines.map(l => [l.category_name, l.amountDollars, l.date]), [
       ['Groceries', -200, '2026-09-05'],
       ['Household Goods', -100, '2026-09-05']
     ]);
@@ -273,11 +278,11 @@ describe('cash-flow classification', () => {
   });
 
   test('emoji-prefixed YNAB group names map to CSP buckets', () => {
-    assert.equal(cashflow.bucketFromGroupName('🔗 Fixed Costs'), 'fixedCosts');
-    assert.equal(cashflow.bucketFromGroupName('💵 Savings'), 'savings');
-    assert.equal(cashflow.bucketFromGroupName('🤑 Post Tax Investments'), 'investments');
-    assert.equal(cashflow.bucketFromGroupName('👩🏽‍❤️‍👨🏼 Family Guilt Free Spending'), 'guiltFree');
-    assert.equal(cashflow.bucketFromGroupName('✅ True Expenses'), 'guiltFree');
+    assert.equal(shared.mapGroupNameToBucket('🔗 Fixed Costs'), 'fixedCosts');
+    assert.equal(shared.mapGroupNameToBucket('💵 Savings'), 'savings');
+    assert.equal(shared.mapGroupNameToBucket('🤑 Post Tax Investments'), 'investments');
+    assert.equal(shared.mapGroupNameToBucket('👩🏽‍❤️‍👨🏼 Family Guilt Free Spending'), 'guiltFree');
+    assert.equal(shared.mapGroupNameToBucket('✅ True Expenses'), 'guiltFree');
   });
 
   test('same-named categories in different groups keep their own buckets', () => {

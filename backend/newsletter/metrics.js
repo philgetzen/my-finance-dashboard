@@ -19,8 +19,6 @@ const {
   isInvestmentAccount,
   isCashAccount,
   isOnBudget,
-  GROUP_NAME_TO_BUCKET,
-  categorizeTransaction,
   buildLedger,
   summarize
 } = require('./cashflow');
@@ -445,7 +443,6 @@ function calculateAllMetrics(data, options = {}) {
 
 module.exports = {
   CSP_TARGETS,
-  GROUP_NAME_TO_BUCKET,
   calculateNetWorth,
   calculateRunway,
   calculateCSPBuckets,
@@ -453,6 +450,5 @@ module.exports = {
   getMonthlyHistory,
   getTopSpendingCategories,
   getWeeklyTopCategories,
-  calculateAllMetrics,
-  categorizeTransaction
+  calculateAllMetrics
 };
