@@ -10,11 +10,12 @@ import {
   DEFAULT_FIXED_COST_KEYWORDS,
   DEFAULT_INVESTMENT_KEYWORDS,
   DEFAULT_SAVINGS_KEYWORDS,
-  GROUP_NAME_TO_BUCKET,
   DEFAULT_CSP_SETTINGS,
   isIncomeCategory,
   shouldSkipTransaction,
 } from '../utils/calculations/constants';
+import { mapGroupNameToBucket } from '../utils/calculations/categories';
+import { flattenLines, parseLocalDate, toMonthKey } from '../utils/calculations/cashflow';
 
 // Re-export for backward compatibility
 export { CSP_TARGETS, CSP_BUCKETS };
@@ -330,19 +331,24 @@ export function useExcludedPayees() {
  * Get bucket from YNAB group name (direct match)
  */
 function getBucketFromGroupName(groupName) {
-  if (!groupName) return null;
-  const lowerGroup = groupName.toLowerCase().trim();
-  return GROUP_NAME_TO_BUCKET[lowerGroup] || null;
+  return mapGroupNameToBucket(groupName);
 }
 
 /**
  * Categorize a transaction into a CSP bucket
- * Priority: 1) Custom mapping, 2) Keyword inference (if enabled), 3) Default to guilt-free
+ * Priority: 1) Custom mapping, 2) YNAB group name, 3) Keyword inference (if enabled), 4) Default to guilt-free
+ * (matches getCategoryBucket in utils/calculations/categories.js and the newsletter)
  */
 function categorizeTransaction(categoryId, categoryName, categoryGroupName, categoryMappings, useKeywordFallback) {
   // Use custom mapping if it exists
   if (categoryId && categoryMappings[categoryId]) {
     return categoryMappings[categoryId];
+  }
+
+  // Use the YNAB group the category lives in ("🔗 Fixed Costs" → fixedCosts)
+  const groupBucket = getBucketFromGroupName(categoryGroupName);
+  if (groupBucket) {
+    return groupBucket;
   }
 
   // Use keyword inference as fallback when enabled (default is true)
@@ -527,11 +533,8 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
           accName.includes('real estate');
 
         const isDebtAccount =
-          accType === 'otherliability' ||
-          accType === 'mortgage' ||
-          accType === 'loan' ||
-          accType === 'creditcard' ||
-          accType === 'lineofcredit' ||
+          ['otherliability', 'mortgage', 'loan', 'creditcard', 'lineofcredit', 'autoloan',
+            'studentloan', 'personalloan', 'medicaldebt', 'otherdebt'].includes(accType) ||
           accName.includes('mortgage') ||
           accName.includes('loan') ||
           accName.includes('credit card');
@@ -664,8 +667,10 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
     const preTaxContributions = { total: 0, accounts: new Map() };
     const postTaxContributions = { total: 0, accounts: new Map() };
 
-    transactions.forEach(txn => {
-      const txnDate = new Date(txn.date);
+    // Expand split transactions so each line lands in its own category
+    flattenLines(transactions).forEach(txn => {
+      // Parse as a local date: new Date('2026-08-01') is July 31 in US time zones
+      const txnDate = parseLocalDate(txn.date);
       const txnAmount = getTransactionAmount(txn);
 
       if (txnDate < startDate) {
@@ -770,7 +775,7 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
           // Count it as an investment expense (the outflow from budget)
           const amount = getTransactionAmount(txn);
           if (amount < 0) { // Outflow from budget = investment contribution
-            const monthKey = txnDate.toISOString().slice(0, 7);
+            const monthKey = txn.date.slice(0, 7);
             const expenseAmount = Math.abs(amount);
 
             // Initialize monthly data
@@ -898,7 +903,7 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
 
       const amount = getTransactionAmount(txn);
       const categoryInfo = categoryMap.get(txn.category_id) || { name: txn.category_name, groupName: '' };
-      const monthKey = txnDate.toISOString().slice(0, 7);
+      const monthKey = txn.date.slice(0, 7);
 
       // Initialize monthly data
       if (!monthlyBuckets[monthKey]) {
@@ -1091,12 +1096,11 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
       // Helper to calculate occurrences of a scheduled transaction within date range
       const getOccurrencesInRange = (scheduled, startDate, endDate) => {
         const frequency = scheduled.frequency;
-        const dateNext = new Date(scheduled.date_next);
+        const dateNext = parseLocalDate(scheduled.date_next);
         const rawAmount = (scheduled.amount || 0) / 1000; // milliunits to dollars
 
-        // In YNAB, income is NEGATIVE (inflows are negative, outflows are positive)
-        // Skip if not income (positive amounts are expenses)
-        if (rawAmount >= 0) return { count: 0, total: 0 };
+        // Inflows are positive in YNAB, same as regular transactions
+        if (rawAmount <= 0) return { count: 0, total: 0 };
         if (!INCOME_CATEGORIES.includes(scheduled.category_name)) return { count: 0, total: 0 };
 
         // Convert to positive amount for calculations
@@ -1175,8 +1179,8 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
         }
       });
 
-      // Add scheduled income to total income
-      totalIncome += scheduledIncomeTotal;
+      // Projected income is reported for diagnostics only. Adding it to actual
+      // income would compare future paychecks against past spending.
     }
 
     // Calculate monthly averages
@@ -1280,16 +1284,16 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
         // This represents actual savings contribution, not accumulated balance
         const monthlyAmounts = {};
         const now = new Date();
-        for (let i = 0; i < periodMonths; i++) {
+        for (let i = 0; i < numMonths; i++) {
           const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
-          const monthKey = monthDate.toISOString().slice(0, 7);
+          const monthKey = toMonthKey(monthDate);
           // Use the current month's budgeted amount as a proxy for all months
           // (YNAB only gives us current month's budget, not historical)
           monthlyAmounts[monthKey] = monthlyContribution;
         }
 
-        // Total for the period = monthly contribution × number of months
-        const totalForPeriod = monthlyContribution * periodMonths;
+        // Total for the period = monthly contribution × the months we divide by below
+        const totalForPeriod = monthlyContribution * numMonths;
 
         // Add this savings category with MONTHLY CONTRIBUTION (not accumulated balance)
         categoryTotals.set(categoryName, {
@@ -1379,7 +1383,7 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
       .sort(([a], [b]) => a.localeCompare(b))
       .slice(-periodMonths)
       .map(([monthKey, data]) => {
-        const date = new Date(monthKey + '-01');
+        const date = parseLocalDate(monthKey + '-01');
         return {
           month: date.toLocaleDateString('en-US', { month: 'short' }),
           monthKey,
@@ -1573,7 +1577,8 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
     const netWorthAssets = netWorthAccounts.assets.reduce((sum, acc) => sum + acc.balance, 0);
     const netWorthInvestments = netWorthAccounts.investments.reduce((sum, acc) => sum + acc.balance, 0);
     const netWorthSavings = netWorthAccounts.savings.reduce((sum, acc) => sum + acc.balance, 0);
-    const netWorthDebt = netWorthAccounts.debt.reduce((sum, acc) => sum + Math.abs(acc.balance), 0);
+    // Liability balances are negative in YNAB; a card carrying a credit reduces debt
+    const netWorthDebt = netWorthAccounts.debt.reduce((sum, acc) => sum - acc.balance, 0);
     const netWorthTotal = netWorthAssets + netWorthInvestments + netWorthSavings - netWorthDebt;
 
     // Build pre-tax and post-tax investment summaries

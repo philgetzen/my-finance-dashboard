@@ -22,8 +22,9 @@ const PrivacyCurrency = ({
     ? `${zeroClassName} ${isPrivacyMode ? 'privacy-blur' : ''}`
     : `${className} ${isPrivacyMode ? 'privacy-blur' : ''}`;
 
-  // For zero values, always use '$' prefix (not '-$')
-  const finalPrefix = isZero ? '$' : prefix;
+  // For zero values, always use '$' prefix (not '-$'). Negative amounts keep
+  // their sign unless the caller supplies its own prefix (e.g. '-$' for debts).
+  const finalPrefix = isZero ? '$' : (prefix === '$' && amount < 0 ? '-$' : prefix);
 
   return (
     <span className={`tabular-nums whitespace-nowrap ${finalClassName}`} {...props}>

@@ -122,7 +122,7 @@ export function getMonthBoundaries(date) {
  * @returns {boolean} - True if date is within range
  */
 export function isWithinRange(date, startDate, endDate) {
-  const checkDate = date instanceof Date ? date : new Date(date);
+  const checkDate = date instanceof Date ? date : parseCalendarDate(date);
   const start = startDate instanceof Date ? startDate : new Date(startDate);
   const end = endDate ? (endDate instanceof Date ? endDate : new Date(endDate)) : new Date();
 
@@ -135,8 +135,12 @@ export function isWithinRange(date, startDate, endDate) {
  * @returns {string} - Month key like "2026-01"
  */
 export function getMonthKey(date) {
+  // YNAB dates are calendar dates; read the month straight from the string
+  if (typeof date === 'string' && /^\d{4}-\d{2}/.test(date)) return date.slice(0, 7);
   const d = date instanceof Date ? date : new Date(date);
-  return d.toISOString().slice(0, 7);
+  // Local month: toISOString() would shift local midnight into the previous
+  // month east of UTC
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
 /**
@@ -184,4 +188,15 @@ export function formatDateRange(startDate, endDate) {
     : new Date().toLocaleDateString('en-US', formatOptions);
 
   return `${start} - ${end}`;
+}
+
+/**
+ * Parse 'YYYY-MM-DD' as local midnight. new Date('2026-08-01') is UTC midnight,
+ * which is July 31 in US time zones.
+ * @param {string} value - Date string
+ * @returns {Date}
+ */
+function parseCalendarDate(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value));
+  return match ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])) : new Date(value);
 }

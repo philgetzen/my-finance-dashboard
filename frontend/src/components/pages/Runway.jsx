@@ -135,15 +135,16 @@ export default function Runway() {
       .filter(Boolean)
   ), [allAccounts]);
 
+  // Load CSP settings for category mappings
+  const cspSettings = useCSPSettings();
+
   // Process transactions to get monthly data
   const { monthlyData } = useTransactionProcessor(
     ynabTransactions,
     allAccounts,
-    investmentAccountIds
+    investmentAccountIds,
+    { categories: ynabCategories, cspSettings }
   );
-
-  // Load CSP settings for category mappings
-  const cspSettings = useCSPSettings();
 
   // Calculate CSP data to get expense breakdown by bucket
   const cspData = useConsciousSpendingPlan(

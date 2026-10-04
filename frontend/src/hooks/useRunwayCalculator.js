@@ -46,22 +46,22 @@ export function useRunwayCalculator(allAccounts, monthlyData, periodMonths = 6, 
 
       const type = account.normalizedType;
       const balance = account.balance || 0;
-      const source = account.source;
 
       if (type === 'checking') {
         checking += balance;
       } else if (type === 'savings') {
         savings += balance;
-      } else if (type === 'cash' || (source === 'manual' && type !== 'investment' && type !== 'credit' && type !== 'loan')) {
-        // Include manual cash accounts that aren't investments or debt
+      } else if (type === 'cash') {
+        // Only cash-type accounts count; a manual mortgage or "other" asset isn't spendable cash
         manualCash += balance;
       }
     });
 
     const cashReserves = checking + savings + manualCash;
 
-    // 2. Get historical data for selected period
-    const historicalData = getMonthlyRangeData(monthlyData, periodMonths);
+    // 2. Get historical data for the last N complete months. Including the
+    // current partial month would understate the monthly averages.
+    const historicalData = getMonthlyRangeData(monthlyData, periodMonths, { completeOnly: true });
     const validMonths = historicalData.filter(m => m.income > 0 || m.expenses > 0);
     const numMonths = Math.max(validMonths.length, 1);
 

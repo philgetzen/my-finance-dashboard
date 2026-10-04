@@ -47,7 +47,8 @@ function buildAnalysisPrompt(data) {
       <monthly_net_cash_flow>${formatCurrency(runway.avgMonthlyNet || 0)}</monthly_net_cash_flow>
       <cash_reserves>${formatCurrency(runway.cashReserves || 0)}</cash_reserves>
       <status>${runway.runwayHealth || 'unknown'}</status>
-      <note>Runway is based on net cash flow (income minus true expenses, excluding investment/savings transfers)</note>
+      <monthly_investing>${formatCurrency(runway.avgMonthlyInvesting || 0)}</monthly_investing>
+      <note>Averages of the last ${runway.monthsAveraged || 0} complete months. Net cash flow is income minus spending. Investing is money moved into investment accounts; it is not spending.</note>
     </cash_runway>
     <csp_buckets>
       <fixed_costs percentage="${csp.buckets?.fixedCosts?.percentage || 0}" target="50-60%" on_target="${csp.buckets?.fixedCosts?.isOnTarget}"/>
@@ -58,12 +59,13 @@ function buildAnalysisPrompt(data) {
     </csp_buckets>
   </current_snapshot>
 
-  <weekly_spending note="Excludes investments and savings - shows true expenses only">
+  <weekly_spending note="Money that left the household. Transfers between accounts and investing are excluded">
     <this_week>${formatCurrency(weekly.currentWeek?.spending || 0)}</this_week>
     <last_week>${formatCurrency(weekly.lastWeek?.spending || 0)}</last_week>
     <six_week_average>${formatCurrency(weekly.sixWeekAverage || 0)}</six_week_average>
     <vs_last_week>${weekly.change?.percent || 0}%</vs_last_week>
     <vs_average>${weekly.sixWeekAverage > 0 ? Math.round(((weekly.currentWeek?.spending || 0) - weekly.sixWeekAverage) / weekly.sixWeekAverage * 100) : 0}%</vs_average>
+    <uncategorized count="${weekly.currentWeek?.uncategorized?.count || 0}" outflow="${formatCurrency(weekly.currentWeek?.uncategorized?.outflow || 0)}" note="Not yet categorized in YNAB, so not counted in this_week"/>
     <top_categories note="This week's spending by category vs 6-week weekly average">
       ${weeklyTopCategories.slice(0, 7).map(cat => `
       <category name="${cat.name}" amount="${formatCurrency(cat.amount)}" vs_weekly_average="${cat.vsAverageLabel || 'N/A'}"/>
@@ -76,7 +78,7 @@ function buildAnalysisPrompt(data) {
     <comparison>${mom.previousMonth?.name} to ${mom.currentMonth?.name}</comparison>
     <income_change>${mom.changes?.incomePercent || 0}%</income_change>
     <expense_change>${mom.changes?.expensesPercent || 0}%</expense_change>
-    <savings_rate_change>${mom.changes?.savingsRate || 0}%</savings_rate_change>
+    <savings_rate_change>${mom.changes?.savingsRate || 0} percentage points</savings_rate_change>
     <current_savings_rate>${mom.currentMonth?.savingsRate || 0}%</current_savings_rate>
     <top_category_changes>
       ${(mom.topCategoryChanges || []).slice(0, 5).map(cat => `
@@ -112,9 +114,9 @@ function buildAnalysisPrompt(data) {
   ` : '<annual_progress available="false"/>'}
 
   <burn_rate>
-    <weekly_average_true_expenses>${formatCurrency(weekly.sixWeekAverage || 0)}</weekly_average_true_expenses>
-    <monthly_average_true_expenses>${formatCurrency((weekly.sixWeekAverage || 0) * 4.33)}</monthly_average_true_expenses>
-    <note>True expenses exclude investments and savings contributions - these are wealth-building, not spending</note>
+    <weekly_average_spending>${formatCurrency(weekly.sixWeekAverage || 0)}</weekly_average_spending>
+    <monthly_average_spending>${formatCurrency(burnRate.average || 0)}</monthly_average_spending>
+    <note>Spending excludes transfers between accounts and investment contributions - moving money into your own investments is not spending</note>
     <trend>${burnRate.trend || 'stable'}</trend>
     <trend_percent>${burnRate.trendPercent || 0}%</trend_percent>
   </burn_rate>
@@ -123,10 +125,9 @@ function buildAnalysisPrompt(data) {
     You are a knowledgeable personal finance advisor. This is a WEEKLY newsletter for a couple managing household finances.
 
     IMPORTANT CONTEXT:
-    - Weekly spending data EXCLUDES investments and savings transfers - these are wealth-building, not expenses
-    - Focus on the weekly_spending and burn_rate sections for accurate spending data
-    - Cash runway uses net cash flow (income minus true expenses) - if positive, runway is infinite
-    - Ignore CSP bucket percentages if they seem inconsistent - focus on actual spending categories instead
+    - Spending EXCLUDES transfers between accounts and investment contributions - investing is not spending
+    - Uncategorized transactions are not counted; if there are any, remind them to categorize in YNAB
+    - Cash runway uses net cash flow (income minus spending) - if positive, runway is infinite
 
     Provide a SHORT, focused analysis (150 words max) covering:
 
@@ -266,10 +267,13 @@ function generateTemplateAnalysis(data) {
     insights.push(`Your current net worth is ${formatCurrency(metrics.netWorth.total)}.`);
   }
 
-  // Runway insight
+  // Runway insight (same figure the newsletter shows: runway after income)
   if (runway.runwayHealth) {
-    const runwayMonths = runway.pureRunwayMonths === Infinity ? 'unlimited' : `${Math.round(runway.pureRunwayMonths)} months`;
-    if (runway.runwayHealth === 'critical') {
+    const months = runway.netRunwayMonths;
+    const runwayMonths = !isFinite(months) ? 'unlimited' : `${Math.round(months * 10) / 10} months`;
+    if (!isFinite(months)) {
+      insights.push('Income covers your spending, so your cash reserves are growing.');
+    } else if (runway.runwayHealth === 'critical') {
       insights.push(`Your cash runway of ${runwayMonths} is below the recommended 3-month minimum. Consider building up your emergency fund.`);
     } else if (runway.runwayHealth === 'caution') {
       insights.push(`Your ${runwayMonths} cash runway is adequate but could be stronger. The recommended target is 6+ months.`);
@@ -287,17 +291,17 @@ function generateTemplateAnalysis(data) {
 
   // Burn rate insight
   if (burnRate.trend === 'increasing') {
-    insights.push(`Your spending trend is increasing (${burnRate.trendPercent}%). Review recent expenses to identify areas to optimize.`);
+    insights.push(`Spending over the last 3 full months is up ${burnRate.trendPercent}% from the 3 before. Review recent expenses to identify areas to optimize.`);
   } else if (burnRate.trend === 'decreasing') {
-    insights.push(`Great job! Your spending trend is decreasing (${burnRate.trendPercent}%).`);
+    insights.push(`Great job! Spending over the last 3 full months is down ${Math.abs(burnRate.trendPercent)}% from the 3 before.`);
   }
 
   // Annual progress insight
   if (annual.available && annual.goals?.savingsRate) {
     if (annual.goals.savingsRate.onTrack) {
-      insights.push(`You're on track with your ${annual.goals.savingsRate.actual}% savings rate, meeting your ${annual.goals.savingsRate.target}% target.`);
+      insights.push(`Your year-to-date savings rate of ${annual.goals.savingsRate.actual}% meets your ${annual.goals.savingsRate.target}% target.`);
     } else {
-      insights.push(`Your savings rate of ${annual.goals.savingsRate.actual}% is below your ${annual.goals.savingsRate.target}% target. Look for opportunities to increase savings.`);
+      insights.push(`Your year-to-date savings rate of ${annual.goals.savingsRate.actual}% is below your ${annual.goals.savingsRate.target}% target. Look for opportunities to increase savings.`);
     }
   }
 
