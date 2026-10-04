@@ -72,6 +72,14 @@ export function useRunwayCalculator(allAccounts, monthlyData, periodMonths = 6, 
     const historicalAvgMonthlyExpenses = totalExpenses / numMonths;
     const historicalAvgMonthlyIncome = totalIncome / numMonths;
 
+    // Spending by CSP bucket over the same months, so scenario toggles add up
+    // to the same burn as the baseline
+    const historicalAvgMonthlyByBucket = { fixedCosts: 0, savings: 0, guiltFree: 0 };
+    Object.keys(historicalAvgMonthlyByBucket).forEach(key => {
+      const total = validMonths.reduce((sum, m) => sum + (m.expensesByBucket?.[key] || 0), 0);
+      historicalAvgMonthlyByBucket[key] = total / numMonths;
+    });
+
     // Use scenario values if provided, otherwise use historical averages
     const avgMonthlyExpenses = scenarioExpenses !== undefined && scenarioExpenses !== null
       ? scenarioExpenses
@@ -158,6 +166,7 @@ export function useRunwayCalculator(allAccounts, monthlyData, periodMonths = 6, 
       avgMonthlyIncome,
       historicalAvgMonthlyIncome,
       historicalAvgMonthlyExpenses,
+      historicalAvgMonthlyByBucket,
       avgMonthlyNet,
       pureRunwayMonths,
       netRunwayMonths,

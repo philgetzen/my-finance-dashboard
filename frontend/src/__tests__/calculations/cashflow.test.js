@@ -10,6 +10,8 @@ import { useTransactionProcessor } from '../../hooks/useTransactionProcessor';
 import { useRunwayCalculator } from '../../hooks/useRunwayCalculator';
 import { useConsciousSpendingPlan } from '../../hooks/useConsciousSpendingPlan';
 import { useAccountManager } from '../../hooks/useAccountManager';
+import { calculateScenarioMonthlyIncome } from '../../hooks/useIncomeScenario';
+import { signPrefix } from '../../utils/formatters';
 
 // Oct 2, 2026, local noon
 beforeAll(() => {
@@ -211,5 +213,79 @@ describe('conscious spending plan', () => {
     const { result } = renderHook(() =>
       useConsciousSpendingPlan(transactions, categories, accounts, 3, settings, [], scheduled));
     expect(result.current.totalIncome).toBe(5000);
+  });
+});
+
+describe('remaining dashboard fixes', () => {
+  test('categories with the same name in different groups stay separate', () => {
+    const cats = {
+      category_groups: [
+        { name: '💵 Savings', categories: [{ id: 'gift-save', name: 'Gifts' }] },
+        { name: 'Guilt Free', categories: [{ id: 'gift-fun', name: 'Gifts' }] }
+      ]
+    };
+    const lines = classifyTransactions([
+      { id: 'a', date: '2026-09-01', account_id: 'chk', amount: -100000, category_id: 'gift-save', category_name: 'Gifts', payee_name: 'P' },
+      { id: 'b', date: '2026-09-02', account_id: 'chk', amount: -40000, category_id: 'gift-fun', category_name: 'Gifts', payee_name: 'P' }
+    ], { accounts, categories: cats });
+
+    const summary = summarizeLines(lines);
+    expect(summary.byCategory.map(c => [c.name, c.amount, c.bucket])).toEqual([
+      ['Gifts (Savings)', 100, 'savings'],
+      ['Gifts (Guilt Free)', 40, 'guiltFree']
+    ]);
+  });
+
+  test('CSP keeps same-named categories in their own buckets', () => {
+    const cats = {
+      category_groups: [
+        { name: 'Internal Master Category', categories: [{ id: 'rta', name: 'Inflow: Ready to Assign' }] },
+        { name: '💵 Savings', categories: [{ id: 'gift-save', name: 'Gifts' }] },
+        { name: 'Guilt Free', categories: [{ id: 'gift-fun', name: 'Gifts' }] }
+      ]
+    };
+    const transactions = [
+      { id: 'i', date: '2026-09-01', account_id: 'chk', amount: 1000000, category_id: 'rta', category_name: 'Inflow: Ready to Assign', payee_name: 'Employer' },
+      { id: 'a', date: '2026-09-03', account_id: 'chk', amount: -100000, category_id: 'gift-save', category_name: 'Gifts', payee_name: 'P' },
+      { id: 'b', date: '2026-09-04', account_id: 'chk', amount: -40000, category_id: 'gift-fun', category_name: 'Gifts', payee_name: 'P' }
+    ];
+    const settings = {
+      categoryMappings: {},
+      excludedCategories: new Set(),
+      excludedPayees: new Set(),
+      excludedExpenseCategories: new Set(),
+      settings: { includeTrackingAccounts: true, useKeywordFallback: false }
+    };
+    const { result } = renderHook(() => useConsciousSpendingPlan(transactions, cats, accounts, 3, settings));
+
+    expect(result.current.buckets.savings.total).toBe(100);
+    expect(result.current.buckets.guiltFree.total).toBe(40);
+  });
+
+  test('scenario income is gross pay scaled to take-home', () => {
+    expect(calculateScenarioMonthlyIncome({ salary: { annual: 120000 }, bonus: { annual: 0 }, stock: { annualValue: 0 } }))
+      .toBeCloseTo(7000); // 70% default take-home
+    expect(calculateScenarioMonthlyIncome({ salary: { annual: 120000 }, takeHomeRate: 60 })).toBeCloseTo(6000);
+  });
+
+  test('runway spending by bucket adds up to the baseline burn', () => {
+    const transactions = [];
+    ['04', '05', '06', '07', '08', '09'].forEach(m => {
+      transactions.push({ id: `r${m}`, date: `2026-${m}-01`, account_id: 'chk', amount: -2000000, category_id: 'rent', category_name: 'Rent', payee_name: 'P' });
+      transactions.push({ id: `f${m}`, date: `2026-${m}-05`, account_id: 'card', amount: -500000, category_id: 'fun', category_name: 'Fun', payee_name: 'P' });
+      transactions.push({ id: `v${m}`, date: `2026-${m}-20`, account_id: 'chk', amount: -1000000, category_id: 'roth', category_name: 'Roth IRA', transfer_account_id: 'brokerage', payee_name: 'P' });
+    });
+    const { result: processed } = renderHook(() => useTransactionProcessor(transactions, accounts, new Set(), { categories }));
+    const { result: normalized } = renderHook(() => useAccountManager(accounts, []));
+    const { result } = renderHook(() => useRunwayCalculator(normalized.current.allAccounts, processed.current.monthlyData, 6));
+
+    expect(result.current.historicalAvgMonthlyExpenses).toBe(2500);
+    expect(result.current.historicalAvgMonthlyByBucket).toEqual({ fixedCosts: 2000, savings: 0, guiltFree: 500 });
+  });
+
+  test('signPrefix marks negative amounts only', () => {
+    expect(signPrefix(-1234)).toBe('-');
+    expect(signPrefix(1234)).toBe('');
+    expect(signPrefix(-0.001)).toBe('');
   });
 });

@@ -290,6 +290,7 @@ export function summarizeLines(lines) {
   let investing = 0;
   let saving = 0;
   const uncategorized = { count: 0, outflow: 0, inflow: 0 };
+  // Keyed by category ID: two categories can share a name in different groups
   const spendingByCategory = new Map();
 
   lines.forEach(line => {
@@ -299,10 +300,11 @@ export function summarizeLines(lines) {
         income += amount;
         break;
       case 'spending': {
-        const name = line.category_name || 'Uncategorized';
-        const entry = spendingByCategory.get(name) || { name, amount: 0, bucket: line.bucket };
+        const key = line.category_id || `name:${line.category_name}`;
+        const entry = spendingByCategory.get(key) ||
+          { name: line.category_name || 'Uncategorized', groupName: line.groupName, amount: 0, bucket: line.bucket };
         entry.amount -= amount;
-        spendingByCategory.set(name, entry);
+        spendingByCategory.set(key, entry);
         break;
       }
       case 'investing':
@@ -324,6 +326,15 @@ export function summarizeLines(lines) {
   const byCategory = Array.from(spendingByCategory.values())
     .filter(cat => cat.amount > 0)
     .sort((a, b) => b.amount - a.amount);
+
+  // Label categories that share a name with their group, e.g. "Gifts (Savings)"
+  const nameCounts = new Map();
+  byCategory.forEach(cat => nameCounts.set(cat.name, (nameCounts.get(cat.name) || 0) + 1));
+  byCategory.forEach(cat => {
+    if (nameCounts.get(cat.name) > 1 && cat.groupName) {
+      cat.name = `${cat.name} (${cat.groupName.replace(/[^\p{L}\p{N}&\s-]/gu, '').trim()})`;
+    }
+  });
   const spending = byCategory.reduce((sum, cat) => sum + cat.amount, 0);
 
   return {

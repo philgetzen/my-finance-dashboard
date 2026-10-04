@@ -204,6 +204,28 @@ describe('cash-flow classification', () => {
     assert.equal(cashflow.bucketFromGroupName('✅ True Expenses'), 'guiltFree');
   });
 
+  test('same-named categories in different groups keep their own buckets', () => {
+    const cats = {
+      category_groups: [
+        { name: '💵 Savings', categories: [{ id: 'gift-save', name: 'Gifts' }] },
+        { name: 'Guilt Free', categories: [{ id: 'gift-fun', name: 'Gifts' }] }
+      ]
+    };
+    const lines = cashflow.buildLedger({
+      accounts,
+      categories: cats,
+      transactions: [
+        txn('2026-09-01', 'card', -100, { category_id: 'gift-save', category_name: 'Gifts' }),
+        txn('2026-09-02', 'card', -40, { category_id: 'gift-fun', category_name: 'Gifts' })
+      ]
+    }).lines;
+    const summary = cashflow.summarize(lines, '2026-09-01', '2026-09-30');
+
+    assert.equal(summary.bucketTotals.savings, 100);
+    assert.equal(summary.bucketTotals.guiltFree, 40);
+    assert.deepEqual(summary.byCategory.map(c => c.name), ['Gifts (Savings)', 'Gifts (Guilt Free)']);
+  });
+
   test('custom category mappings still win over group names', () => {
     const lines = classify([spend('2026-09-05', 50, 'dining')], { categoryMappings: { dining: 'fixedCosts' } });
     assert.equal(lines[0].bucket, 'fixedCosts');

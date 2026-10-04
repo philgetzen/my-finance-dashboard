@@ -44,6 +44,10 @@ export const normalizeAmount = (amount) => {
   return amount;
 };
 
+// Minus sign for a negative amount. formatCurrency drops the sign, so callers
+// that can show negative values prepend this.
+export const signPrefix = (amount) => (amount < 0 && !isEffectivelyZero(amount) ? '-' : '');
+
 // Currency formatting - privacy handled via CSS blur, not text conversion
 export const formatCurrency = (amount, isPrivacyMode = false) => {
   // Always format numbers normally - privacy is handled via CSS blur effects

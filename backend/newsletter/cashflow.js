@@ -493,6 +493,20 @@ function buildLedger(data = {}, cspSettings = {}) {
   return { lines, accountsById, categoriesById };
 }
 
+/**
+ * Label categories that share a name with their group, e.g. "Gifts (Savings)"
+ */
+function disambiguateNames(categories) {
+  const counts = new Map();
+  categories.forEach(cat => counts.set(cat.name, (counts.get(cat.name) || 0) + 1));
+  categories.forEach(cat => {
+    if (counts.get(cat.name) > 1 && cat.groupName) {
+      const group = cat.groupName.replace(/[^\p{L}\p{N}&\s-]/gu, '').trim();
+      cat.name = `${cat.name} (${group})`;
+    }
+  });
+}
+
 function toSet(value) {
   if (value instanceof Set) return value;
   return new Set(Array.isArray(value) ? value : []);
@@ -509,8 +523,8 @@ function toSet(value) {
 function summarize(lines, start, end) {
   let income = 0;
   let excludedIncome = 0;
+  // Keyed by category ID: two categories can share a name in different groups
   const spendingByCategory = new Map();
-  const bucketByCategory = new Map();
   let investing = 0;
   let saving = 0;
   const uncategorized = { count: 0, outflow: 0, inflow: 0, items: [] };
@@ -526,9 +540,11 @@ function summarize(lines, start, end) {
         excludedIncome += line.amount;
         break;
       case 'spending': {
-        const name = line.categoryName || 'Uncategorized';
-        spendingByCategory.set(name, (spendingByCategory.get(name) || 0) - line.amount);
-        bucketByCategory.set(name, line.bucket);
+        const key = line.categoryId || `name:${line.categoryName}`;
+        const entry = spendingByCategory.get(key) ||
+          { name: line.categoryName || 'Uncategorized', groupName: line.groupName, bucket: line.bucket, amount: 0 };
+        entry.amount -= line.amount;
+        spendingByCategory.set(key, entry);
         break;
       }
       case 'investing':
@@ -551,13 +567,13 @@ function summarize(lines, start, end) {
   const byCategory = [];
   const bucketTotals = { fixedCosts: 0, investments: 0, savings: 0, guiltFree: 0 };
   let spending = 0;
-  spendingByCategory.forEach((amount, name) => {
+  spendingByCategory.forEach(({ name, groupName, bucket = 'guiltFree', amount }, key) => {
     if (amount <= 0) return;
-    const bucket = bucketByCategory.get(name) || 'guiltFree';
-    byCategory.push({ name, amount, bucket });
+    byCategory.push({ key, name, groupName, amount, bucket });
     bucketTotals[bucket] = (bucketTotals[bucket] || 0) + amount;
     spending += amount;
   });
+  disambiguateNames(byCategory);
   byCategory.sort((a, b) => b.amount - a.amount);
 
   investing = Math.max(0, investing);
