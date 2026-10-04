@@ -45,6 +45,7 @@ CI (`.github/workflows/tests.yml`) runs backend tests, then frontend lint, tests
 Most routes exist twice: as a Vercel function in `api/` (production) and as an Express handler in `backend/index.js` (local development). When you change one, change the other. Where they differ:
 - Only `api/` has `manual_holdings`.
 - Only Express has the per-resource paths (`/api/ynab/budgets/:budgetId/accounts` and so on), `/api/debug/env` and `/api/debug/auth-url`.
+- Express's `/api/ynab/budgets?budgetId=&resource=` handler ignores `since_date` (every transaction comes back) and doesn't validate `resource`; `api/` does both.
 - Express exposes the newsletter as `/api/newsletter/send`, `/preview`, `/preview-prompt`, `/logs`, `/status` and `/config`, with no auth check. The debug routes return the YNAB client ID and redirect URI. Treat the Express server as local-only.
 
 The production routes in `api/`:
