@@ -19,7 +19,6 @@ const {
   isInvestmentAccount,
   isCashAccount,
   isOnBudget,
-  GROUP_NAME_TO_BUCKET,
   buildLedger,
   summarize
 } = require('./cashflow');
@@ -444,7 +443,6 @@ function calculateAllMetrics(data, options = {}) {
 
 module.exports = {
   CSP_TARGETS,
-  GROUP_NAME_TO_BUCKET,
   calculateNetWorth,
   calculateRunway,
   calculateCSPBuckets,

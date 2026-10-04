@@ -11,13 +11,30 @@
  * monthKey.
  */
 
-const shared = require('../../shared/cashflow.mjs');
+// The shared rules are an ES module. Vercel's function runtime can't
+// require() one, so it loads with import(). Await loadSharedRules() before
+// building a ledger.
+let shared = null;
+let loading = null;
 
-const {
-  isOnBudget,
-  isDebtAccount,
-  isHomeValueAccount
-} = shared;
+function loadSharedRules() {
+  loading ??= import('../../shared/cashflow.mjs').then(mod => {
+    shared = mod;
+    return mod;
+  });
+  return loading;
+}
+
+function rules() {
+  if (!shared) throw new Error('Shared cash-flow rules not loaded: await loadSharedRules() first');
+  return shared;
+}
+
+const isOnBudget = acc => rules().isOnBudget(acc);
+const isLoanAccount = acc => rules().isLoanAccount(acc);
+const isDebtAccount = acc => rules().isDebtAccount(acc);
+const isHomeValueAccount = acc => rules().isHomeValueAccount(acc);
+const isInvestmentAccount = acc => rules().isInvestmentAccount(acc);
 
 // ============================================
 // Calendar dates
@@ -169,7 +186,7 @@ function isCashAccount(acc) {
  */
 function buildLedger(data = {}, cspSettings = {}) {
   const { accounts = [], transactions = [], categories = {} } = data;
-  return { lines: shared.classifyTransactions(transactions, { accounts, categories, cspSettings }) };
+  return { lines: rules().classifyTransactions(transactions, { accounts, categories, cspSettings }) };
 }
 
 /**
@@ -179,7 +196,7 @@ function buildLedger(data = {}, cspSettings = {}) {
  * @param {string} end - 'YYYY-MM-DD' inclusive
  */
 function summarize(lines, start, end) {
-  return shared.summarizeLines(lines, start, end);
+  return rules().summarizeLines(lines, start, end);
 }
 
 module.exports = {
@@ -201,19 +218,13 @@ module.exports = {
   // Accounts
   isOnBudget,
   isDebtAccount,
-  isLoanAccount: shared.isLoanAccount,
+  isLoanAccount,
   isHomeValueAccount,
-  isInvestmentAccount: shared.isInvestmentAccount,
+  isInvestmentAccount,
   isCashAccount,
 
-  // Categories
-  GROUP_NAME_TO_BUCKET: shared.GROUP_NAME_TO_BUCKET,
-  INCOME_CATEGORIES: shared.INCOME_CATEGORIES,
-  mapGroupNameToBucket: shared.mapGroupNameToBucket,
-  getBucketForCategory: shared.getBucketForCategory,
-  isIncomeCategory: shared.isIncomeCategory,
-
   // Ledger
+  loadSharedRules,
   buildLedger,
   summarize
 };

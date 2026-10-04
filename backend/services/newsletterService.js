@@ -12,7 +12,7 @@ const { generateNewsletterHtml, generateSubject } = require('../newsletter/templ
 const { sendNewsletter, getRecipients, validateConfig: validateEmailConfig } = require('./emailService');
 const { generateAnalysis, validateConfig: validateAiConfig, getAnalysisPrompt } = require('./aiAnalysisService');
 const { getNextSaturday9am } = require('../newsletter/helpers');
-const { todayKey, formatKey, reportWeek } = require('../newsletter/cashflow');
+const { todayKey, formatKey, reportWeek, loadSharedRules } = require('../newsletter/cashflow');
 const { snapshotDateKey } = require('../newsletter/trends');
 
 // YNAB API configuration
@@ -283,7 +283,8 @@ function formatWeekEnding(today) {
  * Calculate metrics and trends for a user's budget
  * @returns {Object} - { metrics, trends }
  */
-function calculateNewsletterData(ynabData, cspSettings, newsletterSettings, snapshots) {
+async function calculateNewsletterData(ynabData, cspSettings, newsletterSettings, snapshots) {
+  await loadSharedRules();
   const timeZone = newsletterSettings.timezone || process.env.NEWSLETTER_TIMEZONE || 'America/Los_Angeles';
   const today = todayKey(timeZone);
   const metrics = calculateAllMetrics(ynabData, { periodMonths: 6, cspSettings, today, timeZone });
@@ -400,7 +401,7 @@ async function generateAndSend(userId, options = {}) {
     let metrics;
     let trends;
     try {
-      ({ metrics, trends } = calculateNewsletterData(ynabData, cspSettings, newsletterSettings, snapshots));
+      ({ metrics, trends } = await calculateNewsletterData(ynabData, cspSettings, newsletterSettings, snapshots));
     } catch (metricsError) {
       logger.error('Metrics calculation failed', { userId, error: metricsError.message, stage: 'calculateMetrics' });
       errors.push({ stage: 'calculateMetrics', error: metricsError.message });
@@ -556,7 +557,7 @@ async function generatePreview(userId) {
     getHistoricalSnapshots(userId)
   ]);
 
-  const { metrics, trends } = calculateNewsletterData(ynabData, cspSettings, newsletterSettings, snapshots);
+  const { metrics, trends } = await calculateNewsletterData(ynabData, cspSettings, newsletterSettings, snapshots);
 
   // Generate AI analysis for preview
   let aiAnalysis = null;
@@ -585,7 +586,7 @@ async function buildAIPrompt(userId) {
     getHistoricalSnapshots(userId)
   ]);
 
-  const { metrics, trends } = calculateNewsletterData(ynabData, cspSettings, newsletterSettings, snapshots);
+  const { metrics, trends } = await calculateNewsletterData(ynabData, cspSettings, newsletterSettings, snapshots);
 
   return getAnalysisPrompt({ metrics, trends });
 }

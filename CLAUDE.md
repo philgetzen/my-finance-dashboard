@@ -33,7 +33,7 @@ This is a personal finance dashboard application with a React frontend and Expre
 
 ### Cash-Flow Rules
 - `shared/cashflow.mjs` decides what counts as income, spending, investing and saving. The dashboard (`frontend/src/utils/calculations/cashflow.js`) and the weekly newsletter (`backend/newsletter/cashflow.js`) both re-export it, so change the rules there, not in either app.
-- It is a plain ES module with no imports: Vite bundles it, and the backend loads it with `require()` (Node 20.19+).
+- It is a plain ES module with no imports. Vite bundles it for the dashboard. The backend loads it with `import()`, because Vercel's function runtime can't `require()` an ES module, so newsletter code must `await loadSharedRules()` (from `backend/newsletter/cashflow.js`) before building a ledger.
 
 ### Data Flow
 1. User authenticates via Google OAuth through Firebase Auth

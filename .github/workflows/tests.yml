@@ -25,6 +25,10 @@ jobs:
           cache-dependency-path: backend/package-lock.json
       - run: npm ci
       - run: npm test
+        env:
+          # Vercel's function runtime can't require() an ES module, though
+          # Node 24 can. Turn it off so tests fail the way a deploy would.
+          NODE_OPTIONS: --no-experimental-require-module
 
   frontend:
     name: Frontend tests and build
