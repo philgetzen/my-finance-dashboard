@@ -3,7 +3,7 @@
  * Calculate totals directly from YNAB months data for comparison with app calculations
  */
 
-import { getDateRange, getMonthCount } from './dateRanges';
+import { getDateRange } from './dateRanges';
 import { INCOME_CATEGORIES } from './constants';
 
 /**
@@ -39,10 +39,9 @@ export function getMonthsInRange(months, period) {
 /**
  * Calculate YNAB totals from months data
  * @param {Array} months - YNAB months array (filtered for date range)
- * @param {Object} options - Calculation options
  * @returns {Object} YNAB totals for comparison
  */
-export function calculateYNABTotals(months, options = {}) {
+export function calculateYNABTotals(months) {
   if (!months?.length) {
     return {
       totalIncome: 0,

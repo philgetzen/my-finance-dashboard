@@ -73,7 +73,7 @@ export default function AddHoldingModal({ show, onClose, onAddHoldings }) {
       } else {
         setUploadError('No valid holdings found in CSV');
       }
-    } catch (error) {
+    } catch {
       setUploadError('Error parsing CSV file');
     }
   };

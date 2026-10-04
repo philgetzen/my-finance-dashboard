@@ -1,4 +1,5 @@
-import { MatchIndicator, formatCurrency, amountsMatch } from './DebugDrawer';
+import { MatchIndicator } from './DebugDrawer';
+import { formatCurrency, amountsMatch } from './format';
 
 /**
  * Summary View - High-level comparison of App vs YNAB totals

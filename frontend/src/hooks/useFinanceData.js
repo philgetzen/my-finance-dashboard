@@ -44,7 +44,7 @@ export const useDeleteManualAccount = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async ({ accountId, userId }) => {
+    mutationFn: async ({ accountId }) => {
       const accountRef = doc(dbClient, 'manual_accounts', accountId);
       return await deleteDoc(accountRef);
     },

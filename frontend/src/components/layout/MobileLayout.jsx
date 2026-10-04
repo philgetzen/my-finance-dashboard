@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { usePrivacy, useFinanceData } from '../../contexts/ConsolidatedDataContext';
 import DemoModeIndicator from '../ui/DemoModeIndicator';
 import DemoModeFloatingModule from '../ui/DemoModeFloatingModule';
 import Sidebar from './Sidebar';
@@ -35,8 +34,6 @@ const navItems = [
 export default function MobileLayout({ children }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { privacyMode, setPrivacyMode } = usePrivacy();
-  const { darkMode, toggleDarkMode, isDemoMode, logout } = useFinanceData();
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1024);
 
@@ -57,10 +54,6 @@ export default function MobileLayout({ children }) {
     window.scrollTo(0, 0);
   }, [location.pathname]);
 
-  const handleLogout = async () => {
-    await logout();
-    navigate('/login');
-  };
 
   // Desktop sidebar - uses the Sidebar component
   const DesktopSidebar = () => (

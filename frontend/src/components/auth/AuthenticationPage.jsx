@@ -146,7 +146,6 @@ export default function AuthenticationPage() {
   };
 
   // Determine what UI elements should be shown based on auth state
-  const shouldShowDemoMode = authState !== AUTH_STATES.FULLY_AUTHENTICATED;
   const shouldShowContinueButton = authState === AUTH_STATES.FULLY_AUTHENTICATED;
   const isYNABDisabled = authState === AUTH_STATES.LOGGED_OUT;
 

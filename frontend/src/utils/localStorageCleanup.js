@@ -14,7 +14,7 @@ export function cleanupLocalStorage() {
         // Try to parse to ensure it's valid JSON
         try {
           JSON.parse(value);
-        } catch (e) {
+        } catch {
           localStorage.removeItem(key);
           console.log(`Removed unparseable localStorage value for: ${key}`);
         }

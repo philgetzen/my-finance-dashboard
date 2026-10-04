@@ -14,13 +14,13 @@ class ErrorBoundary extends React.Component {
     };
   }
 
-  static getDerivedStateFromError(error) {
+  static getDerivedStateFromError() {
     return { hasError: true };
   }
 
   componentDidCatch(error, errorInfo) {
     // Log error to console in development
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.DEV) {
       console.error('ErrorBoundary caught an error:', error, errorInfo);
     }
 
@@ -32,7 +32,7 @@ class ErrorBoundary extends React.Component {
     }));
 
     // Report to error tracking service (e.g., Sentry) in production
-    if (process.env.NODE_ENV === 'production' && window.Sentry) {
+    if (import.meta.env.PROD && window.Sentry) {
       window.Sentry.captureException(error, {
         contexts: {
           react: {
@@ -72,7 +72,7 @@ class ErrorBoundary extends React.Component {
             </p>
 
             {/* Error details in development */}
-            {process.env.NODE_ENV === 'development' && this.state.error && (
+            {import.meta.env.DEV && this.state.error && (
               <div className="mb-6 text-left">
                 <details className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4">
                   <summary className="cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300">

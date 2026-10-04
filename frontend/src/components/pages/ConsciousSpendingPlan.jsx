@@ -241,7 +241,7 @@ const CALCULATION_EXPLANATIONS = {
 };
 
 // CSP Score Ring - Visual indicator of overall plan health
-const CSPScoreRing = ({ buckets, isOnTrack }) => {
+const CSPScoreRing = ({ buckets }) => {
   // Calculate a score based on how well each bucket meets targets
   const calculateScore = () => {
     let score = 0;
@@ -826,18 +826,13 @@ export default function ConsciousSpendingPlan() {
   // CSP settings (persisted to Firestore)
   const cspSettings = useCSPSettings();
   const {
-    excludedPayees,
-    excludedCategories,
-    excludedExpenseCategories,
     categoryMappings,
-    settings,
     isLoading: cspSettingsLoading,
     togglePayeeExclusion,
     toggleCategoryExclusion,
     toggleExpenseCategoryExclusion,
     setCategoryBucket,
-    clearCategoryMapping,
-    updateSettings
+    clearCategoryMapping
   } = cspSettings;
 
   // Handler for setting category bucket (with toggle support)
@@ -968,7 +963,7 @@ export default function ConsciousSpendingPlan() {
             <div className="flex flex-col lg:flex-row items-stretch gap-6">
               {/* Left side: Score Ring + Status */}
               <div className="flex flex-col items-center justify-center w-full lg:w-64 lg:min-w-[16rem] p-4 rounded-2xl bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-800/30">
-                <CSPScoreRing buckets={cspData.buckets} isOnTrack={cspData.isOnTrack} />
+                <CSPScoreRing buckets={cspData.buckets} />
                 <div className="mt-4 text-center">
                   <div className="flex items-center justify-center gap-2">
                     {cspData.isOnTrack ? (
@@ -1268,7 +1263,7 @@ export default function ConsciousSpendingPlan() {
         />
 
         {/* Debug Drawer - Press 'D' twice to toggle (dev only) */}
-        {process.env.NODE_ENV === 'development' && (
+        {import.meta.env.DEV && (
           <Suspense fallback={null}>
             <DebugDrawerContainer />
           </Suspense>

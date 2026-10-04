@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
-import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useFinanceData } from '../contexts/ConsolidatedDataContext';
 import { getTransactionAmount } from '../utils/ynabHelpers';
@@ -11,8 +11,6 @@ import {
   DEFAULT_INVESTMENT_KEYWORDS,
   DEFAULT_SAVINGS_KEYWORDS,
   DEFAULT_CSP_SETTINGS,
-  isIncomeCategory,
-  shouldSkipTransaction,
 } from '../utils/calculations/constants';
 import { mapGroupNameToBucket } from '../utils/calculations/categories';
 import { flattenLines, parseLocalDate, toMonthKey } from '../utils/calculations/cashflow';
@@ -399,10 +397,10 @@ export function getInferredBucket(categoryName, categoryGroupName) {
  * @param {Array} accounts - YNAB accounts array (to identify tracking accounts)
  * @param {number} periodMonths - Number of months to analyze (default: 6)
  * @param {Object} cspSettings - CSP settings from useCSPSettings hook
- * @param {Array} months - YNAB budget months array (contains budgeted amounts per category)
+ * @param {Array} _months - Unused; kept so scheduledTransactions stays in the same position
  * @param {Array} scheduledTransactions - YNAB scheduled transactions array (for projected recurring income)
  */
-export function useConsciousSpendingPlan(transactions, categories, accounts, periodMonths = 6, cspSettings = {}, months = [], scheduledTransactions = []) {
+export function useConsciousSpendingPlan(transactions, categories, accounts, periodMonths = 6, cspSettings = {}, _months = [], scheduledTransactions = []) {
   const {
     categoryMappings = {},
     excludedCategories = new Set(),
@@ -626,12 +624,6 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
     // Process transactions
     let totalIncome = 0;
     let excludedIncomeTotal = 0; // Track income excluded via payee/category settings
-    const bucketTotals = {
-      fixedCosts: 0,
-      investments: 0,
-      savings: 0,
-      guiltFree: 0
-    };
     const categoryTotals = new Map();
     const monthlyBuckets = {};
 
@@ -1212,7 +1204,7 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
     });
 
     // Iterate through all categories and assign amounts to buckets based on current mappings
-    categoryTotals.forEach((catData, catKey) => {
+    categoryTotals.forEach((catData) => {
       // Determine the current bucket for this category
       // Priority: 1) Custom mapping, 2) Inferred bucket (if keyword fallback enabled), 3) Original bucket
       const inferredBucket = settings.useKeywordFallback !== false
@@ -1325,14 +1317,6 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
     }
 
     // Use the recalculated totals
-    // Calculate Guilt-Free as REMAINDER per Ramit's CSP formula:
-    // Guilt-Free = Income - Fixed Costs - Investments - Savings
-    // This ensures all 4 buckets always add to exactly 100%
-    const fixedCostsMonthly = recalculatedBucketTotals.fixedCosts / numMonths;
-    const investmentsMonthly = recalculatedBucketTotals.investments / numMonths;
-    const savingsMonthly = recalculatedBucketTotals.savings / numMonths;
-    const guiltFreeMonthly = monthlyIncome - fixedCostsMonthly - investmentsMonthly - savingsMonthly;
-
     // Use actual spending for all buckets (don't override guilt-free with remainder)
     // This shows what was ACTUALLY spent in each category
     // Percentages may exceed 100% if spending exceeds income - that's informative!
@@ -1528,7 +1512,7 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
     // Add categories that have transactions but are hidden in YNAB (e.g., mortgage/loan categories)
     // These won't appear in the category_groups loop above because they're hidden
     const addedCategoryIds = new Set(allExpenseCategories.map(c => c.id));
-    categoryTotals.forEach((catData, catKey) => {
+    categoryTotals.forEach((catData) => {
       // Skip if already added from visible categories
       if (addedCategoryIds.has(catData.id)) {
         return;
@@ -1650,5 +1634,5 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
       scheduledIncomeDiagnostics,
       scheduledIncomeTotal,
     };
-  }, [transactions, categories, accounts, periodMonths, categoryMappings, excludedCategories, excludedPayees, excludedExpenseCategories, settings, months, scheduledTransactions]);
+  }, [transactions, categories, accounts, periodMonths, categoryMappings, excludedCategories, excludedPayees, excludedExpenseCategories, settings, scheduledTransactions]);
 }
