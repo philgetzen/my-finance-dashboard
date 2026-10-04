@@ -31,6 +31,10 @@ This is a personal finance dashboard application with a React frontend and Expre
 - **usePlaidData hook**: Custom hook that handles all Plaid API calls and data fetching
 - User state managed through Firebase Auth's `onAuthStateChanged`
 
+### Cash-Flow Rules
+- `shared/cashflow.mjs` decides what counts as income, spending, investing and saving. The dashboard (`frontend/src/utils/calculations/cashflow.js`) and the weekly newsletter (`backend/newsletter/cashflow.js`) both re-export it, so change the rules there, not in either app.
+- It is a plain ES module with no imports: Vite bundles it, and the backend loads it with `require()` (Node 20.19+).
+
 ### Data Flow
 1. User authenticates via Google OAuth through Firebase Auth
 2. Frontend obtains Plaid link token from backend

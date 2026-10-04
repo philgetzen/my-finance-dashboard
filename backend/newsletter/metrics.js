@@ -20,7 +20,6 @@ const {
   isCashAccount,
   isOnBudget,
   GROUP_NAME_TO_BUCKET,
-  categorizeTransaction,
   buildLedger,
   summarize
 } = require('./cashflow');
@@ -453,6 +452,5 @@ module.exports = {
   getMonthlyHistory,
   getTopSpendingCategories,
   getWeeklyTopCategories,
-  calculateAllMetrics,
-  categorizeTransaction
+  calculateAllMetrics
 };

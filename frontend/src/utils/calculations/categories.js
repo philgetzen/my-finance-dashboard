@@ -3,85 +3,11 @@
  * Handles mapping YNAB categories to Conscious Spending Plan buckets
  */
 
-import {
-  GROUP_NAME_TO_BUCKET,
-  DEFAULT_FIXED_COST_KEYWORDS,
-  DEFAULT_INVESTMENT_KEYWORDS,
-  DEFAULT_SAVINGS_KEYWORDS,
-  CSP_BUCKETS,
-  isIncomeCategory,
-} from './constants';
+import { CSP_BUCKETS, isIncomeCategory } from './constants';
+import { mapGroupNameToBucket, inferBucketFromKeywords } from '../../../../shared/cashflow.mjs';
 
-/**
- * Normalize a string for comparison (lowercase, remove special chars)
- * @param {string} str - String to normalize
- * @returns {string} - Normalized string
- */
-function normalizeString(str) {
-  return (str || '').toLowerCase().trim();
-}
-
-/**
- * Normalize a YNAB group name for matching. Strips emoji and punctuation so
- * "🔗 Fixed Costs" matches "fixed costs".
- * @param {string} groupName - YNAB category group name
- * @returns {string} - Normalized group name
- */
-export function normalizeGroupName(groupName) {
-  return (groupName || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9&\s-]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-/**
- * Map a category group name to a CSP bucket using known mappings
- * @param {string} groupName - YNAB category group name
- * @returns {string|null} - CSP bucket key or null if no match
- */
-export function mapGroupNameToBucket(groupName) {
-  const normalized = normalizeGroupName(groupName);
-  if (!normalized) return null;
-  if (GROUP_NAME_TO_BUCKET[normalized]) return GROUP_NAME_TO_BUCKET[normalized];
-
-  // Decorated names like "Family Guilt Free Spending" or "Retirement Investments"
-  if (normalized.includes('invest')) return 'investments';
-  if (normalized.includes('guilt')) return 'guiltFree';
-  if (normalized.includes('fixed') || normalized.includes('bills')) return 'fixedCosts';
-  if (normalized.includes('saving')) return 'savings';
-  return null;
-}
-
-/**
- * Infer a CSP bucket from category name using keywords
- * Used as fallback when no explicit mapping exists
- * @param {string} categoryName - Category name to analyze
- * @returns {string} - CSP bucket key (defaults to 'guiltFree')
- */
-export function inferBucketFromKeywords(categoryName) {
-  if (!categoryName) return 'guiltFree';
-
-  const normalized = normalizeString(categoryName);
-
-  // Check investment keywords first (most specific)
-  if (DEFAULT_INVESTMENT_KEYWORDS.some(kw => normalized.includes(kw))) {
-    return 'investments';
-  }
-
-  // Check savings keywords
-  if (DEFAULT_SAVINGS_KEYWORDS.some(kw => normalized.includes(kw))) {
-    return 'savings';
-  }
-
-  // Check fixed cost keywords
-  if (DEFAULT_FIXED_COST_KEYWORDS.some(kw => normalized.includes(kw))) {
-    return 'fixedCosts';
-  }
-
-  // Default to guilt-free spending
-  return 'guiltFree';
-}
+// Group-name and keyword matching are shared with the newsletter
+export { normalizeGroupName, mapGroupNameToBucket, inferBucketFromKeywords } from '../../../../shared/cashflow.mjs';
 
 /**
  * Get the CSP bucket for a category

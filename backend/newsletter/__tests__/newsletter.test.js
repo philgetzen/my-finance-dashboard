@@ -251,7 +251,7 @@ describe('cash-flow classification', () => {
         ]
       })
     ]);
-    assert.deepEqual(lines.map(l => [l.categoryName, l.amount, l.date]), [
+    assert.deepEqual(lines.map(l => [l.category_name, l.amountDollars, l.date]), [
       ['Groceries', -200, '2026-09-05'],
       ['Household Goods', -100, '2026-09-05']
     ]);
@@ -273,11 +273,11 @@ describe('cash-flow classification', () => {
   });
 
   test('emoji-prefixed YNAB group names map to CSP buckets', () => {
-    assert.equal(cashflow.bucketFromGroupName('🔗 Fixed Costs'), 'fixedCosts');
-    assert.equal(cashflow.bucketFromGroupName('💵 Savings'), 'savings');
-    assert.equal(cashflow.bucketFromGroupName('🤑 Post Tax Investments'), 'investments');
-    assert.equal(cashflow.bucketFromGroupName('👩🏽‍❤️‍👨🏼 Family Guilt Free Spending'), 'guiltFree');
-    assert.equal(cashflow.bucketFromGroupName('✅ True Expenses'), 'guiltFree');
+    assert.equal(cashflow.mapGroupNameToBucket('🔗 Fixed Costs'), 'fixedCosts');
+    assert.equal(cashflow.mapGroupNameToBucket('💵 Savings'), 'savings');
+    assert.equal(cashflow.mapGroupNameToBucket('🤑 Post Tax Investments'), 'investments');
+    assert.equal(cashflow.mapGroupNameToBucket('👩🏽‍❤️‍👨🏼 Family Guilt Free Spending'), 'guiltFree');
+    assert.equal(cashflow.mapGroupNameToBucket('✅ True Expenses'), 'guiltFree');
   });
 
   test('same-named categories in different groups keep their own buckets', () => {
