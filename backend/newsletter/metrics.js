@@ -380,7 +380,7 @@ function getTopSpendingCategories(monthToDate, monthlyHistory = []) {
   });
 
   const averages = new Map();
-  totals.forEach((total, name) => averages.set(name, total / numMonths));
+  totals.forEach((total, key) => averages.set(key, total / numMonths));
 
   return compareToAverage(monthToDate.byCategory, averages);
 }

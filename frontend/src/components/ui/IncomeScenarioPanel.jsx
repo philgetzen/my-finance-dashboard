@@ -11,7 +11,6 @@ import {
   ReceiptPercentIcon,
 } from '@heroicons/react/24/outline';
 import { usePrivacy } from '../../contexts/ConsolidatedDataContext';
-import { formatCurrency } from '../../utils/formatters';
 import { EXPENSE_BUCKETS } from '../../hooks/useIncomeScenario';
 import Card from './Card';
 import PrivacyCurrency from './PrivacyCurrency';
@@ -127,7 +126,11 @@ function PercentInput({ label, icon: Icon, value, onChange, description }) {
           value={localValue}
           onChange={handleChange}
           onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
+          onBlur={() => {
+            // Show the clamped value the scenario actually uses (1-100)
+            setIsFocused(false);
+            setLocalValue(String(value));
+          }}
           className="w-full pl-3 pr-7 py-2.5 text-sm font-medium
                      bg-gray-50 dark:bg-gray-800
                      border border-gray-200 dark:border-gray-700 rounded-lg
@@ -313,7 +316,7 @@ export default function IncomeScenarioPanel({
                     icon={ReceiptPercentIcon}
                     value={takeHomeRate}
                     onChange={setTakeHomeRate}
-                    description="Share left after taxes and pre-tax deductions"
+                    description="Blended share left after taxes and pre-tax deductions"
                   />
                 </div>
               </div>

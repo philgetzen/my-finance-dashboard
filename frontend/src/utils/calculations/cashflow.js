@@ -261,11 +261,36 @@ export function createClassifier({ accounts = [], categories = null, cspSettings
 }
 
 /**
+ * Display label for each category. Categories that share a name get their
+ * group appended, e.g. "Gifts (Savings)". Computed from the whole budget so
+ * every summary and every month uses the same label.
+ * @param {Object} categories - YNAB categories response ({ category_groups })
+ * @returns {Map} - id -> label
+ */
+export function categoryLabels(categories) {
+  const all = [];
+  (categories?.category_groups || []).forEach(group => {
+    (group.categories || []).forEach(cat => all.push({ id: cat.id, name: cat.name, groupName: group.name }));
+  });
+
+  const counts = new Map();
+  all.forEach(({ name }) => counts.set(name, (counts.get(name) || 0) + 1));
+
+  const labels = new Map();
+  all.forEach(({ id, name, groupName }) => {
+    const group = (groupName || '').replace(/[^\p{L}\p{N}&\s-]/gu, '').trim();
+    labels.set(id, counts.get(name) > 1 && group ? `${name} (${group})` : name);
+  });
+  return labels;
+}
+
+/**
  * Flatten and classify transactions
  * @returns {Array} - Lines with kind, bucket, groupName, amountDollars, and monthKey added
  */
 export function classifyTransactions(transactions, options = {}) {
   const classify = createClassifier(options);
+  const labels = categoryLabels(options.categories);
   return flattenLines(transactions).map(line => {
     const { kind, bucket, groupName } = classify(line);
     return {
@@ -273,6 +298,7 @@ export function classifyTransactions(transactions, options = {}) {
       kind,
       bucket,
       groupName,
+      categoryLabel: labels.get(line.category_id) || line.category_name,
       amountDollars: (line.amount || 0) / 1000,
       monthKey: String(line.date || '').slice(0, 7)
     };
@@ -302,7 +328,7 @@ export function summarizeLines(lines) {
       case 'spending': {
         const key = line.category_id || `name:${line.category_name}`;
         const entry = spendingByCategory.get(key) ||
-          { name: line.category_name || 'Uncategorized', groupName: line.groupName, amount: 0, bucket: line.bucket };
+          { name: line.categoryLabel || line.category_name || 'Uncategorized', amount: 0, bucket: line.bucket };
         entry.amount -= amount;
         spendingByCategory.set(key, entry);
         break;
@@ -326,15 +352,6 @@ export function summarizeLines(lines) {
   const byCategory = Array.from(spendingByCategory.values())
     .filter(cat => cat.amount > 0)
     .sort((a, b) => b.amount - a.amount);
-
-  // Label categories that share a name with their group, e.g. "Gifts (Savings)"
-  const nameCounts = new Map();
-  byCategory.forEach(cat => nameCounts.set(cat.name, (nameCounts.get(cat.name) || 0) + 1));
-  byCategory.forEach(cat => {
-    if (nameCounts.get(cat.name) > 1 && cat.groupName) {
-      cat.name = `${cat.name} (${cat.groupName.replace(/[^\p{L}\p{N}&\s-]/gu, '').trim()})`;
-    }
-  });
   const spending = byCategory.reduce((sum, cat) => sum + cat.amount, 0);
 
   return {

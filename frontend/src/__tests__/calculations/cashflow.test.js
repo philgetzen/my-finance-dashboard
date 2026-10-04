@@ -236,6 +236,20 @@ describe('remaining dashboard fixes', () => {
     ]);
   });
 
+  test('same-named category labels stay consistent when only one appears', () => {
+    const cats = {
+      category_groups: [
+        { name: '💵 Savings', categories: [{ id: 'gift-save', name: 'Gifts' }] },
+        { name: 'Guilt Free', categories: [{ id: 'gift-fun', name: 'Gifts' }] }
+      ]
+    };
+    const lines = classifyTransactions([
+      { id: 'a', date: '2026-08-03', account_id: 'chk', amount: -100000, category_id: 'gift-save', category_name: 'Gifts', payee_name: 'P' }
+    ], { accounts, categories: cats });
+
+    expect(summarizeLines(lines).byCategory.map(c => c.name)).toEqual(['Gifts (Savings)']);
+  });
+
   test('CSP keeps same-named categories in their own buckets', () => {
     const cats = {
       category_groups: [

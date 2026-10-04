@@ -164,9 +164,10 @@ export function useIncomeScenario(historicalAvgIncome = 0) {
   }, []);
 
   const setTakeHomeRate = useCallback((percent) => {
+    const value = Number.isFinite(percent) ? percent : DEFAULT_TAKE_HOME_RATE;
     setScenario(prev => ({
       ...prev,
-      takeHomeRate: Math.min(100, Math.max(1, percent || DEFAULT_TAKE_HOME_RATE))
+      takeHomeRate: Math.min(100, Math.max(1, value))
     }));
   }, []);
 
