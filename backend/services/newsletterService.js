@@ -18,6 +18,9 @@ const { snapshotDateKey } = require('../newsletter/trends');
 // YNAB API configuration
 const YNAB_API_BASE_URL = 'https://api.ynab.com/v1';
 
+// A successful send blocks another send for this long (duplicate cron deliveries)
+const DEDUP_WINDOW_MINUTES = 30;
+
 /**
  * Get Firestore database instance
  */
@@ -330,10 +333,12 @@ async function generateAndSend(userId, options = {}) {
   logger.info('Newsletter generation started', { userId, skipAI, skipEmail });
 
   try {
-    // Step 0: Dedup check — skip if already sent successfully in last 6 hours
+    // Step 0: Dedup check — skip if already sent successfully in the last 30
+    // minutes. That catches a duplicate cron delivery but still allows a manual
+    // rerun after a fix.
     // Uses single-field query (userId) + in-code filtering to avoid needing a composite Firestore index
     const db = getDb();
-    const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
+    const dedupCutoff = new Date(Date.now() - DEDUP_WINDOW_MINUTES * 60 * 1000).toISOString();
     try {
       const recentLogsQuery = await db.collection('newsletter_logs')
         .where('userId', '==', userId)
@@ -343,7 +348,7 @@ async function generateAndSend(userId, options = {}) {
 
       const recentSuccess = recentLogsQuery.docs.find(doc => {
         const data = doc.data();
-        return data.status === 'success' && data.startedAt > sixHoursAgo;
+        return data.status === 'success' && data.startedAt > dedupCutoff;
       });
 
       if (recentSuccess) {
