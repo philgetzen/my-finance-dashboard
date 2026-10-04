@@ -4,75 +4,63 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a personal finance dashboard application with a React frontend and Express.js backend that integrates with Plaid for banking data and Firebase for authentication and data storage.
+HealthyWealth is a personal finance dashboard built on YNAB. It reads accounts, transactions and categories from the YNAB API, adds manual accounts and holdings, and shows net worth, cash flow, runway, investments and a Conscious Spending Plan (CSP). A weekly email newsletter summarizes the same numbers.
 
-**Architecture:**
-- **Frontend**: React 19.1.0 with Vite, using Tailwind CSS for styling
-- **Backend**: Express.js server with Plaid API integration
-- **Authentication**: Firebase Auth with Google OAuth
-- **Database**: Firestore for storing user tokens and manual accounts
-- **External APIs**: Plaid for banking data, Recharts for data visualization
+- **Frontend** (`frontend/`): React 19, Vite 6, Tailwind CSS 3, Recharts, TanStack Query, React Router 7
+- **API in production** (`api/`): Vercel serverless functions
+- **API for local development** (`backend/`): an Express server on port 5001 serving the same routes, plus the newsletter code
+- **Shared rules** (`shared/`): the cash-flow classifier both the dashboard and the newsletter use
+- **Auth and storage**: Firebase Auth (Google sign-in) and Firestore
+- **Deploy**: Vercel (`vercel.json`), at healthywealth.philgetzen.com
 
-## Development Commands
+## Commands
 
-### Frontend (from `frontend/` directory):
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm run lint` - Run ESLint
-- `npm run preview` - Preview production build
+Frontend (from `frontend/`):
+- `npm run dev`: start the Vite dev server
+- `npm run build`: production build
+- `npm run lint`: ESLint (CI fails on errors; warnings are allowed)
+- `npm run test:run`: Vitest, single run (`npm test` watches)
 
-### Backend (from `backend/` directory):
-- `node index.js` - Start backend server (runs on port 5001)
+Backend (from `backend/`):
+- `npm start`: start the Express server on port 5001 (`npm run dev` uses nodemon)
+- `npm test`: Node's built-in test runner over `newsletter/` and `services/`
 
-## Key Architecture Patterns
+CI (`.github/workflows/tests.yml`) runs backend tests, then frontend lint, tests and build, on every PR and on pushes to main.
 
-### Context and State Management
-- **PlaidDataContext**: Central context that provides user authentication state and Plaid data (accounts, transactions)
-- **usePlaidData hook**: Custom hook that handles all Plaid API calls and data fetching
-- User state managed through Firebase Auth's `onAuthStateChanged`
+## Architecture
 
-### Cash-Flow Rules
-- `shared/cashflow.mjs` decides what counts as income, spending, investing and saving. The dashboard (`frontend/src/utils/calculations/cashflow.js`) and the weekly newsletter (`backend/newsletter/cashflow.js`) both re-export it, so change the rules there, not in either app.
-- It is a plain ES module with no imports. Vite bundles it for the dashboard. The backend loads it with `import()`, because Vercel's function runtime can't `require()` an ES module, so newsletter code must `await loadSharedRules()` (from `backend/newsletter/cashflow.js`) before building a ledger.
+### Cash-flow rules
+- `shared/cashflow.mjs` decides what counts as income, spending, investing and saving. The dashboard (`frontend/src/utils/calculations/cashflow.js`) and the newsletter (`backend/newsletter/cashflow.js`) both re-export it, so change the rules there, not in either app.
+- It is a plain ES module with no imports. Vite bundles it for the dashboard. The backend loads it with `import()`, because Vercel's function runtime can't `require()` an ES module, so newsletter code must `await loadSharedRules()` (from `backend/newsletter/cashflow.js`) before building a ledger. The backend CI job runs with `--no-experimental-require-module` to catch a stray `require()`.
+- YNAB dates are calendar dates. Parse them with `parseLocalDate()` (frontend) or keep them as `'YYYY-MM-DD'` strings (backend). `new Date('2026-08-01')` is July 31 in US time zones.
 
-### Data Flow
-1. User authenticates via Google OAuth through Firebase Auth
-2. Frontend obtains Plaid link token from backend
-3. User connects bank accounts through Plaid Link
-4. Backend exchanges public token for access token and stores in Firestore
-5. Frontend fetches account/transaction data using stored access tokens
+### Frontend
+- `src/App.jsx` holds the routes. Pages are in `src/components/pages/`: Dashboard (`/`), Accounts, CashFlow (`/spending`), InvestmentAllocation (`/investments`), Runway, ConsciousSpendingPlan (`/conscious-spending`).
+- `src/contexts/ConsolidatedDataContext.jsx` is the single data provider. Components read it through `useFinanceData()` and `usePrivacy()`. It also handles demo mode, which uses `src/lib/mockData.js`.
+- `src/lib/ynabApi.js` calls the API at `VITE_API_BASE_URL` (empty in production, so same origin; `http://localhost:5001` in development) and refreshes the YNAB token on a 401.
+- Page math lives in hooks (`src/hooks/`: `useTransactionProcessor`, `useCategoryProcessor`, `useConsciousSpendingPlan`, `useRunwayCalculator`, `useIncomeScenario`) and in `src/utils/calculations/`.
+- Use the existing card and layout patterns and Tailwind classes. Use `import.meta.env.DEV` / `PROD`, not `process.env`.
 
-### Component Structure
-- **App.jsx**: Main application with routing and all page components
-- **PlaidDataContext**: Authentication and data provider
-- **usePlaidData**: Custom hook for Plaid API integration
-- Pages are defined as functions within App.jsx (DashboardPage, AccountsPage, etc.)
+### API routes
+Most routes exist twice: as a Vercel function in `api/` (production) and as an Express handler in `backend/index.js` (local development). When you change one, change the other. Express has no `manual_holdings` routes, and it exposes the newsletter as `/api/newsletter/send`, `/preview`, `/logs`, `/status` and `/config`.
+- `api/ynab/`: OAuth (`auth`, `token`, `save_token`, `refresh_token`, `disconnect`) and YNAB data. `budgets/index.js` proxies `?budgetId=&resource=accounts|transactions|categories|months`.
+- `api/manual_accounts/`, `api/manual_holdings/`, `api/import-altruist-holdings.js`: manual data
+- `api/newsletter.js`: the weekly email. `?action=cron` (Vercel cron, Saturdays 17:00 UTC), `?action=preview&user_id=`, or POST to send. Every action needs `Authorization: Bearer $CRON_SECRET`.
 
-### API Endpoints (Backend)
-- `POST /api/create_link_token` - Generate Plaid link token
-- `POST /api/exchange_public_token` - Exchange public token for access token
-- `POST /api/save_access_token` - Store access token in Firestore
-- `GET /api/access_tokens` - Retrieve user's access tokens
-- `POST /api/accounts` - Fetch account data from Plaid
-- `POST /api/transactions` - Fetch transaction data from Plaid
+### Newsletter
+`backend/services/newsletterService.js` fetches YNAB data, then:
+- `backend/newsletter/metrics.js` and `trends.js` compute the numbers.
+- `aiAnalysisService.js` writes insights with Claude (Sonnet, falling back to Haiku, then to template text).
+- `template.js` renders the email, and `emailService.js` sends it through Resend.
 
-### Data Storage
-- **Firestore Collections**:
-  - `user_tokens`: Stores Plaid access tokens per user
-  - `manual_accounts`: User-created accounts not from Plaid
+### Firestore collections
+`ynab_tokens`, `manual_accounts`, `user_holdings`, `csp_settings`, `income_scenarios`, `newsletter_settings`, `newsletter_snapshots`, `newsletter_logs`
 
-## Configuration Notes
+## Configuration
 
-- Backend expects environment variables: `PLAID_CLIENT_ID`, `PLAID_SECRET`, `PLAID_ENV`
-- Firebase service account key should be in `backend/firebaseServiceAccount.json`
-- Frontend connects to backend at `http://localhost:5001`
-- Plaid environment defaults to 'sandbox'
-
-## Common Development Patterns
-
-When adding new features:
-1. Check if user authentication is required (most features do)
-2. Use the `usePlaid()` hook to access user state and data
-3. Follow existing component patterns in App.jsx
-4. Manual accounts are stored in Firestore, Plaid accounts come from API
-5. Use the established card/layout styling patterns with Tailwind classes
+- **Frontend** (`frontend/.env`): `VITE_API_BASE_URL` and the `VITE_FIREBASE_*` keys
+- **API and backend** (Vercel env vars, or `backend/.env` locally):
+  - Firebase Admin credentials: `FIREBASE_PROJECT_ID`, `FIREBASE_PRIVATE_KEY`, `FIREBASE_CLIENT_EMAIL` and the related fields. The local backend can use `backend/firebaseServiceAccount.json` instead.
+  - YNAB OAuth: `YNAB_CLIENT_ID`, `YNAB_CLIENT_SECRET`, `YNAB_REDIRECT_URI`
+  - Newsletter: `ANTHROPIC_API_KEY`, `RESEND_API_KEY`, `NEWSLETTER_FROM_EMAIL`, `NEWSLETTER_RECIPIENTS`, `NEWSLETTER_TIMEZONE`, `FRONTEND_URL`, `CRON_SECRET`
+- Never commit credentials. `.env` files and the service-account JSON are gitignored.
