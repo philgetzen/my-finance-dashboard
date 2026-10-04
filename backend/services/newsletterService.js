@@ -419,7 +419,7 @@ async function generateAndSend(userId, options = {}) {
       try {
         const aiResult = await generateAnalysis({ metrics, trends });
         aiAnalysis = aiResult.analysis;
-        aiTokens = aiResult.usage?.total_tokens || 0;
+        aiTokens = (aiResult.usage?.input_tokens || 0) + (aiResult.usage?.output_tokens || 0);
         aiFallback = aiResult.fallback || false;
 
         logger.info('AI analysis completed', {
