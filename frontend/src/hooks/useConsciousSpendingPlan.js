@@ -13,7 +13,7 @@ import {
   DEFAULT_CSP_SETTINGS,
 } from '../utils/calculations/constants';
 import { mapGroupNameToBucket } from '../utils/calculations/categories';
-import { flattenLines, parseLocalDate, toMonthKey } from '../utils/calculations/cashflow';
+import { flattenLines, parseLocalDate, toMonthKey, createClassifier } from '../utils/calculations/cashflow';
 
 // Re-export for backward compatibility
 export { CSP_TARGETS, CSP_BUCKETS };
@@ -659,6 +659,15 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
     const preTaxContributions = { total: 0, accounts: new Map() };
     const postTaxContributions = { total: 0, accounts: new Map() };
 
+    // The shared classifier knows which lines are transfers, e.g. a stock-sale
+    // inflow in an investment category. They are not refunds and must not net
+    // against real investing outflows.
+    const classify = createClassifier({
+      accounts: accounts || [],
+      categories,
+      cspSettings: { categoryMappings, excludedPayees, excludedCategories, excludedExpenseCategories, settings }
+    });
+
     // Expand split transactions so each line lands in its own category
     flattenLines(transactions).forEach(txn => {
       // Parse as a local date: new Date('2026-08-01') is July 31 in US time zones
@@ -893,6 +902,10 @@ export function useConsciousSpendingPlan(transactions, categories, accounts, per
         }
         return;
       }
+
+      // CSP follows the shared classifier's transfer rule (same as the Dashboard): investment-category
+      // inflows and categorized inflow transfers between budget accounts aren't spending or refunds
+      if (classify(txn).kind === 'transfer') return;
 
       const amount = getTransactionAmount(txn);
       const categoryInfo = categoryMap.get(txn.category_id) || { name: txn.category_name, groupName: '' };

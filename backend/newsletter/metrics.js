@@ -140,7 +140,16 @@ function calculateRunway(accounts, monthlyHistory = []) {
     else cash += balance;
   });
 
-  const cashReserves = checking + savings + cash;
+  // Amounts owed on open on-budget cards and credit lines come out of cash
+  // (balances are signed: owed is negative, a credit is positive)
+  const cardBalance = (accounts || []).reduce((sum, acc) => {
+    if (!acc || acc.closed || acc.deleted || !isOnBudget(acc)) return sum;
+    const accType = (acc.type || '').toLowerCase();
+    if (accType !== 'creditcard' && accType !== 'lineofcredit') return sum;
+    return sum + (acc.balance || 0) / 1000;
+  }, 0);
+
+  const cashReserves = checking + savings + cash + cardBalance;
 
   // Months before the budget had data would drag the averages toward zero
   const validMonths = monthlyHistory.filter(hasActivity);
@@ -151,22 +160,27 @@ function calculateRunway(accounts, monthlyHistory = []) {
   const avgMonthlyInvesting = validMonths.reduce((sum, m) => sum + m.investing, 0) / numMonths;
   const avgMonthlyNet = avgMonthlyIncome - avgMonthlyExpenses;
 
-  const pureRunwayMonths = avgMonthlyExpenses > 0 ? cashReserves / avgMonthlyExpenses : Infinity;
-  const netRunwayMonths = avgMonthlyNet >= 0 ? Infinity : cashReserves / Math.abs(avgMonthlyNet);
+  // Nothing left after cards: no runway, whatever the cash flow
+  const noReserves = cashReserves <= 0;
+  const pureRunwayMonths = noReserves ? 0 : (avgMonthlyExpenses > 0 ? cashReserves / avgMonthlyExpenses : Infinity);
+  const netRunwayMonths = noReserves ? 0 : (avgMonthlyNet >= 0 ? Infinity : cashReserves / Math.abs(avgMonthlyNet));
 
-  // Health is based on the runway the newsletter shows (accounts for income)
+  // Health is based on the runway the newsletter shows (accounts for income).
+  // When income covers spending that runway is not finite, so grade the
+  // reserves against monthly expenses instead.
+  const gradedMonths = netRunwayMonths === Infinity ? pureRunwayMonths : netRunwayMonths;
   let runwayHealth = 'excellent';
-  if (netRunwayMonths < 3) {
+  if (gradedMonths < 3) {
     runwayHealth = 'critical';
-  } else if (netRunwayMonths < 6) {
+  } else if (gradedMonths < 6) {
     runwayHealth = 'caution';
-  } else if (netRunwayMonths < 12) {
+  } else if (gradedMonths < 12) {
     runwayHealth = 'healthy';
   }
 
   return {
     cashReserves,
-    cashBreakdown: { checking, savings, cash },
+    cashBreakdown: { checking, savings, cash, creditCards: cardBalance },
     avgMonthlyExpenses,
     avgMonthlyIncome,
     avgMonthlyInvesting,
@@ -385,7 +399,7 @@ function getTopSpendingCategories(monthToDate, monthlyHistory = []) {
 
 /**
  * This week's spending by category vs the category's average over the prior 6 weeks
- * Uses the same Sunday-Saturday report week as trends
+ * Uses the same 7-complete-day report week as trends
  * @param {Object} ledger - Output of buildLedger
  * @param {string} today - 'YYYY-MM-DD'
  * @returns {Array} - Top categories with weekly comparison

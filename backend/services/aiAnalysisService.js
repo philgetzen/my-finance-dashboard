@@ -43,7 +43,7 @@ function buildAnalysisPrompt(data) {
       <debt>${formatCurrency(netWorth.debt || 0)}</debt>
     </net_worth>
     <cash_runway>
-      <realistic_months>${runway.netRunwayMonths === Infinity || runway.avgMonthlyNet >= 0 ? 'Infinite (positive cash flow)' : Math.round(runway.netRunwayMonths * 10) / 10}</realistic_months>
+      <realistic_months>${runway.netRunwayMonths === Infinity ? 'Not limited by spending (operating cash flow is positive)' : Math.round(runway.netRunwayMonths * 10) / 10}</realistic_months>
       <monthly_net_cash_flow>${formatCurrency(runway.avgMonthlyNet || 0)}</monthly_net_cash_flow>
       <cash_reserves>${formatCurrency(runway.cashReserves || 0)}</cash_reserves>
       <status>${runway.runwayHealth || 'unknown'}</status>
@@ -107,7 +107,7 @@ function buildAnalysisPrompt(data) {
     <ytd_savings_rate actual="${annual.ytd?.savingsRate || 0}%" target="${annual.goals?.savingsRate?.target || 25}%" on_track="${annual.goals?.savingsRate?.onTrack}"/>
     <ytd_investments actual="${formatCurrency(annual.ytd?.investments || 0)}" target="${formatCurrency(annual.goals?.investments?.target || 24000)}" progress="${annual.goals?.investments?.progress || 0}%"/>
     ${annual.netWorthProgress?.available ? `
-    <ytd_net_worth_growth amount="${formatCurrency(annual.netWorthProgress.growth)}" percent="${annual.netWorthProgress.growthPercent}%"/>
+    <net_worth_change_since_snapshot since="${annual.netWorthProgress.since}" amount="${formatCurrency(annual.netWorthProgress.growth)}" percent="${annual.netWorthProgress.growthPercent}%" note="Change in total net worth since that snapshot date. It includes market moves and transfers, so it is not investment return, and it may not cover the full year."/>
     ` : ''}
     <projected_annual_savings>${formatCurrency(annual.projections?.annualSavings || 0)}</projected_annual_savings>
   </annual_progress>
@@ -127,7 +127,7 @@ function buildAnalysisPrompt(data) {
     IMPORTANT CONTEXT:
     - Spending EXCLUDES transfers between accounts and investment contributions - investing is not spending
     - Uncategorized transactions are not counted; if there are any, remind them to categorize in YNAB
-    - Cash runway uses net cash flow (income minus spending) - if positive, runway is infinite
+    - Cash runway uses net cash flow (income minus spending) - if positive, spending does not limit runway, but investing transfers can still draw down reserves, so make no claim about reserve growth
 
     Provide a SHORT, focused analysis (150 words max) covering:
 
@@ -140,7 +140,7 @@ function buildAnalysisPrompt(data) {
     Guidelines:
     - Be conversational, not formal
     - Use the WEEKLY spending numbers, not monthly
-    - If runway is infinite/positive cash flow, that's GOOD - don't alarm
+    - If operating cash flow is positive, that's GOOD - don't alarm (but make no claim that runway is limitless or that reserves grow)
     - Focus on actionable insights, not comprehensive analysis
     - Skip sections that have no meaningful insight
 
@@ -284,9 +284,9 @@ function generateTemplateAnalysis(data) {
   // Runway insight (same figure the newsletter shows: runway after income)
   if (runway.runwayHealth) {
     const months = runway.netRunwayMonths;
-    const runwayMonths = !isFinite(months) ? 'unlimited' : `${Math.round(months * 10) / 10} months`;
+    const runwayMonths = !isFinite(months) ? 'not spending-limited' : `${Math.round(months * 10) / 10} months`;
     if (!isFinite(months)) {
-      insights.push('Income covers your spending, so your cash reserves are growing.');
+      insights.push('Income covers your spending, so spending does not limit your cash runway.');
     } else if (runway.runwayHealth === 'critical') {
       insights.push(`Your cash runway of ${runwayMonths} is below the recommended 3-month minimum. Consider building up your emergency fund.`);
     } else if (runway.runwayHealth === 'caution') {

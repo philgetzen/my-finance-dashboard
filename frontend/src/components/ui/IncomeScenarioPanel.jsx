@@ -172,6 +172,7 @@ export default function IncomeScenarioPanel({
   historicalAvgIncome,
   incomeDelta,
   hasScenarioValues,
+  hasIncomeInput = false,
   // Expense bucket filters
   expenseBuckets,
   toggleExpenseBucket,
@@ -213,7 +214,7 @@ export default function IncomeScenarioPanel({
               Income Scenario Planning
             </h3>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-              {isEnabled && (hasScenarioValues || hasExpenseFilters)
+              {isEnabled && (hasScenarioValues || hasIncomeInput || hasExpenseFilters)
                 ? `Scenario active${hasExpenseFilters ? ' with expense filters' : ''}`
                 : 'Model income and expense scenarios'}
             </p>
@@ -222,7 +223,7 @@ export default function IncomeScenarioPanel({
 
         <div className="flex items-center gap-3">
           {/* Quick toggle when panel is collapsed */}
-          {!isOpen && (hasScenarioValues || hasExpenseFilters) && (
+          {!isOpen && (hasScenarioValues || hasIncomeInput || hasExpenseFilters) && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -468,7 +469,7 @@ export default function IncomeScenarioPanel({
                 </div>
 
                 {/* Runway Impact Indicator */}
-                {isEnabled && (hasScenarioValues || hasExpenseFilters) && currentRunwayMonths !== undefined && projectedRunwayMonths !== undefined && (
+                {isEnabled && (hasScenarioValues || hasIncomeInput || hasExpenseFilters) && currentRunwayMonths !== undefined && projectedRunwayMonths !== undefined && (
                   <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                     <div className="flex items-center justify-between">
                       <p className="text-xs text-gray-500 dark:text-gray-400">

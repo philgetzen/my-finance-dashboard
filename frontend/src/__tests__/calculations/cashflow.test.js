@@ -219,7 +219,8 @@ describe('runway', () => {
       useRunwayCalculator(normalized.current.allAccounts, processed.current.monthlyData, 6));
     expect(result.current.avgMonthlyExpenses).toBe(5000);
     expect(result.current.avgMonthlyIncome).toBe(10000);
-    expect(result.current.cashReserves).toBe(30000);
+    // Checking $30,000 less the $1,000 owed on the open on-budget card
+    expect(result.current.cashReserves).toBe(29000);
   });
 
   test('manual mortgages and other assets are not cash', () => {
@@ -228,7 +229,7 @@ describe('runway', () => {
       { id: 'm2', name: 'Car', type: 'other', balance: 15000 }
     ]));
     const { result } = renderHook(() => useRunwayCalculator(normalized.current.allAccounts, {}, 6));
-    expect(result.current.cashReserves).toBe(30000);
+    expect(result.current.cashReserves).toBe(29000);
   });
 });
 

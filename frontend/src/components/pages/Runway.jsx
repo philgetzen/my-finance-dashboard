@@ -7,7 +7,7 @@ import { useFinanceData, usePrivacy } from '../../contexts/ConsolidatedDataConte
 import { useAccountManager } from '../../hooks/useAccountManager';
 import { useTransactionProcessor } from '../../hooks/useTransactionProcessor';
 import { useRunwayCalculator } from '../../hooks/useRunwayCalculator';
-import { useIncomeScenario, EXPENSE_BUCKETS } from '../../hooks/useIncomeScenario';
+import { useIncomeScenario, resolveScenarioIncome, EXPENSE_BUCKETS } from '../../hooks/useIncomeScenario';
 import { useCSPSettings } from '../../hooks/useConsciousSpendingPlan';
 import { formatCurrency } from '../../utils/formatters';
 import PageTransition from '../ui/PageTransition';
@@ -175,16 +175,22 @@ export default function Runway() {
   // Build scenario options for runway calculator
   const scenarioOptions = useMemo(() => {
     const options = {};
-    // Apply income scenario if enabled and has values
-    if (incomeScenario.isEnabled && incomeScenario.hasScenarioValues) {
-      options.scenarioIncome = incomeScenario.scenarioMonthlyIncome;
+    // Apply income scenario if enabled and income was entered (including $0)
+    const scenarioIncome = resolveScenarioIncome({
+      isEnabled: incomeScenario.isEnabled,
+      hasScenarioValues: incomeScenario.hasScenarioValues,
+      hasIncomeInput: incomeScenario.hasIncomeInput,
+      scenarioMonthlyIncome: incomeScenario.scenarioMonthlyIncome
+    });
+    if (scenarioIncome !== undefined) {
+      options.scenarioIncome = scenarioIncome;
     }
     // Apply expense scenario if enabled and has filters
     if (incomeScenario.isEnabled && incomeScenario.hasExpenseFilters) {
       options.scenarioExpenses = scenarioMonthlyExpenses;
     }
     return options;
-  }, [incomeScenario.isEnabled, incomeScenario.hasScenarioValues, incomeScenario.scenarioMonthlyIncome, incomeScenario.hasExpenseFilters, scenarioMonthlyExpenses]);
+  }, [incomeScenario.isEnabled, incomeScenario.hasScenarioValues, incomeScenario.hasIncomeInput, incomeScenario.scenarioMonthlyIncome, incomeScenario.hasExpenseFilters, scenarioMonthlyExpenses]);
 
   // Calculate runway metrics with scenario overrides
   const runway = useRunwayCalculator(
@@ -234,7 +240,7 @@ export default function Runway() {
                   <div className="space-y-3 text-xs text-gray-600 dark:text-gray-400">
                     <div>
                       <p className="font-medium text-gray-700 dark:text-gray-300 mb-1">Cash Reserves</p>
-                      <p>Sum of all Checking, Savings, and Cash accounts (excludes investments and closed accounts)</p>
+                      <p>Checking, Savings, and Cash balances minus what you owe on open budget credit cards (excludes investments and closed accounts)</p>
                     </div>
                     <div>
                       <p className="font-medium text-gray-700 dark:text-gray-300 mb-1">Worst Case (No Income)</p>
@@ -386,6 +392,7 @@ export default function Runway() {
           historicalAvgIncome={incomeScenario.historicalAvgIncome}
           incomeDelta={incomeScenario.incomeDelta}
           hasScenarioValues={incomeScenario.hasScenarioValues}
+          hasIncomeInput={incomeScenario.hasIncomeInput}
           // Expense bucket filters
           expenseBuckets={incomeScenario.expenseBuckets}
           toggleExpenseBucket={incomeScenario.toggleExpenseBucket}
@@ -407,7 +414,7 @@ export default function Runway() {
             <BanknotesIcon className="h-5 w-5 text-violet-500" />
             Cash Reserves Breakdown
           </h3>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
             <div className="p-4 bg-violet-50 dark:bg-violet-900/20 rounded-lg text-center">
               <p className="text-xs text-violet-600 dark:text-violet-400 font-medium uppercase mb-1">
                 Total Cash
@@ -444,6 +451,16 @@ export default function Runway() {
               </p>
               <PrivacyCurrency
                 amount={runway.cashBreakdown.manualCash}
+                isPrivacyMode={privacyMode}
+                className="text-lg sm:text-xl font-bold text-gray-700 dark:text-gray-300"
+              />
+            </div>
+            <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg text-center">
+              <p className="text-xs text-gray-600 dark:text-gray-400 font-medium uppercase mb-1">
+                Credit Cards
+              </p>
+              <PrivacyCurrency
+                amount={runway.cashBreakdown.creditCards}
                 isPrivacyMode={privacyMode}
                 className="text-lg sm:text-xl font-bold text-gray-700 dark:text-gray-300"
               />

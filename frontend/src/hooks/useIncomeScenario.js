@@ -28,6 +28,8 @@ export const DEFAULT_TAKE_HOME_RATE = 70;
 // Default scenario state
 const DEFAULT_SCENARIO = {
   enabled: false,
+  // Explicit so clearing writes false over a saved true (Firestore merge keeps absent keys)
+  incomeEdited: false,
   salary: { annual: 0 },
   bonus: { annual: 0, frequency: 'annual' },
   stock: { annualValue: 0 },
@@ -54,6 +56,18 @@ export function calculateScenarioMonthlyIncome(scenario) {
   const stockAnnual = scenario.stock?.annualValue || 0;
 
   return ((salaryAnnual + bonusAnnual + stockAnnual) * takeHomeShare(scenario)) / 12;
+}
+
+/**
+ * Income override for the runway calculator, or undefined to use history.
+ * An enabled scenario whose income the user set to $0 means "no income" and
+ * must yield 0, not fall back to the historical average. A scenario that
+ * never had income entered (e.g. only expense filters) keeps history.
+ */
+export function resolveScenarioIncome({ isEnabled, hasScenarioValues, hasIncomeInput, scenarioMonthlyIncome }) {
+  if (!isEnabled) return undefined;
+  if (hasScenarioValues || hasIncomeInput) return scenarioMonthlyIncome;
+  return undefined;
 }
 
 /**
@@ -105,6 +119,9 @@ export function useIncomeScenario(historicalAvgIncome = 0) {
     return salary > 0 || bonus > 0 || stock > 0;
   }, [scenario]);
 
+  // True once the user has entered any income figure, including $0
+  const hasIncomeInput = scenario.incomeEdited === true;
+
   // Expense bucket filters
   const expenseBuckets = useMemo(() => {
     return scenario.expenseBuckets || DEFAULT_EXPENSE_BUCKETS;
@@ -145,6 +162,7 @@ export function useIncomeScenario(historicalAvgIncome = 0) {
   const setSalary = useCallback((annual) => {
     setScenario(prev => ({
       ...prev,
+      incomeEdited: true,
       salary: { ...prev.salary, annual: Math.max(0, annual || 0) }
     }));
   }, []);
@@ -152,6 +170,7 @@ export function useIncomeScenario(historicalAvgIncome = 0) {
   const setBonus = useCallback((annual, frequency = 'annual') => {
     setScenario(prev => ({
       ...prev,
+      incomeEdited: true,
       bonus: { annual: Math.max(0, annual || 0), frequency }
     }));
   }, []);
@@ -159,6 +178,7 @@ export function useIncomeScenario(historicalAvgIncome = 0) {
   const setStock = useCallback((annualValue) => {
     setScenario(prev => ({
       ...prev,
+      incomeEdited: true,
       stock: { ...prev.stock, annualValue: Math.max(0, annualValue || 0) }
     }));
   }, []);
@@ -195,6 +215,7 @@ export function useIncomeScenario(historicalAvgIncome = 0) {
     setScenario(prev => ({
       ...prev,
       // Historical income is take-home; convert back to the gross salary that produces it
+      incomeEdited: true,
       salary: { annual: Math.round((historicalAvgIncome * 12) / takeHomeShare(prev)) },
       bonus: { annual: 0, frequency: 'annual' },
       stock: { annualValue: 0 }
@@ -328,6 +349,7 @@ export function useIncomeScenario(historicalAvgIncome = 0) {
     historicalAvgIncome,
     incomeDelta,
     hasScenarioValues,
+    hasIncomeInput,
 
     // Expense bucket filters
     expenseBuckets,
