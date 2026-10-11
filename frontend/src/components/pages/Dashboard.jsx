@@ -16,6 +16,7 @@ import YNABConnectionErrorModal from '../ui/YNABConnectionErrorModal';
 import PrivacyCurrency from '../ui/PrivacyCurrency';
 import { getAccountBalance, normalizeYNABAccountType } from '../../utils/ynabHelpers';
 import { calculateNetWorthTotals, isAccountOpen } from '../../utils/netWorth';
+import { gradedRunwayMonths } from '../../utils/runwayCopy';
 import { formatCurrency, isLiability, getDisplayAccountType, isEffectivelyZero } from '../../utils/formatters';
 import { useTransactionProcessor, getMonthlyRangeData } from '../../hooks/useTransactionProcessor';
 import { useCSPSettings } from '../../hooks/useConsciousSpendingPlan';
@@ -447,17 +448,13 @@ const RUNWAY_HEALTH_COLORS = {
 // Runway Summary Card for Dashboard
 const RunwaySummaryCard = React.memo(({ runway, isPrivacyMode }) => {
   const colors = RUNWAY_HEALTH_COLORS[runway.runwayHealth];
-  // Use netRunwayMonths (realistic case with income) instead of pureRunwayMonths (worst case)
-  const displayMonths = !isFinite(runway.netRunwayMonths)
-    ? '∞'
-    : runway.netRunwayMonths >= 24
-      ? '24+'
-      : Math.floor(runway.netRunwayMonths);
+  // Show the runway the health grade uses: net runway when finite, otherwise
+  // reserves vs monthly expenses (so a red card never shows a full bar)
+  const graded = gradedRunwayMonths(runway);
+  const displayMonths = !isFinite(graded) || graded >= 24 ? '24+' : Math.floor(graded);
 
   // Progress bar shows runway (capped at 24 months = 100%)
-  const progressPercent = !isFinite(runway.netRunwayMonths)
-    ? 100
-    : Math.min((runway.netRunwayMonths / 24) * 100, 100);
+  const progressPercent = !isFinite(graded) ? 100 : Math.min((graded / 24) * 100, 100);
 
   return (
     <Card className="p-4 sm:p-6">

@@ -15,6 +15,7 @@ import Card from '../ui/Card';
 import PrivacyCurrency from '../ui/PrivacyCurrency';
 import IncomeScenarioPanel from '../ui/IncomeScenarioPanel';
 import { RunwaySkeleton } from '../ui/Skeleton';
+import { runwayBanner } from '../../utils/runwayCopy';
 import {
   ClockIcon,
   BanknotesIcon,
@@ -48,7 +49,6 @@ const PERIOD_OPTIONS = [
 const HEALTH_CONFIG = {
   critical: {
     label: 'Critical',
-    description: 'Less than 3 months of runway',
     icon: ExclamationTriangleIcon,
     color: 'text-red-600 dark:text-red-400',
     bg: 'bg-red-50 dark:bg-red-900/20',
@@ -56,7 +56,6 @@ const HEALTH_CONFIG = {
   },
   caution: {
     label: 'Caution',
-    description: '3-6 months of runway',
     icon: ExclamationTriangleIcon,
     color: 'text-amber-600 dark:text-amber-400',
     bg: 'bg-amber-50 dark:bg-amber-900/20',
@@ -64,7 +63,6 @@ const HEALTH_CONFIG = {
   },
   healthy: {
     label: 'Healthy',
-    description: '6-12 months of runway',
     icon: CheckCircleIcon,
     color: 'text-emerald-600 dark:text-emerald-400',
     bg: 'bg-emerald-50 dark:bg-emerald-900/20',
@@ -72,7 +70,6 @@ const HEALTH_CONFIG = {
   },
   excellent: {
     label: 'Excellent',
-    description: 'More than 12 months of runway',
     icon: CheckCircleIcon,
     color: 'text-violet-600 dark:text-violet-400',
     bg: 'bg-violet-50 dark:bg-violet-900/20',
@@ -205,13 +202,14 @@ export default function Runway() {
 
   // Format runway display
   const formatRunway = (months) => {
-    if (!isFinite(months)) return { value: '∞', label: 'Unlimited' };
+    if (!isFinite(months)) return { value: 'No limit', label: 'from spending' };
     if (months >= 24) return { value: '24+', label: 'months' };
     return { value: Math.floor(months).toString(), label: months === 1 ? 'month' : 'months' };
   };
 
   const pureDisplay = formatRunway(runway.pureRunwayMonths);
   const netDisplay = formatRunway(runway.netRunwayMonths);
+  const banner = runwayBanner(runway);
 
   if (isLoading) {
     return (
@@ -287,12 +285,10 @@ export default function Runway() {
             <HealthIcon className={`h-6 w-6 ${healthConfig.color}`} />
             <div>
               <p className={`font-semibold ${healthConfig.color}`}>
-                {healthConfig.label}: {!isFinite(runway.netRunwayMonths) ? 'Cash is growing' : `${pureDisplay.value} ${pureDisplay.label} of runway`}
+                {healthConfig.label}: {banner.headline}
               </p>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                {!isFinite(runway.netRunwayMonths)
-                  ? 'Income exceeds expenses - your cash reserves are increasing'
-                  : healthConfig.description}
+                {banner.detail}
               </p>
             </div>
           </div>
@@ -609,7 +605,7 @@ export default function Runway() {
           </Card>
           <Card className="p-4 text-center">
             <p className="text-xs text-gray-500 dark:text-gray-400 uppercase font-medium mb-1">
-              Avg Monthly Savings
+              Avg Monthly Net Cash Flow
             </p>
             <span className={`text-xl font-bold ${privacyMode ? 'privacy-blur' : ''} ${
               runway.avgMonthlyNet >= 0
