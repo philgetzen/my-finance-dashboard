@@ -54,7 +54,7 @@ function markdownToHtml(text) {
 
 /**
  * Get week date range string
- * @param {string} weekStart - Sunday of the week ('YYYY-MM-DD')
+ * @param {string} weekStart - First day of the 7-day report week ('YYYY-MM-DD')
  * @returns {string} - Formatted date range like "Jan 15 - Jan 21"
  */
 function getWeekDateRange(weekStart) {
@@ -119,7 +119,7 @@ function getBurnRateStatus(currentSpending, averageWeekly) {
  */
 function formatRunwayMonths(months) {
   if (months === Infinity || months > 999) {
-    return '∞';
+    return 'not limited by spending';
   }
   return Math.round(months * 10) / 10;
 }
@@ -284,15 +284,17 @@ function generateNewsletterHtml(data) {
               </table>
 
               <div style="margin-top: 16px;">
-                <span style="font-size: 36px; font-weight: 700;">${formatRunwayMonths(runway.netRunwayMonths || runway.pureRunwayMonths || 0)}</span>
-                <span style="font-size: 16px; color: #666; margin-left: 8px;">months</span>
+                ${(runway.netRunwayMonths === Infinity || runway.netRunwayMonths > 999) ? `
+                <span style="font-size: 24px; font-weight: 700;">Not limited by spending</span>` : `
+                <span style="font-size: 36px; font-weight: 700;">${formatRunwayMonths(runway.netRunwayMonths ?? runway.pureRunwayMonths ?? 0)}</span>
+                <span style="font-size: 16px; color: #666; margin-left: 8px;">months</span>`}
               </div>
 
               <div style="font-size: 14px; color: #666; margin-top: 8px;">
                 ${(runway.netRunwayMonths === Infinity || runway.netRunwayMonths > 999) ?
-                  `Your income exceeds expenses - unlimited runway!` :
+                  `Operating cash flow is positive - spending doesn't limit your runway` :
                   runway.avgMonthlyNet >= 0 ?
-                    `With your positive cash flow, your ${formatCurrency(runway.cashReserves || 0)} in reserves continues to grow` :
+                    `Operating cash flow is positive; your reserves are ${formatCurrency(runway.cashReserves || 0)} after credit cards` :
                     `Based on your net monthly spend, your ${formatCurrency(runway.cashReserves || 0)} in cash covers ${formatRunwayMonths(runway.netRunwayMonths || 0)} months`
                 }
               </div>

@@ -92,11 +92,12 @@ function startOfWeek(key) {
 }
 
 /**
- * The Sunday-Saturday week a newsletter reports on: the current week when it
- * runs on Saturday (the scheduled day), otherwise the last full week
+ * The week a newsletter reports on: the 7 complete days ending yesterday.
+ * Today is excluded because the Saturday-morning run only has part of its
+ * transactions posted, which would compare a short day count to full weeks.
  */
 function reportWeek(today) {
-  const end = dayOfWeek(today) === 6 ? today : addDays(startOfWeek(today), -1);
+  const end = addDays(today, -1);
   return { start: addDays(end, -6), end };
 }
 

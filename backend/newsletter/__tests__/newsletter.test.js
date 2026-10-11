@@ -5,7 +5,8 @@ const cashflow = require('../cashflow');
 const { calculateAllMetrics } = require('../metrics');
 const { calculateAllTrends } = require('../trends');
 const { generateNewsletterHtml } = require('../template');
-const { generateTemplateAnalysis } = require('../../services/aiAnalysisService');
+const { generateTemplateAnalysis, buildAnalysisPrompt } = require('../../services/aiAnalysisService');
+const { shouldBlockRerun } = require('../../services/newsletterService');
 
 let shared;
 before(async () => {
@@ -356,14 +357,12 @@ describe('calendar math', () => {
     );
   });
 
-  test('the report week is the current week on Saturday, otherwise the last full week', () => {
-    assert.deepEqual(cashflow.reportWeek('2026-10-03'), { start: '2026-09-27', end: '2026-10-03' });
-    // Oct 4, 2026 ad hoc run: a Sunday showed an empty Oct 4 - Oct 10 week
+  test('the report week is the 7 complete days ending yesterday', () => {
+    // Saturday cron: the partial Saturday is excluded
+    assert.deepEqual(cashflow.reportWeek('2026-10-10'), { start: '2026-10-03', end: '2026-10-09' });
     assert.deepEqual(cashflow.reportWeek('2026-10-04'), { start: '2026-09-27', end: '2026-10-03' });
-    // Every other weekday reports the same last full week
-    ['2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08', '2026-10-09'].forEach(day =>
-      assert.deepEqual(cashflow.reportWeek(day), { start: '2026-09-27', end: '2026-10-03' }));
-    assert.deepEqual(cashflow.reportWeek('2026-10-10'), { start: '2026-10-04', end: '2026-10-10' });
+    assert.deepEqual(cashflow.reportWeek('2026-10-05'), { start: '2026-09-28', end: '2026-10-04' });
+    assert.deepEqual(cashflow.reportWeek('2026-03-01'), { start: '2026-02-22', end: '2026-02-28' });
   });
 
   test('today is taken in the newsletter timezone', () => {
@@ -386,10 +385,49 @@ describe('newsletter metrics', () => {
     assert.equal(metrics.runway.avgMonthlyIncome, 10000);
     assert.equal(metrics.runway.avgMonthlyNet, 5000);
     assert.equal(metrics.runway.netRunwayMonths, Infinity);
-    assert.equal(metrics.runway.cashReserves, 80000); // two checking accounts; card debt isn't cash
+    assert.equal(metrics.runway.cashReserves, 78000); // two checking accounts less the $2k owed on the card
     assert.equal(metrics.burnRate.average, 5000);
     assert.equal(metrics.burnRate.currentMonth, 100);
     assert.equal(metrics.burnRate.trend, 'stable');
+  });
+
+  test('cash reserves are net of open on-budget credit card balances', () => {
+    const extra = [
+      { id: 'loc', name: 'HELOC', type: 'lineOfCredit', on_budget: true, balance: -5000000 },
+      { id: 'closed', name: 'Old Card', type: 'creditCard', on_budget: true, closed: true, balance: -9000000 },
+      { id: 'track', name: 'Tracking Card', type: 'creditCard', on_budget: false, balance: -7000000 },
+      { id: 'credit', name: 'Refund Card', type: 'creditCard', on_budget: true, balance: 1000000 }
+    ];
+    const metrics = calculateAllMetrics(
+      { accounts: [...accounts, ...extra], transactions: steadyBudget(), categories },
+      { today: '2026-10-02', cspSettings: {} }
+    );
+    // 80,000 cash - 2,000 card - 5,000 line of credit + 1,000 card credit
+    assert.equal(metrics.runway.cashReserves, 74000);
+  });
+
+  test('negative reserves give zero runway and critical health, for positive or negative cash flow', () => {
+    const small = [
+      { id: 'checking', name: 'Checking', type: 'checking', on_budget: true, balance: 5000000 },
+      { id: 'card', name: 'Chase Card', type: 'creditCard', on_budget: true, balance: -8000000 }
+    ];
+    const positive = calculateAllMetrics({ accounts: small, transactions: steadyBudget(), categories }, { today: '2026-10-02', cspSettings: {} });
+    const negative = calculateAllMetrics({ accounts: small, transactions: steadyBudget().filter(t => t.category_id !== 'rta'), categories }, { today: '2026-10-02', cspSettings: {} });
+
+    for (const { runway } of [positive, negative]) {
+      assert.equal(runway.cashReserves, -3000);
+      assert.equal(runway.netRunwayMonths, 0);
+      assert.equal(runway.pureRunwayMonths, 0);
+      assert.equal(runway.runwayHealth, 'critical');
+    }
+  });
+
+  test('infinite net runway is graded on reserves vs expenses, not labelled excellent by default', () => {
+    const lowCash = [{ id: 'checking', name: 'Checking', type: 'checking', on_budget: true, balance: 10000000 }];
+    const m = calculateAllMetrics({ accounts: lowCash, transactions: steadyBudget(), categories }, { today: '2026-10-02', cspSettings: {} });
+    // $10k reserves / $5k monthly expenses = 2 months, even though income exceeds spending
+    assert.equal(m.runway.netRunwayMonths, Infinity);
+    assert.equal(m.runway.runwayHealth, 'critical');
   });
 
   test('investing lowers neither income nor runway, and is reported separately', () => {
@@ -487,6 +525,29 @@ describe('newsletter metrics', () => {
     assert.equal(trends.annualProgress.netWorthProgress.since, '2026-02-14');
     assert.equal(trends.annualProgress.netWorthProgress.startOfYear, 1000000);
   });
+
+  test('the AI prompt labels the net worth delta as a change since a dated snapshot, not a return', () => {
+    const snapshots = [{ createdAt: '2026-02-14T17:00:00.000Z', netWorth: 1000000 }];
+    const { metrics, trends } = run([], { snapshots });
+    const prompt = buildAnalysisPrompt({ metrics, trends });
+
+    assert.doesNotMatch(prompt, /ytd_net_worth_growth/);
+    assert.match(prompt, /<net_worth_change_since_snapshot since="2026-02-14"/);
+    assert.match(prompt, /not investment return/i);
+  });
+
+  test('the AI prompt, fallback and email do not claim unlimited runway or growing reserves', () => {
+    const { metrics, trends } = run(steadyBudget());
+    assert.equal(metrics.runway.netRunwayMonths, Infinity);
+    const prompt = buildAnalysisPrompt({ metrics, trends });
+    const fallback = generateTemplateAnalysis({ metrics, trends });
+    const html = generateNewsletterHtml({ metrics, trends, aiAnalysis: null, weekEnding: 'October 9, 2026' });
+
+    assert.doesNotMatch(html, /∞/);
+    for (const text of [prompt, fallback, html]) {
+      assert.doesNotMatch(text, /unlimited runway|runway is infinite|reserves (are|continues?) (to )?grow|Infinite \(positive/i);
+    }
+  });
 });
 
 // --------------------------------------------
@@ -505,7 +566,7 @@ describe('newsletter rendering', () => {
     assert.match(html, /\$200</);
     assert.match(html, /1 uncategorized transaction/);
     assert.match(html, /Wire &lt;Out&gt;: -\$250,361/);
-    assert.match(html, /Sep 13 - Sep 19/);
+    assert.match(html, /Sep 12 - Sep 18/);
   });
 
   test('fallback insights quote the same runway the newsletter shows', () => {
@@ -513,8 +574,27 @@ describe('newsletter rendering', () => {
     const { metrics, trends } = run(transactions);
     const text = generateTemplateAnalysis({ metrics, trends });
 
-    // $80k cash / $5k monthly burn with no income
-    assert.equal(Math.round(metrics.runway.netRunwayMonths * 10) / 10, 16);
-    assert.match(text, /16 months cash runway/);
+    // $78k cash after the card / $5k monthly burn with no income
+    assert.equal(Math.round(metrics.runway.netRunwayMonths * 10) / 10, 15.6);
+    assert.match(text, /15.6 months cash runway/);
+  });
+});
+
+describe('rerun guard', () => {
+  const cutoff = '2026-10-10T17:00:00.000Z';
+  const recent = '2026-10-10T17:10:00.000Z';
+
+  test('blocks after a recent success', () => {
+    assert.equal(shouldBlockRerun({ status: 'success', startedAt: recent }, cutoff), true);
+  });
+
+  test('blocks after a recent partial run that sent email', () => {
+    assert.equal(shouldBlockRerun({ status: 'partial', startedAt: recent, metrics: { emailsSent: 2 } }, cutoff), true);
+  });
+
+  test('allows a retry after a partial run that sent nothing, a failure, or an old success', () => {
+    assert.equal(shouldBlockRerun({ status: 'partial', startedAt: recent, metrics: { emailsSent: 0 } }, cutoff), false);
+    assert.equal(shouldBlockRerun({ status: 'failed', startedAt: recent, metrics: { emailsSent: 0 } }, cutoff), false);
+    assert.equal(shouldBlockRerun({ status: 'success', startedAt: '2026-10-10T16:00:00.000Z' }, cutoff), false);
   });
 });

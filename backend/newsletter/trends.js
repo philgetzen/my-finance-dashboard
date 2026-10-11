@@ -378,7 +378,7 @@ function calculateAnnualProgress(ledger, today, currentMetrics, snapshots = [], 
 // ============================================
 
 /**
- * Calculate week-over-week trends (weeks run Sunday-Saturday)
+ * Calculate week-over-week trends (the report week is the 7 complete days ending yesterday)
  * @param {Object} ledger - Output of buildLedger
  * @param {string} today - 'YYYY-MM-DD'
  * @returns {Object} - Weekly comparison data

@@ -22,6 +22,19 @@ const YNAB_API_BASE_URL = 'https://api.ynab.com/v1';
 const DEDUP_WINDOW_MINUTES = 30;
 
 /**
+ * Whether a logged run should block a new send: a recent success, or a recent
+ * partial run that already emailed someone (e.g. the snapshot save failed
+ * after sending)
+ * @param {Object} log - newsletter_logs document data
+ * @param {string} cutoff - ISO time; runs started before it don't block
+ */
+function shouldBlockRerun(log, cutoff) {
+  if (!log || !(log.startedAt > cutoff)) return false;
+  if (log.status === 'success') return true;
+  return log.status === 'partial' && (log.metrics?.emailsSent || 0) > 0;
+}
+
+/**
  * Get Firestore database instance
  */
 function getDb() {
@@ -271,8 +284,8 @@ async function saveSnapshot(userId, metrics, trends) {
 }
 
 /**
- * Display date for the newsletter header: the Saturday that ends the report
- * week (e.g., "September 26, 2026")
+ * Display date for the newsletter header: the last day of the report
+ * week (yesterday) (e.g., "September 26, 2026")
  * @param {string} today - 'YYYY-MM-DD'
  */
 function formatWeekEnding(today) {
@@ -348,8 +361,7 @@ async function generateAndSend(userId, options = {}) {
         .get();
 
       const recentSuccess = recentLogsQuery.docs.find(doc => {
-        const data = doc.data();
-        return data.status === 'success' && data.startedAt > dedupCutoff;
+        return shouldBlockRerun(doc.data(), dedupCutoff);
       });
 
       if (recentSuccess) {
@@ -690,6 +702,7 @@ function validateConfiguration() {
 }
 
 module.exports = {
+  shouldBlockRerun,
   generateAndSend,
   generatePreview,
   buildAIPrompt,
