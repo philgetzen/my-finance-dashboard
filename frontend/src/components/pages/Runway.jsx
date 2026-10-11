@@ -49,7 +49,6 @@ const PERIOD_OPTIONS = [
 const HEALTH_CONFIG = {
   critical: {
     label: 'Critical',
-    description: 'Less than 3 months of runway',
     icon: ExclamationTriangleIcon,
     color: 'text-red-600 dark:text-red-400',
     bg: 'bg-red-50 dark:bg-red-900/20',
@@ -57,7 +56,6 @@ const HEALTH_CONFIG = {
   },
   caution: {
     label: 'Caution',
-    description: '3-6 months of runway',
     icon: ExclamationTriangleIcon,
     color: 'text-amber-600 dark:text-amber-400',
     bg: 'bg-amber-50 dark:bg-amber-900/20',
@@ -65,7 +63,6 @@ const HEALTH_CONFIG = {
   },
   healthy: {
     label: 'Healthy',
-    description: '6-12 months of runway',
     icon: CheckCircleIcon,
     color: 'text-emerald-600 dark:text-emerald-400',
     bg: 'bg-emerald-50 dark:bg-emerald-900/20',
@@ -73,7 +70,6 @@ const HEALTH_CONFIG = {
   },
   excellent: {
     label: 'Excellent',
-    description: 'More than 12 months of runway',
     icon: CheckCircleIcon,
     color: 'text-violet-600 dark:text-violet-400',
     bg: 'bg-violet-50 dark:bg-violet-900/20',
