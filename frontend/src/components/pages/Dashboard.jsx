@@ -15,10 +15,11 @@ import PageTransition from '../ui/PageTransition';
 import YNABConnectionErrorModal from '../ui/YNABConnectionErrorModal';
 import PrivacyCurrency from '../ui/PrivacyCurrency';
 import { getAccountBalance, normalizeYNABAccountType } from '../../utils/ynabHelpers';
+import { calculateNetWorthTotals, isAccountOpen } from '../../utils/netWorth';
 import { formatCurrency, isLiability, getDisplayAccountType, isEffectivelyZero } from '../../utils/formatters';
 import { useTransactionProcessor, getMonthlyRangeData } from '../../hooks/useTransactionProcessor';
 import { useCSPSettings } from '../../hooks/useConsciousSpendingPlan';
-import { summarizeLines, toDateKey, isDebtAccount, parseLocalDate } from '../../utils/calculations/cashflow';
+import { summarizeLines, toDateKey, toMonthKey, parseLocalDate } from '../../utils/calculations/cashflow';
 import { useAccountManager } from '../../hooks/useAccountManager';
 import { useRunwayCalculator } from '../../hooks/useRunwayCalculator';
 import { Link } from 'react-router-dom';
@@ -234,6 +235,7 @@ const HeroMetric = React.memo(({ value, label, trend, change, isPrivacyMode }) =
               'text-violet-200'
             }`}>
               {change > 0 ? '+' : change < 0 ? '-' : ''}${formatCurrency(change)} this month
+              <span className="font-normal opacity-75" title="Net cash flow this month, not a measured change in account balances"> (est. from cash flow)</span>
             </span>
           </div>
         )}
@@ -665,55 +667,23 @@ export default function Dashboard() {
     }
   }, [selectedTimePeriod]);
 
+  // "Last Year" is the previous calendar year (Jan-Dec); every other period
+  // ends with the current month
+  const chartEndMonth = useMemo(() => (
+    selectedTimePeriod === 'last-year' ? new Date(new Date().getFullYear() - 1, 11, 1) : null
+  ), [selectedTimePeriod]);
+
   // Calculate net worth, totals, and top accounts
-  const { netWorth, totalAssets, totalLiabilities, topAssets, topLiabilities } = useMemo(() => {
-    let assets = 0;
-    let liabilities = 0;
-    const assetAccounts = [];
-    const liabilityAccounts = [];
-
-    allAccounts.forEach(account => {
-      const balance = getAccountBalance(account);
-      const type = normalizeYNABAccountType(account.type);
-      const name = account.name || account.nickname || 'Unknown Account';
-
-      if (isLiability(account) || ['credit', 'loan', 'mortgage'].includes(type) || isDebtAccount(account)) {
-        // YNAB liabilities are negative (a card carrying a credit is positive);
-        // manual liabilities may be entered either way
-        const owed = account.on_budget !== undefined ? -balance : Math.abs(balance);
-        liabilities += owed;
-        liabilityAccounts.push({ name, balance: owed });
-      } else {
-        assets += balance;
-        if (balance > 0) {
-          assetAccounts.push({ name, balance });
-        }
-      }
-    });
-
-    // Sort and get top 3
-    const topAssets = assetAccounts
-      .sort((a, b) => b.balance - a.balance)
-      .slice(0, 3);
-
-    const topLiabilities = liabilityAccounts
-      .sort((a, b) => b.balance - a.balance)
-      .slice(0, 3);
-
-    return {
-      netWorth: assets - liabilities,
-      totalAssets: assets,
-      totalLiabilities: liabilities,
-      topAssets,
-      topLiabilities
-    };
-  }, [allAccounts]);
+  const { netWorth, totalAssets, totalLiabilities, topAssets, topLiabilities } = useMemo(
+    () => calculateNetWorthTotals(allAccounts),
+    [allAccounts]
+  );
 
   // Asset allocation data
   const allocationData = useMemo(() => {
     const allocation = {};
     
-    allAccounts.forEach(account => {
+    allAccounts.filter(isAccountOpen).forEach(account => {
       const balance = getAccountBalance(account);
       if (balance > 0 && !isLiability(account)) {
         const type = getDisplayAccountType(account.type);
@@ -729,14 +699,14 @@ export default function Dashboard() {
 
   // Chart data - uses selected time period
   const chartData = useMemo(() => {
-    const monthsData = getMonthlyRangeData(monthlyData, chartMonths);
+    const monthsData = getMonthlyRangeData(monthlyData, chartMonths, { endMonth: chartEndMonth });
 
     return monthsData.map(month => ({
       month: month.monthName.split(' ')[0],
       income: month.income,
       expenses: month.expenses
     }));
-  }, [monthlyData, chartMonths]);
+  }, [monthlyData, chartMonths, chartEndMonth]);
 
   // Period summary data - uses selected time period, compared with the same
   // days of the prior period (Oct 1-2 vs Sep 1-2, not vs all of September)
@@ -813,13 +783,22 @@ export default function Dashboard() {
 
   // Net worth over time data - work backwards from current totals using cash flow
   const netWorthHistoryData = useMemo(() => {
-    const monthsToShow = getMonthlyRangeData(monthlyData, chartMonths);
+    const monthsToShow = getMonthlyRangeData(monthlyData, chartMonths, { endMonth: chartEndMonth });
 
     if (monthsToShow.length === 0) return [];
 
     // Start with current values and work backwards
     let runningAssets = totalAssets;
     let runningLiabilities = totalLiabilities;
+
+    // A window that ends before this month (Last Year) starts from the net
+    // worth at its end, so back out the cash flow of the months after it
+    if (chartEndMonth) {
+      const endKey = toMonthKey(chartEndMonth);
+      Object.entries(monthlyData).forEach(([monthKey, month]) => {
+        if (monthKey > endKey) runningAssets -= month.income - month.expenses;
+      });
+    }
 
     // Walk backwards from the current month. Each point is that month's
     // ending net worth; the previous month ended lower by this month's net
@@ -839,7 +818,7 @@ export default function Dashboard() {
 
     // Reverse back to chronological order
     return reversedData.reverse();
-  }, [monthlyData, chartMonths, totalAssets, totalLiabilities]);
+  }, [monthlyData, chartMonths, chartEndMonth, totalAssets, totalLiabilities]);
 
   const handleYNABConnect = async (accessToken, refreshToken) => {
     await saveYNABToken(accessToken, refreshToken);
@@ -992,8 +971,8 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Net Worth Over Time */}
           <SectionCard
-            title="Net Worth Over Time"
-            subtitle={TIME_PERIODS.find(p => p.key === selectedTimePeriod)?.label || 'Last 6 Months'}
+            title="Net Worth Over Time (Estimate)"
+            subtitle={`Estimated from cash flow, not account history · ${TIME_PERIODS.find(p => p.key === selectedTimePeriod)?.label || 'Last 6 Months'}`}
             icon={ChartBarIcon}
           >
             {netWorthHistoryData.length > 0 ? (

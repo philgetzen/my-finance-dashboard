@@ -258,13 +258,14 @@ export default function CashFlow() {
     return map;
   }, [categories]);
 
-  // Category mappings decide which categories are investing (not spending)
-  const { categoryMappings, settings: cspPreferences } = useCSPSettings();
+  // Category mappings decide which categories are investing (not spending);
+  // payee and expense-category exclusions must match the Dashboard
+  const { categoryMappings, excludedPayees, excludedCategories, excludedExpenseCategories, settings: cspPreferences } = useCSPSettings();
   const classificationOptions = useMemo(() => ({
     accounts: allAccounts,
     categories,
-    cspSettings: { categoryMappings, settings: cspPreferences }
-  }), [allAccounts, categories, categoryMappings, cspPreferences]);
+    cspSettings: { categoryMappings, excludedPayees, excludedCategories, excludedExpenseCategories, settings: cspPreferences }
+  }), [allAccounts, categories, categoryMappings, excludedPayees, excludedCategories, excludedExpenseCategories, cspPreferences]);
 
   const {
     processedCategoryGroups,

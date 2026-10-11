@@ -111,11 +111,12 @@ export function useTransactionProcessor(transactions, accounts, _investmentAccou
  * Get monthly summary data for a specific time range
  * @param {Object} monthlyData - Map of 'YYYY-MM' -> { income, expenses, net }
  * @param {number} months - Number of months, ending with the current month
- * @param {Object} [options] - { completeOnly: true } to end with last month instead
+ * @param {Object} [options] - { completeOnly: true } to end with last month instead;
+ *   { endMonth: Date } to end with that month instead of the current one
  */
-export function getMonthlyRangeData(monthlyData, months = 6, { completeOnly = false } = {}) {
+export function getMonthlyRangeData(monthlyData, months = 6, { completeOnly = false, endMonth = null } = {}) {
   const result = [];
-  const today = new Date();
+  const today = endMonth ? new Date(endMonth) : new Date();
   const offset = completeOnly ? 1 : 0;
 
   for (let i = months - 1 + offset; i >= offset; i--) {

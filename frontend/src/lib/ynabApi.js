@@ -259,7 +259,11 @@ class YNABService {
     } catch (parallelError) {
       console.warn('Parallel fetch failed, attempting sequential fallback:', parallelError.message);
 
-      // Sequential fallback - fetch one at a time for reliability
+      // Sequential fallback - fetch one at a time for reliability.
+      // Accounts and transactions are required: returning a budget without
+      // them would show $0 flows and infinite runway as if they were real,
+      // so a failure in either rejects. Categories, months and scheduled
+      // transactions are optional and fall back to empty.
       try {
         const result = {
           budgets: [],
@@ -270,24 +274,16 @@ class YNABService {
           scheduledTransactions: []
         };
 
-        // Fetch critical data first
+        // The budget list is only for the picker, so it stays optional
         try {
           result.budgets = await this.getBudgets();
         } catch (e) {
           console.warn('Failed to fetch budgets:', e.message);
         }
 
-        try {
-          result.accounts = await this.getAccounts(budgetId);
-        } catch (e) {
-          console.warn('Failed to fetch accounts:', e.message);
-        }
-
-        try {
-          result.transactions = await this.getTransactions(budgetId);
-        } catch (e) {
-          console.warn('Failed to fetch transactions:', e.message);
-        }
+        // Required data: let failures propagate
+        result.accounts = await this.getAccounts(budgetId);
+        result.transactions = await this.getTransactions(budgetId);
 
         // Non-critical data
         try {
@@ -308,14 +304,8 @@ class YNABService {
           console.warn('Failed to fetch scheduled transactions:', e.message);
         }
 
-        // If we got at least accounts or transactions, return partial data
-        if (result.accounts.length > 0 || result.transactions.length > 0) {
-          console.log('Sequential fallback succeeded with partial data');
-          return result;
-        }
-
-        // If all critical data failed, throw the original error
-        throw parallelError;
+        console.log('Sequential fallback succeeded');
+        return result;
       } catch (sequentialError) {
         console.error('Sequential fallback also failed:', sequentialError);
         throw parallelError; // Throw the original parallel error

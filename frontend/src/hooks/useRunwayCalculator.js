@@ -18,7 +18,7 @@ export function useRunwayCalculator(allAccounts, monthlyData, periodMonths = 6, 
     // Default return for empty data
     const emptyResult = {
       cashReserves: 0,
-      cashBreakdown: { checking: 0, savings: 0, manualCash: 0 },
+      cashBreakdown: { checking: 0, savings: 0, manualCash: 0, creditCards: 0 },
       avgMonthlyExpenses: 0,
       avgMonthlyIncome: 0,
       avgMonthlyNet: 0,
@@ -35,11 +35,14 @@ export function useRunwayCalculator(allAccounts, monthlyData, periodMonths = 6, 
     }
 
     // 1. Calculate cash reserves from normalized accounts
-    // Filter for cash accounts: checking, savings, cash (but NOT investments)
+    // Cash accounts: checking, savings, cash (but NOT investments), less what
+    // open on-budget credit cards and lines of credit owe. YNAB card balances
+    // are signed (owed is negative), so adding them nets the debt out.
     // Exclude closed accounts (closed_on field is set)
     let checking = 0;
     let savings = 0;
     let manualCash = 0;
+    let creditCards = 0;
 
     allAccounts.forEach(account => {
       // Skip closed accounts
@@ -55,10 +58,13 @@ export function useRunwayCalculator(allAccounts, monthlyData, periodMonths = 6, 
       } else if (type === 'cash') {
         // Only cash-type accounts count; a manual mortgage or "other" asset isn't spendable cash
         manualCash += balance;
+      } else if (type === 'credit' && account.on_budget === true) {
+        // Manual accounts carry no on_budget flag, so they are left out
+        creditCards += balance;
       }
     });
 
-    const cashReserves = checking + savings + manualCash;
+    const cashReserves = checking + savings + manualCash + creditCards;
 
     // 2. Get historical data for the last N complete months. Including the
     // current partial month would understate the monthly averages.
@@ -94,16 +100,23 @@ export function useRunwayCalculator(allAccounts, monthlyData, periodMonths = 6, 
 
     // 4. Calculate runway months
     // Pure runway: how long cash lasts with zero income (worst case)
-    const pureRunwayMonths = avgMonthlyExpenses > 0
-      ? cashReserves / avgMonthlyExpenses
-      : Infinity;
+    // With no cash (or card debt larger than cash) there is no runway,
+    // whatever the cash flow looks like
+    const hasNoCash = cashReserves <= 0;
+    const pureRunwayMonths = hasNoCash
+      ? 0
+      : avgMonthlyExpenses > 0
+        ? cashReserves / avgMonthlyExpenses
+        : Infinity;
 
     // Net runway: how long cash lasts considering income
     // If income > expenses (positive net), runway is infinite (growing)
     // If expenses > income (negative net), calculate depletion time
-    const netRunwayMonths = avgMonthlyNet >= 0
-      ? Infinity
-      : cashReserves / Math.abs(avgMonthlyNet);
+    const netRunwayMonths = hasNoCash
+      ? 0
+      : avgMonthlyNet >= 0
+        ? Infinity
+        : cashReserves / Math.abs(avgMonthlyNet);
 
     // 5. Generate projection data (single array with both scenarios)
     const maxProjectionMonths = 24;
@@ -126,7 +139,7 @@ export function useRunwayCalculator(allAccounts, monthlyData, periodMonths = 6, 
       let netBalance;
       if (avgMonthlyNet >= 0) {
         // Growing - cap at reasonable display value
-        netBalance = Math.min(cashReserves + (avgMonthlyNet * i), cashReserves * 2);
+        netBalance = Math.max(0, Math.min(cashReserves + (avgMonthlyNet * i), cashReserves * 2));
       } else {
         netBalance = Math.max(0, cashReserves - (Math.abs(avgMonthlyNet) * i));
       }
@@ -149,7 +162,9 @@ export function useRunwayCalculator(allAccounts, monthlyData, periodMonths = 6, 
     // If net runway is infinite (income >= expenses), cash is growing - always excellent
     // Otherwise, base health on pure burn (worst case scenario)
     let runwayHealth = 'excellent';
-    if (!isFinite(netRunwayMonths)) {
+    if (hasNoCash) {
+      runwayHealth = 'critical';
+    } else if (!isFinite(netRunwayMonths)) {
       // Income >= expenses means cash is growing, not depleting
       runwayHealth = 'excellent';
     } else if (pureRunwayMonths < 3) {
@@ -162,7 +177,7 @@ export function useRunwayCalculator(allAccounts, monthlyData, periodMonths = 6, 
 
     return {
       cashReserves,
-      cashBreakdown: { checking, savings, manualCash },
+      cashBreakdown: { checking, savings, manualCash, creditCards },
       avgMonthlyExpenses,
       avgMonthlyIncome,
       historicalAvgMonthlyIncome,
