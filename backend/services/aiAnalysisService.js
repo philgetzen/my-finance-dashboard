@@ -43,7 +43,7 @@ function buildAnalysisPrompt(data) {
       <debt>${formatCurrency(netWorth.debt || 0)}</debt>
     </net_worth>
     <cash_runway>
-      <realistic_months>${runway.netRunwayMonths === Infinity || runway.avgMonthlyNet >= 0 ? 'Not limited by spending (operating cash flow is positive)' : Math.round(runway.netRunwayMonths * 10) / 10}</realistic_months>
+      <realistic_months>${runway.netRunwayMonths === Infinity ? 'Not limited by spending (operating cash flow is positive)' : Math.round(runway.netRunwayMonths * 10) / 10}</realistic_months>
       <monthly_net_cash_flow>${formatCurrency(runway.avgMonthlyNet || 0)}</monthly_net_cash_flow>
       <cash_reserves>${formatCurrency(runway.cashReserves || 0)}</cash_reserves>
       <status>${runway.runwayHealth || 'unknown'}</status>

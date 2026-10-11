@@ -143,7 +143,7 @@ function calculateRunway(accounts, monthlyHistory = []) {
   // Amounts owed on open on-budget cards and credit lines come out of cash
   // (balances are signed: owed is negative, a credit is positive)
   const cardBalance = (accounts || []).reduce((sum, acc) => {
-    if (!acc || acc.closed || !isOnBudget(acc)) return sum;
+    if (!acc || acc.closed || acc.deleted || !isOnBudget(acc)) return sum;
     const accType = (acc.type || '').toLowerCase();
     if (accType !== 'creditcard' && accType !== 'lineofcredit') return sum;
     return sum + (acc.balance || 0) / 1000;

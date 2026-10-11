@@ -293,6 +293,8 @@ function generateNewsletterHtml(data) {
               <div style="font-size: 14px; color: #666; margin-top: 8px;">
                 ${(runway.netRunwayMonths === Infinity || runway.netRunwayMonths > 999) ?
                   `Operating cash flow is positive - spending doesn't limit your runway` :
+                  (runway.cashReserves || 0) <= 0 ?
+                    `Card balances exceed your cash (${formatCurrency(runway.cashReserves || 0)} after credit cards), so there is no runway until they are paid down` :
                   runway.avgMonthlyNet >= 0 ?
                     `Operating cash flow is positive; your reserves are ${formatCurrency(runway.cashReserves || 0)} after credit cards` :
                     `Based on your net monthly spend, your ${formatCurrency(runway.cashReserves || 0)} in cash covers ${formatRunwayMonths(runway.netRunwayMonths || 0)} months`

@@ -45,8 +45,8 @@ export function useRunwayCalculator(allAccounts, monthlyData, periodMonths = 6, 
     let creditCards = 0;
 
     allAccounts.forEach(account => {
-      // Skip closed accounts
-      if (account.closed_on) return;
+      // Skip closed and deleted accounts
+      if (account.closed_on || account.closed === true || account.deleted === true) return;
 
       const type = account.normalizedType;
       const balance = account.balance || 0;
@@ -110,7 +110,7 @@ export function useRunwayCalculator(allAccounts, monthlyData, periodMonths = 6, 
         : Infinity;
 
     // Net runway: how long cash lasts considering income
-    // If income > expenses (positive net), runway is infinite (growing)
+    // If income >= expenses (positive net), spending doesn't run the cash down
     // If expenses > income (negative net), calculate depletion time
     const netRunwayMonths = hasNoCash
       ? 0
@@ -158,20 +158,16 @@ export function useRunwayCalculator(allAccounts, monthlyData, periodMonths = 6, 
       expenses: m.expenses
     }));
 
-    // 7. Determine health status
-    // If net runway is infinite (income >= expenses), cash is growing - always excellent
-    // Otherwise, base health on pure burn (worst case scenario)
+    // 7. Determine health status (same rule as the newsletter)
+    // Grade on the net runway the page headlines. When income covers spending
+    // that runway is not finite, so grade reserves against monthly expenses.
+    const gradedMonths = isFinite(netRunwayMonths) ? netRunwayMonths : pureRunwayMonths;
     let runwayHealth = 'excellent';
-    if (hasNoCash) {
+    if (hasNoCash || gradedMonths < 3) {
       runwayHealth = 'critical';
-    } else if (!isFinite(netRunwayMonths)) {
-      // Income >= expenses means cash is growing, not depleting
-      runwayHealth = 'excellent';
-    } else if (pureRunwayMonths < 3) {
-      runwayHealth = 'critical';
-    } else if (pureRunwayMonths < 6) {
+    } else if (gradedMonths < 6) {
       runwayHealth = 'caution';
-    } else if (pureRunwayMonths < 12) {
+    } else if (gradedMonths < 12) {
       runwayHealth = 'healthy';
     }
 

@@ -36,6 +36,33 @@ describe('negative reserves', () => {
   });
 });
 
+describe('runway health matches the newsletter grading', () => {
+  const monthKey = (back) => {
+    const d = new Date(new Date().getFullYear(), new Date().getMonth() - back, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  };
+  const flow = (income, expenses) => {
+    const data = {};
+    [1, 2, 3].forEach(b => { data[monthKey(b)] = { income, expenses, net: income - expenses }; });
+    return data;
+  };
+  const cash = (balance) => [{ normalizedType: 'checking', balance, on_budget: true, closed_on: null }];
+
+  it('grades a positive cash flow on reserves vs expenses, not excellent by default', () => {
+    // $10k reserves / $5k monthly expenses = 2 months
+    const { result } = renderHook(() => useRunwayCalculator(cash(10000), flow(6000, 5000), 3));
+    expect(result.current.netRunwayMonths).toBe(Infinity);
+    expect(result.current.runwayHealth).toBe('critical');
+  });
+
+  it('grades a negative cash flow on the net runway the page headlines', () => {
+    // $40k reserves; net burn $800/mo = 50 months, worst case $40k / $5k = 8 months
+    const { result } = renderHook(() => useRunwayCalculator(cash(40000), flow(4200, 5000), 3));
+    expect(result.current.netRunwayMonths).toBe(50);
+    expect(result.current.runwayHealth).toBe('excellent');
+  });
+});
+
 describe('clearScenario', () => {
   beforeEach(() => localStorage.clear());
   it('persists incomeEdited:false explicitly', async () => {

@@ -548,6 +548,32 @@ describe('newsletter metrics', () => {
       assert.doesNotMatch(text, /unlimited runway|runway is infinite|reserves (are|continues?) (to )?grow|Infinite \(positive/i);
     }
   });
+
+  test('card debt larger than cash is never described as runway not limited by spending', () => {
+    const { metrics, trends } = run(steadyBudget());
+    const small = [
+      { id: 'checking', name: 'Checking', type: 'checking', on_budget: true, balance: 5000000 },
+      { id: 'card', name: 'Chase Card', type: 'creditCard', on_budget: true, balance: -8000000 }
+    ];
+    const { runway } = calculateAllMetrics({ accounts: small, transactions: steadyBudget(), categories }, { today: '2026-10-02', cspSettings: {} });
+    assert.ok(runway.avgMonthlyNet >= 0);
+    const negative = { ...metrics, runway };
+    const prompt = buildAnalysisPrompt({ metrics: negative, trends });
+    const html = generateNewsletterHtml({ metrics: negative, trends, aiAnalysis: null, weekEnding: 'October 9, 2026' });
+
+    assert.doesNotMatch(prompt, /Not limited by spending/);
+    assert.match(prompt, /<realistic_months>0<\/realistic_months>/);
+    assert.match(html, /Card balances exceed your cash/);
+  });
+
+  test('deleted card accounts do not count against cash reserves', () => {
+    const accounts = [
+      { id: 'checking', name: 'Checking', type: 'checking', on_budget: true, balance: 10000000 },
+      { id: 'gone', name: 'Old Card', type: 'creditCard', on_budget: true, deleted: true, balance: -4000000 }
+    ];
+    const { runway } = calculateAllMetrics({ accounts, transactions: steadyBudget(), categories }, { today: '2026-10-02', cspSettings: {} });
+    assert.equal(runway.cashReserves, 10000);
+  });
 });
 
 // --------------------------------------------
