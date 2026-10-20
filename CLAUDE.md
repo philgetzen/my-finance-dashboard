@@ -25,7 +25,13 @@ Backend (from `backend/`):
 - `npm start`: start the Express server on port 5001 (`npm run dev` uses nodemon)
 - `npm test`: Node's built-in test runner over `newsletter/` and `services/`
 
-CI (`.github/workflows/tests.yml`) runs backend tests, then frontend lint, tests and build, on every PR and on pushes to main.
+API (from the repo root):
+- `npm run test:api`: Node's test runner over `api/__tests__/` (auth and ownership for every user route)
+
+Firestore rules (from `tests/firestore-rules/`, needs Java):
+- `npm install && npm test`: runs `firestore.rules` against the emulator
+
+CI (`.github/workflows/tests.yml`) runs backend tests, API tests, then frontend lint, tests and build, on every PR and on pushes to main. The rules tests are local-only.
 
 ## Architecture
 
@@ -37,7 +43,8 @@ CI (`.github/workflows/tests.yml`) runs backend tests, then frontend lint, tests
 ### Frontend
 - `src/App.jsx` holds the routes. Pages are in `src/components/pages/`: Dashboard (`/`), Accounts, CashFlow (`/spending`), InvestmentAllocation (`/investments`), Runway, ConsciousSpendingPlan (`/conscious-spending`).
 - `src/contexts/ConsolidatedDataContext.jsx` is the single data provider. Components read it through `useFinanceData()` and `usePrivacy()`. It also handles demo mode, which uses `src/lib/mockData.js`.
-- API calls use `VITE_API_BASE_URL`: empty in production (same origin), `http://localhost:5001` locally. It must be set: `src/lib/ynabApi.js` falls back to localhost, but the direct `fetch` calls in `ConsolidatedDataContext.jsx`, `AuthenticationPage.jsx` and `YNABConnectionCard.jsx` don't. `ynabApi.js` also refreshes the YNAB token on a 401.
+- API calls use `VITE_API_BASE_URL`: empty in production (same origin), `http://localhost:5001` locally. It must be set: `src/lib/ynabApi.js` falls back to localhost, but the calls in `ConsolidatedDataContext.jsx`, `AuthenticationPage.jsx` and `YNABConnectionCard.jsx` don't. `ynabApi.js` also refreshes the YNAB token on a 401.
+- Calls to the user routes (`ynab/token`, `save_token`, `refresh_token`, `disconnect`, `manual_accounts`, `manual_holdings`, `import-altruist-holdings`) go through `src/lib/authFetch.js`, which sends the Firebase ID token. Never send `user_id`; the server takes the user from the token.
 - Page math lives in hooks (`src/hooks/`: `useTransactionProcessor`, `useCategoryProcessor`, `useConsciousSpendingPlan`, `useRunwayCalculator`, `useIncomeScenario`) and in `src/utils/calculations/`.
 - Use the existing card and layout patterns and Tailwind classes. Use `import.meta.env.DEV` / `PROD`, not `process.env`.
 
@@ -46,6 +53,7 @@ Most routes exist twice: as a Vercel function in `api/` (production) and as an E
 - Only `api/` has `manual_holdings`.
 - Only Express has the per-resource paths (`/api/ynab/budgets/:budgetId/accounts` and so on), `/api/debug/env` and `/api/debug/auth-url`.
 - Express's `/api/ynab/budgets?budgetId=&resource=` handler ignores `since_date` (every transaction comes back) and doesn't validate `resource`; `api/` does both.
+- The `api/` user routes require `Authorization: Bearer <Firebase ID token>` (`api/_lib/auth.js`: `withUser`, inside `handleCors`) and use the token's uid. A `user_id` that disagrees gets 403; per-document routes check the owner (`ownerOf`). Express's copies still trust a `user_id` parameter, and the frontend no longer sends one, so those routes don't work against Express. Use `vercel dev` for anything that touches them.
 - Express exposes the newsletter as `/api/newsletter/send`, `/preview`, `/preview-prompt`, `/logs`, `/status` and `/config`, with no auth check. The debug routes return the YNAB client ID and redirect URI. Treat the Express server as local-only.
 
 The production routes in `api/`:

@@ -1,16 +1,17 @@
 const { handleCors } = require('./_lib/cors');
 const { getFirestore } = require('./_lib/firebase');
+const { withUser } = require('./_lib/auth');
 
-async function handler(req, res) {
+async function handler(req, res, uid) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   const db = getFirestore();
-  const { user_id, csvData } = req.body;
+  const { csvData } = req.body || {};
 
-  if (!user_id || !csvData) {
-    return res.status(400).json({ error: 'user_id and csvData are required' });
+  if (!csvData) {
+    return res.status(400).json({ error: 'csvData is required' });
   }
 
   try {
@@ -43,7 +44,7 @@ async function handler(req, res) {
       }
 
       const holding = {
-        userId: user_id,
+        userId: uid,
         source: "AltruistCSV",
         importDate: new Date().toISOString(),
         ticker: values[0],
@@ -63,7 +64,7 @@ async function handler(req, res) {
 
     // Delete existing holdings
     const existingHoldingsQuery = db.collection('user_holdings')
-      .where('userId', '==', user_id)
+      .where('userId', '==', uid)
       .where('source', '==', 'AltruistCSV');
     const existingDocsSnapshot = await existingHoldingsQuery.get();
 
@@ -72,7 +73,7 @@ async function handler(req, res) {
       batchDelete.delete(doc.ref);
     });
     await batchDelete.commit();
-    console.log(`Deleted ${existingDocsSnapshot.size} existing AltruistCSV holdings for user ${user_id}`);
+    console.log(`Deleted ${existingDocsSnapshot.size} existing AltruistCSV holdings for user ${uid}`);
 
     // Add new holdings
     const batchAdd = db.batch();
@@ -91,4 +92,4 @@ async function handler(req, res) {
   }
 }
 
-module.exports = handleCors(handler);
+module.exports = handleCors(withUser(handler));

@@ -4,6 +4,7 @@ import Card from '../ui/Card';
 import Button from '../ui/Button';
 import YNABConnectionCard from '../ui/YNABConnectionCard';
 import { useFinanceData } from '../../contexts/ConsolidatedDataContext';
+import { authFetch } from '../../lib/authFetch';
 
 // Authentication states
 const AUTH_STATES = {
@@ -65,7 +66,7 @@ export default function AuthenticationPage() {
     (async () => {
       try {
         setAuthState(AUTH_STATES.YNAB_CONNECTING);
-        const tokenResponse = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/ynab/token`, {
+        const tokenResponse = await authFetch(`${import.meta.env.VITE_API_BASE_URL}/api/ynab/token`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ code: pendingCode })
