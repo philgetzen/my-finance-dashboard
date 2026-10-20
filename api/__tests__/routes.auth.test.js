@@ -220,3 +220,29 @@ test('POST /api/import-altruist-holdings replaces only the caller\'s Altruist ho
   assert.equal(aliceHoldings.length, 1);
   assert.equal(aliceHoldings[0].ticker, 'VTI');
 });
+
+// A client-SDK write can set userId freely (firestore.rules only checks
+// user_id), so a document whose two ownership fields disagree has no owner.
+test('a document whose userId and user_id disagree is owned by nobody', async () => {
+  seedVictimData();
+  db.seed('manual_accounts', 'acct-conflict', { userId: 'alice', user_id: 'mallory', name: 'Planted' });
+  const put = await call(loadRoute('manual_accounts/[accountId].js'), {
+    method: 'PUT', token: ALICE, query: { accountId: 'acct-conflict' }, body: { account: { name: 'X' } },
+  });
+  assert.equal(put.statusCode, 403);
+  const asMallory = await call(loadRoute('manual_accounts/[accountId].js'), {
+    method: 'DELETE', token: 'Bearer valid:mallory', query: { accountId: 'acct-conflict' },
+  });
+  assert.equal(asMallory.statusCode, 403);
+  assert.ok(db.read('manual_accounts', 'acct-conflict'));
+});
+
+test('list routes omit documents planted with a conflicting user_id', async () => {
+  seedVictimData();
+  db.seed('manual_accounts', 'acct-planted', { userId: 'alice', user_id: 'mallory', name: 'Planted' });
+  db.seed('user_holdings', 'hold-planted', { userId: 'alice', user_id: 'mallory', ticker: 'SCAM' });
+  const accounts = await call(loadRoute('manual_accounts/index.js'), { token: ALICE });
+  const holdings = await call(loadRoute('manual_holdings/index.js'), { token: ALICE });
+  assert.deepEqual(accounts.body.accounts, []);
+  assert.deepEqual(holdings.body.holdings, []);
+});

@@ -1,6 +1,6 @@
 const { handleCors } = require('../_lib/cors');
 const { getFirestore } = require('../_lib/firebase');
-const { withUser } = require('../_lib/auth');
+const { withUser, ownerOf } = require('../_lib/auth');
 
 async function handler(req, res, uid) {
   const db = getFirestore();
@@ -13,7 +13,10 @@ async function handler(req, res, uid) {
 
       const accounts = [];
       snapshot.forEach(doc => {
-        accounts.push({ id: doc.id, ...doc.data() });
+        const data = doc.data();
+        if (ownerOf(data) === uid) {
+          accounts.push({ id: doc.id, ...data });
+        }
       });
 
       res.json({ accounts });

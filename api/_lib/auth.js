@@ -51,10 +51,16 @@ function withUser(handler) {
   };
 }
 
-// Owner of a Firestore document. Server routes write `userId`; older
-// client-written documents use `user_id`.
+// Owner of a Firestore document. Server routes write `userId`; client-written
+// documents use `user_id`, the only field firestore.rules checks. A client can
+// therefore set `userId` freely, so when both are present and disagree the
+// document has no owner.
 function ownerOf(data) {
-  return data?.userId ?? data?.user_id;
+  const { userId, user_id: legacyUserId } = data || {};
+  if (userId !== undefined && legacyUserId !== undefined && userId !== legacyUserId) {
+    return undefined;
+  }
+  return userId ?? legacyUserId;
 }
 
 module.exports = { requireUser, withUser, ownerOf, AuthError };

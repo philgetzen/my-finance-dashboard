@@ -1,4 +1,5 @@
 // YNAB API Service - using backend proxy to avoid CORS issues
+import { authFetch } from './authFetch';
 
 // Helper function for delay
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -68,13 +69,12 @@ class YNABService {
     try {
       console.log('Attempting to refresh YNAB access token...');
 
-      const response = await fetch(`${this.apiBaseUrl}/api/ynab/refresh_token`, {
+      const response = await authFetch(`${this.apiBaseUrl}/api/ynab/refresh_token`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          user_id: this.userId,
           refresh_token: this.refreshToken
         })
       });

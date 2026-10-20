@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useFinanceData } from '../../contexts/ConsolidatedDataContext';
+import { authFetch } from '../../lib/authFetch';
 import { useDemoMode } from '../../hooks/useDemoMode';
 import { DemoModeWarning } from './DemoModeIndicator';
 import Button from './Button';
@@ -115,7 +116,7 @@ export default function YNABConnectionCard({
             const { code } = event.data;
             
             try {
-              const tokenResponse = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/ynab/token`, {
+              const tokenResponse = await authFetch(`${import.meta.env.VITE_API_BASE_URL}/api/ynab/token`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ code })

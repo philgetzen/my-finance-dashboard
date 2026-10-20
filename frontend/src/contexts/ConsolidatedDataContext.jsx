@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../firebase';
+import { authFetch } from '../lib/authFetch';
 import { useYNABData } from '../hooks/useYNABData';
 import { ErrorBoundary } from 'react-error-boundary';
 import { 
@@ -310,8 +311,8 @@ export const FinanceDataProvider = ({ children }) => {
           setIsAutoConnectingYNAB(true);
 
           const [tokenResult, accountsResult] = await Promise.allSettled([
-            fetch(`${import.meta.env.VITE_API_BASE_URL}/api/ynab/token?user_id=${currentUser.uid}`),
-            fetch(`${import.meta.env.VITE_API_BASE_URL}/api/manual_accounts?user_id=${currentUser.uid}`)
+            authFetch(`${import.meta.env.VITE_API_BASE_URL}/api/ynab/token`),
+            authFetch(`${import.meta.env.VITE_API_BASE_URL}/api/manual_accounts`)
           ]);
 
           // Handle YNAB token response
@@ -421,11 +422,10 @@ export const FinanceDataProvider = ({ children }) => {
     if (!user) return;
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/ynab/save_token`, {
+      const response = await authFetch(`${import.meta.env.VITE_API_BASE_URL}/api/ynab/save_token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          user_id: user.uid,
           access_token: accessToken,
           refresh_token: refreshToken
         })
@@ -445,10 +445,8 @@ export const FinanceDataProvider = ({ children }) => {
     if (!user) return;
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/ynab/disconnect`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: user.uid })
+      const response = await authFetch(`${import.meta.env.VITE_API_BASE_URL}/api/ynab/disconnect`, {
+        method: 'DELETE'
       });
 
       if (response.ok) {
@@ -466,10 +464,10 @@ export const FinanceDataProvider = ({ children }) => {
     if (!user) return;
     
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/manual_accounts`, {
+      const response = await authFetch(`${import.meta.env.VITE_API_BASE_URL}/api/manual_accounts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: user.uid, account })
+        body: JSON.stringify({ account })
       });
       
       if (response.ok) {
@@ -484,7 +482,7 @@ export const FinanceDataProvider = ({ children }) => {
 
   const updateManualAccount = useCallback(async (accountId, account) => {
     try {
-      const response = await fetch(
+      const response = await authFetch(
         `${import.meta.env.VITE_API_BASE_URL}/api/manual_accounts/${accountId}`,
         {
           method: 'PUT',
@@ -507,7 +505,7 @@ export const FinanceDataProvider = ({ children }) => {
 
   const deleteManualAccount = useCallback(async (accountId) => {
     try {
-      const response = await fetch(
+      const response = await authFetch(
         `${import.meta.env.VITE_API_BASE_URL}/api/manual_accounts/${accountId}`,
         { method: 'DELETE' }
       );

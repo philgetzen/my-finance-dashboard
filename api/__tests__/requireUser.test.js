@@ -60,3 +60,12 @@ test('withUser passes the verified uid to the handler', async () => {
   assert.equal(res.statusCode, 200);
   assert.equal(seen, 'alice');
 });
+
+test('ownerOf returns undefined when userId and user_id disagree', () => {
+  const { ownerOf } = loadRoute('_lib/auth.js');
+  assert.equal(ownerOf({ userId: 'a', user_id: 'b' }), undefined);
+  assert.equal(ownerOf({ userId: 'a', user_id: 'a' }), 'a');
+  assert.equal(ownerOf({ userId: 'a' }), 'a');
+  assert.equal(ownerOf({ user_id: 'b' }), 'b');
+  assert.equal(ownerOf({}), undefined);
+});
