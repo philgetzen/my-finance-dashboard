@@ -11,7 +11,13 @@ async function handler(req, res, uid) {
   const { accountId } = req.query;
   const docRef = db.collection('manual_accounts').doc(accountId);
 
-  const snapshot = await docRef.get();
+  let snapshot;
+  try {
+    snapshot = await docRef.get();
+  } catch (error) {
+    console.error('Error loading manual account:', error);
+    return res.status(500).json({ error: 'Unable to load manual account' });
+  }
   if (!snapshot.exists) {
     return res.status(404).json({ error: 'Account not found' });
   }

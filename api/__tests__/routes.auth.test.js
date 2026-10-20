@@ -246,3 +246,23 @@ test('list routes omit documents planted with a conflicting user_id', async () =
   assert.deepEqual(accounts.body.accounts, []);
   assert.deepEqual(holdings.body.holdings, []);
 });
+
+// A failed ownership lookup must answer with the usual JSON error, not an
+// unhandled rejection that Vercel turns into a bare 500.
+for (const route of ROUTES.filter((r) => r.path.includes('['))) {
+  test(`${route.name} returns a JSON 500 when the ownership lookup fails`, async () => {
+    seedVictimData();
+    const realCollection = db.collection;
+    db.collection = (name) => {
+      const col = realCollection(name);
+      return { ...col, doc: (id) => ({ ...col.doc(id), get: async () => { throw new Error('UNAVAILABLE'); } }) };
+    };
+    try {
+      const res = await call(loadRoute(route.path), { ...route, token: ALICE });
+      assert.equal(res.statusCode, 500);
+      assert.equal(typeof res.body.error, 'string');
+    } finally {
+      db.collection = realCollection;
+    }
+  });
+}
