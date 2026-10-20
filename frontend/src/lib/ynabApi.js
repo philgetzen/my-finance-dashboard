@@ -12,7 +12,7 @@ class YNABService {
     this.isRefreshing = false;
     this.refreshPromise = null;
     // Use empty string for same-domain in production, localhost for development
-    this.apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5001';
+    this.apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000';
     this.maxRetries = 3;
     this.baseRetryDelay = 1000; // 1 second
   }
