@@ -69,6 +69,6 @@ Every route is a Vercel function in `api/`; `vercel dev` runs the same files loc
 - **Frontend** (`frontend/.env`, from `frontend/.env.example`): `VITE_API_BASE_URL` and the `VITE_FIREBASE_*` keys
 - **API and newsletter** (Vercel project env vars; `vercel dev` loads the development set, and `vercel env pull .env.local` copies them to disk):
   - Firebase Admin credentials: `FIREBASE_PROJECT_ID`, `FIREBASE_PRIVATE_KEY`, `FIREBASE_CLIENT_EMAIL` and the related fields
-  - YNAB OAuth: `YNAB_CLIENT_ID`, `YNAB_CLIENT_SECRET`, `YNAB_REDIRECT_URI` (locally `http://localhost:5173/auth/ynab/callback`; as of 2026-10-20 the Vercel Development env doesn't set it, so `api/ynab/auth` builds a URL with `redirect_uri=undefined` under `vercel dev`)
+  - YNAB OAuth: `YNAB_CLIENT_ID`, `YNAB_CLIENT_SECRET`, `YNAB_REDIRECT_URI` (locally `http://localhost:5173/auth/ynab/callback`)
   - Newsletter: `ANTHROPIC_API_KEY`, `RESEND_API_KEY`, `NEWSLETTER_FROM_EMAIL`, `NEWSLETTER_RECIPIENTS`, `NEWSLETTER_TIMEZONE`, `FRONTEND_URL`, `CRON_SECRET`
 - Never commit credentials. `.env` files and the service-account JSON are gitignored.
