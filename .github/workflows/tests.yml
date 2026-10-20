@@ -30,6 +30,19 @@ jobs:
           # Node 24 can. Turn it off so tests fail the way a deploy would.
           NODE_OPTIONS: --no-experimental-require-module
 
+  api:
+    name: API auth tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci --ignore-scripts
+      - run: npm run test:api
+
   frontend:
     name: Frontend lint, tests and build
     runs-on: ubuntu-latest

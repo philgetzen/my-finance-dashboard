@@ -42,3 +42,4 @@ yarn-debug.log*
 
 # Per-machine Claude config
 .claude/
+tests/firestore-rules/node_modules

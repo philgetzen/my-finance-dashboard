@@ -1,0 +1,12 @@
+{
+  "name": "firestore-rules-tests",
+  "private": true,
+  "description": "Security-rule tests for firestore.rules. Run: npm test (starts the Firestore emulator; needs Java).",
+  "scripts": {
+    "test": "firebase emulators:exec --only firestore --project demo-healthywealth --config ../../firebase.json \"node --test rules.test.mjs\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^4.0.1",
+    "firebase": "^11.0.0"
+  }
+}
