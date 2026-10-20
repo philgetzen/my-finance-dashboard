@@ -1,22 +1,17 @@
 const { handleCors } = require('../_lib/cors');
 const { getFirestore } = require('../_lib/firebase');
+const { withUser } = require('../_lib/auth');
 
-async function handler(req, res) {
+async function handler(req, res, uid) {
   if (req.method !== 'DELETE') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { user_id } = req.body;
-
-  if (!user_id) {
-    return res.status(400).json({ error: 'user_id is required' });
-  }
-
   try {
     const db = getFirestore();
-    await db.collection('ynab_tokens').doc(user_id).delete();
+    await db.collection('ynab_tokens').doc(uid).delete();
 
-    console.log('Successfully disconnected YNAB for user:', user_id);
+    console.log('Successfully disconnected YNAB for user:', uid);
     res.json({ success: true, message: 'YNAB disconnected successfully' });
   } catch (error) {
     console.error('Error disconnecting YNAB:', error);
@@ -24,4 +19,4 @@ async function handler(req, res) {
   }
 }
 
-module.exports = handleCors(handler);
+module.exports = handleCors(withUser(handler));

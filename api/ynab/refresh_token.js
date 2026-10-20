@@ -1,21 +1,22 @@
 const { handleCors } = require('../_lib/cors');
 const { getFirestore } = require('../_lib/firebase');
+const { withUser } = require('../_lib/auth');
 const { YNAB_CONFIG } = require('../_lib/ynab');
 const axios = require('axios');
 
-async function handler(req, res) {
+async function handler(req, res, uid) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { user_id, refresh_token } = req.body;
+  const { refresh_token } = req.body || {};
 
-  if (!user_id || !refresh_token) {
-    return res.status(400).json({ error: 'user_id and refresh_token are required' });
+  if (!refresh_token) {
+    return res.status(400).json({ error: 'refresh_token is required' });
   }
 
   console.log('=== TOKEN REFRESH REQUEST ===');
-  console.log('User ID:', user_id);
+  console.log('User ID:', uid);
 
   try {
     const tokenPayload = {
@@ -37,13 +38,13 @@ async function handler(req, res) {
 
     // Update tokens in Firestore
     const db = getFirestore();
-    await db.collection('ynab_tokens').doc(user_id).set({
+    await db.collection('ynab_tokens').doc(uid).set({
       access_token,
       refresh_token: new_refresh_token,
       updated_at: new Date().toISOString()
     });
 
-    console.log('Token refresh successful for user:', user_id);
+    console.log('Token refresh successful for user:', uid);
 
     return res.json({
       access_token,
@@ -74,4 +75,4 @@ async function handler(req, res) {
   }
 }
 
-module.exports = handleCors(handler);
+module.exports = handleCors(withUser(handler));

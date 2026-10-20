@@ -1,20 +1,15 @@
 const { handleCors } = require('../_lib/cors');
 const { getFirestore } = require('../_lib/firebase');
+const { withUser } = require('../_lib/auth');
 const { YNAB_CONFIG } = require('../_lib/ynab');
 const axios = require('axios');
 
-async function handler(req, res) {
+async function handler(req, res, uid) {
   // GET - Retrieve stored token
   if (req.method === 'GET') {
-    const { user_id } = req.query;
-
-    if (!user_id) {
-      return res.status(400).json({ error: 'user_id is required' });
-    }
-
     try {
       const db = getFirestore();
-      const doc = await db.collection('ynab_tokens').doc(user_id).get();
+      const doc = await db.collection('ynab_tokens').doc(uid).get();
 
       if (!doc.exists) {
         return res.json({ access_token: null, refresh_token: null });
@@ -96,4 +91,4 @@ async function handler(req, res) {
   return res.status(405).json({ error: 'Method not allowed' });
 }
 
-module.exports = handleCors(handler);
+module.exports = handleCors(withUser(handler));
