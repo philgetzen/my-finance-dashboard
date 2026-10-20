@@ -27,7 +27,7 @@ The dashboard and the newsletter use the same rules for what counts as income, s
 
 - **Frontend** (`frontend/`): React, Vite, Tailwind CSS and Recharts
 - **API** (`api/`): Vercel serverless functions for YNAB OAuth and data, manual accounts and holdings, and the newsletter
-- **Local backend** (`backend/`): an Express server that serves the same routes during development, plus the newsletter code
+- **Newsletter code** (`backend/`): the metrics, email template, AI insights and sending that `api/newsletter.js` runs
 - **Data**: the YNAB API, with Firebase for Google sign-in and Firestore for tokens, manual accounts and settings
 - **Hosting**: Vercel, which also runs the newsletter on a weekly cron
 
@@ -38,15 +38,16 @@ The dashboard and the newsletter use the same rules for what counts as income, s
 - Node.js 22 or later
 - A Firebase project with Google sign-in and Firestore enabled
 - A YNAB account and a YNAB OAuth app (optional; demo mode works without one)
+- The [Vercel CLI](https://vercel.com/docs/cli), with the repo linked to a Vercel project (`vercel link`)
 
 ### Setup
 
-1. **Backend** (from `backend/`):
+1. **API** (from the repo root):
    ```bash
    npm install
-   npm start
+   vercel dev
    ```
-   It runs on port 5001.
+   It serves the `api/` functions on port 3000, the same code that runs in production.
 
 2. **Frontend** (from `frontend/`):
    ```bash
@@ -56,13 +57,13 @@ The dashboard and the newsletter use the same rules for what counts as income, s
 
 ### Environment Variables
 
-Copy `frontend/.env.example` to `frontend/.env` and fill in the `VITE_FIREBASE_*` keys from your Firebase project. Keep `VITE_API_BASE_URL=http://localhost:5001`; the frontend needs it set to reach the local backend.
+Copy `frontend/.env.example` to `frontend/.env` and fill in the `VITE_FIREBASE_*` keys from your Firebase project. Keep `VITE_API_BASE_URL=http://localhost:3000`; the frontend needs it set to reach `vercel dev`.
 
-Copy `backend/.env.example` to `backend/.env`. The backend needs Firebase Admin credentials, either as `FIREBASE_*` variables or a `backend/firebaseServiceAccount.json` file, plus `YNAB_CLIENT_ID`, `YNAB_CLIENT_SECRET` and `YNAB_REDIRECT_URI`. The newsletter also needs `ANTHROPIC_API_KEY`, `RESEND_API_KEY`, `NEWSLETTER_FROM_EMAIL` and `NEWSLETTER_RECIPIENTS`.
+The API reads its settings from the Vercel project's environment variables, and `vercel dev` loads the development set. It needs Firebase Admin credentials (`FIREBASE_*`) plus `YNAB_CLIENT_ID`, `YNAB_CLIENT_SECRET` and `YNAB_REDIRECT_URI`. The newsletter also needs `ANTHROPIC_API_KEY`, `RESEND_API_KEY`, `NEWSLETTER_FROM_EMAIL`, `NEWSLETTER_RECIPIENTS` and `CRON_SECRET`. To keep a local copy, run `vercel env pull .env.local`. Locally, `YNAB_REDIRECT_URI` must be `http://localhost:5173/auth/ynab/callback`, and that address must also be registered on the YNAB OAuth app.
 
 ## Testing
 
-Run `npm run lint` and `npm run test:run` in `frontend/`, and `npm test` in `backend/`. GitHub Actions runs all of them, plus a production build, on every pull request.
+Run `npm run lint` and `npm run test:run` in `frontend/`, `npm test` in `backend/`, and `npm run test:api` at the repo root. GitHub Actions runs all of them, plus a production build, on every pull request.
 
 ## Development
 

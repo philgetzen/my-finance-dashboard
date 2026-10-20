@@ -7,8 +7,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 HealthyWealth is a personal finance dashboard built on YNAB. It reads accounts, transactions and categories from the YNAB API, adds manual accounts and holdings, and shows net worth, cash flow, runway, investments and a Conscious Spending Plan (CSP). A weekly email newsletter summarizes the same numbers.
 
 - **Frontend** (`frontend/`): React 19, Vite 6, Tailwind CSS 3, Recharts, TanStack Query, React Router 7
-- **API in production** (`api/`): Vercel serverless functions
-- **API for local development** (`backend/`): an Express server on port 5001 serving the same routes, plus the newsletter code
+- **API** (`api/`): Vercel serverless functions, in production and locally through `vercel dev`
+- **Newsletter code** (`backend/`): the metrics, template, AI and email modules `api/newsletter.js` loads. There is no server here.
 - **Shared rules** (`shared/`): the cash-flow classifier both the dashboard and the newsletter use
 - **Auth and storage**: Firebase Auth (Google sign-in) and Firestore
 - **Deploy**: Vercel (`vercel.json`), at healthywealth.philgetzen.com
@@ -21,12 +21,12 @@ Frontend (from `frontend/`):
 - `npm run lint`: ESLint (CI fails on errors; warnings are allowed)
 - `npm run test:run`: Vitest, single run (`npm test` watches)
 
-Backend (from `backend/`):
-- `npm start`: start the Express server on port 5001 (`npm run dev` uses nodemon)
-- `npm test`: Node's built-in test runner over `newsletter/` and `services/`
-
 API (from the repo root):
+- `vercel dev`: serve the `api/` functions on port 3000, with the linked Vercel project's development env vars. Run the frontend's `npm run dev` alongside it. Don't add a root `dev` script that calls `vercel dev`: `vercel dev` runs that script itself and refuses to recurse.
 - `npm run test:api`: Node's test runner over `api/__tests__/` (auth and ownership for every user route)
+
+Backend (from `backend/`):
+- `npm test`: Node's built-in test runner over `newsletter/` and `services/`
 
 Firestore rules (from `tests/firestore-rules/`, needs Java):
 - `npm install && npm test`: runs `firestore.rules` against the emulator
@@ -43,20 +43,14 @@ CI (`.github/workflows/tests.yml`) runs backend tests, API tests, then frontend 
 ### Frontend
 - `src/App.jsx` holds the routes. Pages are in `src/components/pages/`: Dashboard (`/`), Accounts, CashFlow (`/spending`), InvestmentAllocation (`/investments`), Runway, ConsciousSpendingPlan (`/conscious-spending`).
 - `src/contexts/ConsolidatedDataContext.jsx` is the single data provider. Components read it through `useFinanceData()` and `usePrivacy()`. It also handles demo mode, which uses `src/lib/mockData.js`.
-- API calls use `VITE_API_BASE_URL`: empty in production (same origin), `http://localhost:5001` locally. It must be set: `src/lib/ynabApi.js` falls back to localhost, but the calls in `ConsolidatedDataContext.jsx`, `AuthenticationPage.jsx` and `YNABConnectionCard.jsx` don't. `ynabApi.js` also refreshes the YNAB token on a 401.
+- API calls use `VITE_API_BASE_URL`: empty in production (same origin), `http://localhost:3000` (`vercel dev`) locally. It must be set: `src/lib/ynabApi.js` falls back to localhost, but the calls in `ConsolidatedDataContext.jsx`, `AuthenticationPage.jsx` and `YNABConnectionCard.jsx` don't. `ynabApi.js` also refreshes the YNAB token on a 401.
 - Calls to the user routes (`ynab/token`, `save_token`, `refresh_token`, `disconnect`, `manual_accounts`, `manual_holdings`, `import-altruist-holdings`) go through `src/lib/authFetch.js`, which sends the Firebase ID token. Never send `user_id`; the server takes the user from the token.
 - Page math lives in hooks (`src/hooks/`: `useTransactionProcessor`, `useCategoryProcessor`, `useConsciousSpendingPlan`, `useRunwayCalculator`, `useIncomeScenario`) and in `src/utils/calculations/`.
 - Use the existing card and layout patterns and Tailwind classes. Use `import.meta.env.DEV` / `PROD`, not `process.env`.
 
 ### API routes
-Most routes exist twice: as a Vercel function in `api/` (production) and as an Express handler in `backend/index.js` (local development). When you change one, change the other. Where they differ:
-- Only `api/` has `manual_holdings`.
-- Only Express has the per-resource paths (`/api/ynab/budgets/:budgetId/accounts` and so on), `/api/debug/env` and `/api/debug/auth-url`.
-- Express's `/api/ynab/budgets?budgetId=&resource=` handler ignores `since_date` (every transaction comes back) and doesn't validate `resource`; `api/` does both.
-- The `api/` user routes require `Authorization: Bearer <Firebase ID token>` (`api/_lib/auth.js`: `withUser`, inside `handleCors`) and use the token's uid. A `user_id` that disagrees gets 403; per-document routes check the owner (`ownerOf`). Express's copies still trust a `user_id` parameter, and the frontend no longer sends one, so those routes don't work against Express. Use `vercel dev` for anything that touches them.
-- Express exposes the newsletter as `/api/newsletter/send`, `/preview`, `/preview-prompt`, `/logs`, `/status` and `/config`, with no auth check. The debug routes return the YNAB client ID and redirect URI. Treat the Express server as local-only.
-
-The production routes in `api/`:
+Every route is a Vercel function in `api/`; `vercel dev` runs the same files locally. (An Express copy in `backend/index.js` was removed in October 2026.)
+- The user routes require `Authorization: Bearer <Firebase ID token>` (`api/_lib/auth.js`: `withUser`, inside `handleCors`) and use the token's uid. A `user_id` that disagrees gets 403; per-document routes check the owner (`ownerOf`).
 - `api/ynab/`: OAuth (`auth`, `token`, `save_token`, `refresh_token`, `disconnect`) and YNAB data. `budgets/index.js` lists budgets, or proxies `?budgetId=&resource=accounts|transactions|categories|months|scheduled_transactions` (plus `since_date` for transactions).
 - `api/manual_accounts/`, `api/manual_holdings/`, `api/import-altruist-holdings.js`: manual data
 - `api/newsletter.js`: the weekly email. `?action=cron` (Vercel cron, Saturdays 17:00 UTC), `?action=preview&user_id=`, or POST to send. Every action needs `Authorization: Bearer $CRON_SECRET`.
@@ -73,8 +67,8 @@ The production routes in `api/`:
 ## Configuration
 
 - **Frontend** (`frontend/.env`, from `frontend/.env.example`): `VITE_API_BASE_URL` and the `VITE_FIREBASE_*` keys
-- **API and backend** (Vercel env vars, or `backend/.env` from `backend/.env.example` locally):
-  - Firebase Admin credentials: `FIREBASE_PROJECT_ID`, `FIREBASE_PRIVATE_KEY`, `FIREBASE_CLIENT_EMAIL` and the related fields. The local backend can use `backend/firebaseServiceAccount.json` instead.
-  - YNAB OAuth: `YNAB_CLIENT_ID`, `YNAB_CLIENT_SECRET`, `YNAB_REDIRECT_URI`
+- **API and newsletter** (Vercel project env vars; `vercel dev` loads the development set, and `vercel env pull .env.local` copies them to disk):
+  - Firebase Admin credentials: `FIREBASE_PROJECT_ID`, `FIREBASE_PRIVATE_KEY`, `FIREBASE_CLIENT_EMAIL` and the related fields
+  - YNAB OAuth: `YNAB_CLIENT_ID`, `YNAB_CLIENT_SECRET`, `YNAB_REDIRECT_URI` (locally `http://localhost:5173/auth/ynab/callback`; as of 2026-10-20 the Vercel Development env doesn't set it, so `api/ynab/auth` builds a URL with `redirect_uri=undefined` under `vercel dev`)
   - Newsletter: `ANTHROPIC_API_KEY`, `RESEND_API_KEY`, `NEWSLETTER_FROM_EMAIL`, `NEWSLETTER_RECIPIENTS`, `NEWSLETTER_TIMEZONE`, `FRONTEND_URL`, `CRON_SECRET`
 - Never commit credentials. `.env` files and the service-account JSON are gitignored.
