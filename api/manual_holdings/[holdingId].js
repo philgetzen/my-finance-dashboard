@@ -11,7 +11,13 @@ async function handler(req, res, uid) {
   const { holdingId } = req.query;
   const docRef = db.collection('user_holdings').doc(holdingId);
 
-  const snapshot = await docRef.get();
+  let snapshot;
+  try {
+    snapshot = await docRef.get();
+  } catch (error) {
+    console.error('Error loading manual holding:', error);
+    return res.status(500).json({ error: 'Unable to load manual holding' });
+  }
   if (!snapshot.exists) {
     return res.status(404).json({ error: 'Holding not found' });
   }
